@@ -1,0 +1,108 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    // Treat users with no status field (registered before this feature) as active
+    function isActiveUser() {
+      let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return isAuthenticated()
+        && userData.get('status', 'active') == 'active';
+    }
+
+    // ── Users ──────────────────────────────────────────────────────────────
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+
+      // First-time registration: status must be 'pending', isAdmin must be false
+      allow create: if isOwner(uid)
+        && request.resource.data.isAdmin == false
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasAll([
+             'name', 'street', 'streetNumber', 'address',
+             'addressNormalized', 'isAdmin', 'status', 'createdAt'
+           ]);
+
+      // User can update profile but cannot change isAdmin or status themselves
+      allow update: if (isOwner(uid)
+          && request.resource.data.isAdmin == resource.data.isAdmin
+          && request.resource.data.get('status', 'active') == resource.data.get('status', 'active'))
+        || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // ── Addresses ──────────────────────────────────────────────────────────
+    match /addresses/{addressKey} {
+      allow read: if true;
+
+      allow create: if isAuthenticated()
+        && request.resource.data.uids is list
+        && request.resource.data.uids.size() == 1
+        && request.resource.data.uids[0] == request.auth.uid;
+
+      allow update: if (isAuthenticated()
+          && resource.data.uids.size() < 2
+          && request.resource.data.uids.hasAll(resource.data.uids)
+          && request.resource.data.uids.size() == resource.data.uids.size() + 1
+          && !resource.data.uids.hasAny([request.auth.uid]))
+        || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    // ── Mail ───────────────────────────────────────────────────────────────
+    // Written by the app on new registration; read/processed by the extension.
+    match /mail/{docId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if false;
+    }
+
+    // ── Courts ─────────────────────────────────────────────────────────────
+    match /courts/{courtId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ── Reservations ───────────────────────────────────────────────────────
+    match /reservations/{reservationId} {
+      allow read: if isAuthenticated();
+
+      // Only active (approved) users can create reservations
+      allow create: if isActiveUser()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'active'
+        && request.resource.data.keys().hasAll([
+             'courtId', 'userId', 'userName', 'date',
+             'startTime', 'endTime', 'durationHours', 'status', 'createdAt'
+           ]);
+
+      allow update: if (
+          isOwner(resource.data.userId)
+          && resource.data.status == 'active'
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.userId      == resource.data.userId
+          && request.resource.data.courtId     == resource.data.courtId
+          && request.resource.data.date        == resource.data.date
+          && request.resource.data.startTime   == resource.data.startTime
+          && request.resource.data.endTime     == resource.data.endTime
+          && request.resource.data.durationHours == resource.data.durationHours
+        ) || isAdmin();
+
+      allow delete: if false;
+    }
+  }
+}
