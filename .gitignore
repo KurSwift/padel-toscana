@@ -35,3 +35,8 @@ out/
 .vscode/
 .idea/
 *.iml
+
+# Playwright (npm run test:e2e) — reportes/artefactos de corridas locales
+test-results/
+playwright-report/
+blob-report/
