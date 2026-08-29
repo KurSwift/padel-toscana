@@ -9,6 +9,7 @@ node_modules/
 # Firebase CLI debug files
 firebase-debug.log
 firebase-debug.*.log
+firestore-debug.log
 ui-debug.log
 
 # Firebase emulator local data + downloaded binaries

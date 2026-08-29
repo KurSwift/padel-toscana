@@ -119,7 +119,9 @@ npm run dev                        # terminal 2
 
 - **`npm run emulators`** (`firebase emulators:start`) requiere Java (JRE)
   para el emulador de Firestore. Persiste datos entre corridas en
-  `.emulator-data/` (gitignored) vía `--import`/`--export-on-exit`.
+  `.emulator-data/` (gitignored) vía `--import`/`--export-on-exit`. El
+  emulador de Hosting corre en el puerto `5050` (no `5000`) porque en macOS
+  el `5000` suele estar tomado por AirPlay Receiver.
 - **`npm run seed`** (`scripts/seed.mjs`) usa `firebase-admin` apuntado
   explícitamente a los puertos del emulador — nunca toca producción. Crea
   usuarios de Auth con `uid` fijo y su perfil correspondiente en Firestore
