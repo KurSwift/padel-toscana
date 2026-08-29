@@ -8,14 +8,17 @@ tocar código:
   cliente + `firestore.rules`, deben mantenerse en sync).
 - **[CONTEXT.md](./CONTEXT.md)** — el dominio: qué es Padel Toscana, roles,
   flujo de registro/aprobación, flujo de reservación, modelo de datos, y los
-  gaps conocidos (sin Cloud Functions, sin tests, la extensión de correo no
-  está declarada en `firebase.json`).
+  gaps conocidos (sin Cloud Functions, la extensión de correo no está
+  declarada en `firebase.json`).
 
 ## Notas específicas para trabajar en este repo con Claude Code
 
-- **No hay test suite ni lint script.** El único gate es `npm run build`
-  (type-check con `tsc -b` en modo estricto + build de Vite). Córrelo antes
-  de dar por terminado un cambio en `src/`.
+- **No hay lint script.** Los gates son `npm run build` (type-check con
+  `tsc -b` en modo estricto + build de Vite) y `npm run test` (Vitest, para
+  la lógica de negocio pura en `src/services/reservationRules.ts` y
+  `src/utils/time.ts`). Córrelos antes de dar por terminado un cambio en
+  `src/`. Si agregas una validación de negocio nueva, prefiere escribirla
+  como función pura testeable (ver AGENTS.md) y agrega sus tests ahí mismo.
 - **Prueba y desarrolla contra los emuladores, no producción.** `cp
   .env.local.example .env.local`, `npm run emulators` + `npm run seed` (ver
   AGENTS.md, sección "Emuladores, seeds y push-to-prod"). El emulador de

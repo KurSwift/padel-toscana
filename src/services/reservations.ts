@@ -12,6 +12,7 @@ import {
 import { db } from '@/firebase'
 import { Court, Reservation } from '@/types'
 import { addHours } from '@/utils/time'
+import { hasOverlap, countOccupyingReservations } from '@/services/reservationRules'
 
 const ERRORS: Record<string, string> = {
   'slot-taken': 'Este horario ya fue reservado. Elige otro.',
@@ -45,7 +46,8 @@ export async function createReservation(params: {
       where('status', '==', 'active'),
     ),
   )
-  if (userSnap.size >= court.settings.maxActiveReservationsPerUser) {
+  const userReservations = userSnap.docs.map((d) => d.data() as Reservation)
+  if (countOccupyingReservations(userReservations) >= court.settings.maxActiveReservationsPerUser) {
     throw new Error('max-reservations')
   }
 
@@ -59,7 +61,7 @@ export async function createReservation(params: {
     ),
   )
   const existing = daySnap.docs.map((d) => d.data() as Reservation)
-  if (existing.some((r) => startTime < r.endTime && endTime > r.startTime)) {
+  if (hasOverlap(existing, startTime, endTime)) {
     throw new Error('slot-taken')
   }
 

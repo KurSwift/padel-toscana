@@ -20,13 +20,15 @@ npm run preview     # sirve el build de producción localmente
 npm run emulators   # Auth + Firestore emulators (requiere Java)
 npm run seed        # prepobla el emulador con datos de ejemplo
 npm run push-to-prod  # migra colecciones seleccionadas emulador → producción (dry-run por default)
+npm run test        # corre la suite de Vitest una vez (CI-friendly)
+npm run test:watch  # Vitest en modo watch, para desarrollo
 ```
 
-No hay lint script ni test runner configurados en `package.json`. El único
-gate de calidad automatizado es el type-check que corre `tsc -b` como parte
-de `npm run build` (strict mode, `noUnusedLocals`, `noUnusedParameters`
-activos en `tsconfig.app.json`) — corre `npm run build` antes de dar por
-terminado un cambio no trivial.
+No hay lint script configurado en `package.json`. Los gates de calidad
+automatizados son: el type-check que corre `tsc -b` como parte de
+`npm run build` (strict mode, `noUnusedLocals`, `noUnusedParameters` activos
+en `tsconfig.app.json`), y `npm run test` (Vitest) para la lógica de negocio
+pura. Corre ambos antes de dar por terminado un cambio no trivial.
 
 `firebase-tools` y `firebase-admin` están como devDependencies (no hace
 falta instalar nada global). El proyecto está enlazado vía `.firebaserc`
@@ -52,6 +54,7 @@ src/
   hooks/useCourtData     # combina cancha activa + reservaciones del día + reservaciones del usuario
   types/index.ts         # shapes de Firestore (UserProfile, Court, Reservation...) — fuente de verdad de tipos
   utils/time.ts          # helpers de fecha/hora en formato 'HH:mm' / 'YYYY-MM-DD' (strings, no Date en el modelo)
+  services/reservationRules.ts  # lógica pura de reservaciones (sin imports de firebase/*), testeada con Vitest
 scripts/
   seed.mjs               # prepobla el emulador (firebase-admin, nunca toca producción)
   push-to-prod.mjs        # migra colecciones seleccionadas emulador → producción
@@ -87,6 +90,14 @@ Alias de import: `@/` → `src/` (configurado en `vite.config.ts` y
 - **Tailwind** con la paleta custom `brand` (verde, ver
   `tailwind.config.js`) — usa `brand-*` para acentos de marca en vez de
   `green-*` de Tailwind por defecto, para mantener consistencia.
+- **Lógica de negocio pura (sin efectos secundarios de Firestore) va en
+  archivos separados** de los servicios que hacen I/O — ver
+  `src/services/reservationRules.ts` como ejemplo (`hasOverlap`,
+  `countOccupyingReservations`). Esto permite testearla con Vitest sin
+  inicializar Firebase/App Check. Al agregar una validación de negocio
+  nueva, prefiere extraerla como función pura ahí (o en un archivo similar)
+  en vez de dejarla inline dentro de una función que también hace `await`
+  a Firestore.
 - **Documenta cada función nueva** (qué recibe, qué hace, qué devuelve, y
   cualquier efecto secundario o invariante no obvio — p. ej. que valida
   contra `firestore.rules`, que es parte de una transacción, etc.) con un
