@@ -17,8 +17,12 @@ tocar código:
   `tsc -b` en modo estricto + build de Vite) y `npm run test` (Vitest, para
   la lógica de negocio pura en `src/services/reservationRules.ts` y
   `src/utils/time.ts`). Córrelos antes de dar por terminado un cambio en
-  `src/`. Si agregas una validación de negocio nueva, prefiere escribirla
-  como función pura testeable (ver AGENTS.md) y agrega sus tests ahí mismo.
+  `src/`.
+- **Toda lógica de negocio nueva o modificada lleva tests de Vitest — no es
+  opcional.** Si la validación vive dentro de una función async que hace
+  `await` a Firestore, extrae la parte pura (decisión/validación) a una
+  función testeable por separado (ver AGENTS.md) y testea esa función. No
+  des una tarea por terminada con lógica de negocio sin cobertura.
 - **Prueba y desarrolla contra los emuladores, no producción.** `cp
   .env.local.example .env.local`, `npm run emulators` + `npm run seed` (ver
   AGENTS.md, sección "Emuladores, seeds y push-to-prod"). El emulador de

@@ -40,6 +40,12 @@ falta instalar nada global). El proyecto está enlazado vía `.firebaserc`
   `main`. Al terminar y verificar el cambio (`npm run build` limpio, feature
   probada), se abre un **Pull Request** para revisión, en vez de mergear
   directo.
+- **Toda lógica de negocio nueva o modificada lleva tests de Vitest** antes
+  de dar la tarea por terminada — no es opcional. Si la lógica no es pura
+  (hace `await` a Firestore), extrae la parte de decisión/validación a una
+  función pura testeable (ver "Lógica de negocio pura..." en Convenciones)
+  y testea esa función; no dejes una validación de negocio sin cobertura
+  solo porque vive dentro de una función async.
 
 ## Estructura
 
