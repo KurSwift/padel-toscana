@@ -58,7 +58,7 @@ function isValidInput(data: unknown): data is CreateReservationInput {
 }
 
 export const createReservation = onCall(
-  { region: 'us-central1' },
+  { region: 'us-central1', enforceAppCheck: true },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'unauthenticated')

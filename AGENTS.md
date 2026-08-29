@@ -265,6 +265,15 @@ contra producción, hay que tomar el debug token que la consola del navegador
 imprime y registrarlo en **Firebase Console → App Check → Manage debug
 tokens**, o las llamadas a Auth/Firestore fallan con `403`.
 
+**Excepción:** el emulador de Functions sí aplica `enforceAppCheck: true` en
+callables (`createReservation`) — el Admin SDK verifica el token contra el
+backend real de App Check aunque la función corra local, no hay bypass. Un
+debug token registrado (Console o API de `firebaseappcheck.googleapis.com`)
+funciona igual ahí que en producción: el cliente manda
+`X-Firebase-AppCheck` con el JWT que resulta de canjear el debug token, y
+`onCall` lo acepta. Verificado 2026-08-29 contra el emulador local con un
+debug token de prueba (creado y borrado vía API, no quedó registrado).
+
 ## Al agregar features
 
 - Si tocas el modelo de reservaciones/canchas, actualiza `src/types/index.ts`
