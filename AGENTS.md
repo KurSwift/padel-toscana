@@ -226,7 +226,11 @@ tokens**, o las llamadas a Auth/Firestore fallan con `403`.
   primero, luego los servicios, luego la UI — y revisa si hace falta un
   nuevo índice compuesto en `firestore.indexes.json` (Firestore falla en
   runtime con un link para crearlo si falta uno; no lo adivines a mano salvo
-  que puedas verificar el patrón de query).
+  que puedas verificar el patrón de query). Si un cambio de query deja un
+  índice sin uso, quítalo del archivo — pero `firebase deploy --only
+  firestore:indexes` **no borra** el índice ya creado en producción, solo
+  deja de declararlo; si quieres liberar el espacio/costo real hay que
+  borrarlo a mano desde la consola de Firebase.
 - Nuevas reglas de negocio en reservaciones casi siempre necesitan tocar
   tanto `src/services/reservations.ts` como `firestore.rules` (ver sección
   anterior).

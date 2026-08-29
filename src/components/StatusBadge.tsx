@@ -1,8 +1,9 @@
 import { ReservationStatus } from '@/types'
 
 // Copy y color por status — un solo lugar para los 4 estados, reusado por
-// MyReservations, SlotsGrid y (issue 6/7 del épico #10) el panel admin.
-const LABELS: Record<ReservationStatus, string> = {
+// MyReservations, SlotsGrid y AdminPage (selector de status en la pestaña
+// Reservaciones).
+export const RESERVATION_STATUS_LABELS: Record<ReservationStatus, string> = {
   solicitada: 'Pendiente de pago',
   pagada: 'Confirmada',
   cancelada: 'Cancelada',
@@ -21,7 +22,7 @@ export default function StatusBadge({ status }: { status: ReservationStatus }) {
     <span
       className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-medium ${STYLES[status]}`}
     >
-      {LABELS[status]}
+      {RESERVATION_STATUS_LABELS[status]}
     </span>
   )
 }

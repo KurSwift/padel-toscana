@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
-import { Court, CourtSettings, UserProfile, UserRole, Reservation } from '@/types'
+import { Court, CourtSettings, UserProfile, UserRole, Reservation, ReservationStatus } from '@/types'
 import { getAllCourts, updateCourtSettings, toggleCourtActive, createCourt, DEFAULT_COURT_SETTINGS } from '@/services/courts'
 import { getAllUsers, setUserRole, approveUser, rejectUser } from '@/services/users'
 import { canChangeRole } from '@/services/userRules'
 import { MAX_RESERVATION_DURATION_HOURS } from '@/services/reservationRules'
-import { subscribeToAllReservationsByDate, cancelReservation } from '@/services/reservations'
+import { subscribeToAllReservationsByDate, setReservationStatus } from '@/services/reservations'
 import { todayString, addDays, formatDateLong, formatTime } from '@/utils/time'
+import StatusBadge, { RESERVATION_STATUS_LABELS } from '@/components/StatusBadge'
 
 type Tab = 'reservations' | 'courts' | 'users'
 
@@ -81,7 +82,7 @@ export default function AdminPage() {
 function ReservationsTab() {
   const [date, setDate] = useState(todayString())
   const [reservations, setReservations] = useState<Reservation[]>([])
-  const [cancelling, setCancelling] = useState<string | null>(null)
+  const [changing, setChanging] = useState<string | null>(null)
 
   useEffect(() => {
     return subscribeToAllReservationsByDate(date, (r) =>
@@ -89,15 +90,17 @@ function ReservationsTab() {
     )
   }, [date])
 
-  async function handleCancel(id: string) {
-    setCancelling(id)
+  async function handleChangeStatus(r: Reservation, status: ReservationStatus) {
+    if (status === r.status) return
+    setChanging(r.id)
     try {
-      await cancelReservation(id)
-      toast.success('Reservación cancelada.')
+      await setReservationStatus(r.id, status)
+      setReservations((prev) => prev.map((x) => x.id === r.id ? { ...x, status } : x))
+      toast.success(`Reservación de ${r.userName.split(' ')[0]} actualizada a "${RESERVATION_STATUS_LABELS[status]}".`)
     } catch {
-      toast.error('No se pudo cancelar.')
+      toast.error('No se pudo cambiar el status.')
     } finally {
-      setCancelling(null)
+      setChanging(null)
     }
   }
 
@@ -131,9 +134,12 @@ function ReservationsTab() {
           {reservations.map((r) => (
             <div key={r.id} className="bg-white rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-800">
-                  {formatTime(r.startTime)} – {formatTime(r.endTime)}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-gray-800">
+                    {formatTime(r.startTime)} – {formatTime(r.endTime)}
+                  </p>
+                  <StatusBadge status={r.status} />
+                </div>
                 <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
                   <span>{r.userName.split(' ')[0]}</span>
                   <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded text-[10px]">
@@ -141,13 +147,16 @@ function ReservationsTab() {
                   </span>
                 </p>
               </div>
-              <button
-                onClick={() => handleCancel(r.id)}
-                disabled={cancelling === r.id}
-                className="text-xs text-red-500 hover:text-red-600 font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition disabled:opacity-40"
+              <select
+                value={r.status}
+                onChange={(e) => handleChangeStatus(r, e.target.value as ReservationStatus)}
+                disabled={changing === r.id}
+                className="shrink-0 text-xs border border-gray-300 rounded-lg px-2 py-1.5 outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-40"
               >
-                {cancelling === r.id ? '...' : 'Cancelar'}
-              </button>
+                {(Object.keys(RESERVATION_STATUS_LABELS) as ReservationStatus[]).map((s) => (
+                  <option key={s} value={s}>{RESERVATION_STATUS_LABELS[s]}</option>
+                ))}
+              </select>
             </div>
           ))}
         </div>
@@ -413,6 +422,17 @@ function CourtCard({
                 max={168}
                 value={settings.paymentDeadlineHours}
                 onChange={(e) => update({ paymentDeadlineHours: Number(e.target.value) })}
+                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs text-gray-500 mb-1 block">Monto a pagar ($)</span>
+              <input
+                type="number"
+                min={0}
+                max={10000}
+                value={settings.reservationFee}
+                onChange={(e) => update({ reservationFee: Number(e.target.value) })}
                 className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
               />
             </label>
