@@ -9,6 +9,8 @@ import {
   onSnapshot,
   serverTimestamp,
   Timestamp,
+  type QueryDocumentSnapshot,
+  type DocumentData,
 } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { Court, Reservation, ReservationStatus } from '@/types'
@@ -19,6 +21,8 @@ import {
   isDurationWithinHardCap,
   isLeadTimeSufficient,
   isWithinMaxAdvanceWindow,
+  computePaymentDueAt,
+  effectiveStatus,
   OCCUPYING_STATUSES,
 } from '@/services/reservationRules'
 
@@ -35,12 +39,51 @@ export function reservationErrorMessage(code: string): string {
   return ERRORS[code] ?? 'No se pudo crear la reservación. Intenta de nuevo.'
 }
 
+// Expiración "lazy" (issue 4/7 del épico #10): convierte docs crudos de
+// Firestore a Reservation[] calculando el status *efectivo* (ver
+// effectiveStatus en reservationRules.ts) en vez de confiar en el campo
+// `status` guardado, que puede estar desactualizado porque no hay Cloud
+// Functions que lo corrijan en el momento exacto en que expira. Además,
+// dispara (sin esperar) una escritura correctiva en Firestore por cada doc
+// cuyo status efectivo ya no coincide con el guardado — así el dato queda
+// consistente para la siguiente lectura de cualquier usuario. Solo
+// devuelve las reservaciones cuyo status efectivo sigue "ocupando" el
+// horario (ver OCCUPYING_STATUSES); las que ya expiraron/finalizaron se
+// excluyen del resultado aunque el doc en Firestore aún no se haya
+// actualizado.
+function toOccupyingReservations(docs: QueryDocumentSnapshot<DocumentData>[]): Reservation[] {
+  const now = new Date()
+  const result: Reservation[] = []
+
+  for (const d of docs) {
+    const data = d.data() as Omit<Reservation, 'id'>
+    const status = effectiveStatus(
+      { status: data.status, paymentDueAt: data.paymentDueAt.toDate(), endAt: data.endAt.toDate() },
+      now,
+    )
+
+    if (status !== data.status) {
+      updateDoc(d.ref, { status }).catch(() => {
+        // Best-effort: si falla (otro cliente ya la actualizó, offline,
+        // etc.) no pasa nada — la próxima lectura lo vuelve a intentar.
+      })
+    }
+
+    if ((OCCUPYING_STATUSES as readonly string[]).includes(status)) {
+      result.push({ id: d.id, ...data, status } as Reservation)
+    }
+  }
+
+  return result
+}
+
 // Crea una reservación en status 'solicitada' (ocupa el horario, pendiente
-// de pago — ver issue 4/7 del épico #10 para el deadline de pago). Valida,
-// en este orden: horario dentro de rango, tope duro de 2h, anticipación
-// mínima/máxima, límite de reservaciones activas del usuario, y traslapes.
-// Estas mismas validaciones (salvo el límite de activas, que requiere un
-// conteo que las rules no pueden hacer) se repiten en firestore.rules.
+// de pago hasta paymentDueAt — ver effectiveStatus() para el auto-release).
+// Valida, en este orden: horario dentro de rango, tope duro de 2h,
+// anticipación mínima/máxima, límite de reservaciones activas del usuario,
+// y traslapes. Estas mismas validaciones (salvo el límite de activas, que
+// requiere un conteo que las rules no pueden hacer) se repiten en
+// firestore.rules.
 export async function createReservation(params: {
   court: Court
   userId: string
@@ -75,7 +118,7 @@ export async function createReservation(params: {
       where('status', 'in', OCCUPYING_STATUSES),
     ),
   )
-  const userReservations = userSnap.docs.map((d) => d.data() as Reservation)
+  const userReservations = toOccupyingReservations(userSnap.docs)
   if (countOccupyingReservations(userReservations) >= court.settings.maxActiveReservationsPerUser) {
     throw new Error('max-reservations')
   }
@@ -89,7 +132,7 @@ export async function createReservation(params: {
       where('status', 'in', OCCUPYING_STATUSES),
     ),
   )
-  const existing = daySnap.docs.map((d) => d.data() as Reservation)
+  const existing = toOccupyingReservations(daySnap.docs)
   if (hasOverlap(existing, startTime, endTime)) {
     throw new Error('slot-taken')
   }
@@ -106,6 +149,7 @@ export async function createReservation(params: {
     status: 'solicitada' satisfies ReservationStatus,
     startAt: Timestamp.fromDate(startAt),
     endAt: Timestamp.fromDate(endAt),
+    paymentDueAt: Timestamp.fromDate(computePaymentDueAt(startAt, court.settings.paymentDeadlineHours)),
     createdAt: serverTimestamp(),
   })
 }
@@ -150,7 +194,7 @@ export function subscribeToReservations(
       where('date', '==', date),
       where('status', 'in', OCCUPYING_STATUSES),
     ),
-    (snap) => onUpdate(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Reservation)),
+    (snap) => onUpdate(toOccupyingReservations(snap.docs)),
   )
 }
 
@@ -164,7 +208,7 @@ export function subscribeToAllReservationsByDate(
       where('date', '==', date),
       where('status', 'in', OCCUPYING_STATUSES),
     ),
-    (snap) => onUpdate(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Reservation)),
+    (snap) => onUpdate(toOccupyingReservations(snap.docs)),
   )
 }
 
@@ -178,6 +222,6 @@ export function subscribeToUserReservations(
       where('userId', '==', userId),
       where('status', 'in', OCCUPYING_STATUSES),
     ),
-    (snap) => onUpdate(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Reservation)),
+    (snap) => onUpdate(toOccupyingReservations(snap.docs)),
   )
 }

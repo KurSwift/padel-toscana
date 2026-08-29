@@ -11,6 +11,10 @@ export interface CourtSettings {
   // Anticipación mínima para poder reservar, en horas. Default 24 (ver
   // reglamento de colonos, issue 3/7 del épico #10).
   minLeadHours: number
+  // Horas desde que se crea la reservación hasta que se libera si nadie
+  // confirma el pago (paymentDueAt = startAt - paymentDeadlineHours).
+  // Default 12. Ver effectiveStatus() en reservationRules.ts (issue 4/7).
+  paymentDeadlineHours: number
 }
 
 export interface Court {
@@ -45,14 +49,25 @@ export interface UserProfile {
   createdAt: Timestamp
 }
 
-// solicitada: recién creada, ocupa el horario, pendiente de pago.
+// solicitada: recién creada, ocupa el horario, pendiente de pago. Se
+//   libera (efectivamente 'cancelada') si nadie confirma el pago antes de
+//   paymentDueAt — ver effectiveStatus() en reservationRules.ts.
 // pagada: el tesorero confirmó el pago — sigue ocupando el horario.
-// cancelada: el dueño o un admin la canceló (o se liberó por falta de pago,
-//   issue 4/7 del épico #10) — ya no ocupa el horario.
-// finalizada: ya pasó (issue 4/7) — ya no ocupa el horario.
+// cancelada: el dueño/admin la canceló, o se liberó por falta de pago.
+//   Ya no ocupa el horario.
+// finalizada: ya pasó su horario (endAt) estando pagada. Ya no ocupa el
+//   horario.
 // "Ocupar el horario" = cuenta para traslapes y para el límite de
 // reservaciones activas por usuario — ver OCCUPYING_STATUSES en
 // src/services/reservationRules.ts.
+//
+// El status guardado en Firestore puede estar desactualizado respecto al
+// tiempo real — no hay Cloud Functions que lo actualicen en el momento
+// exacto en que expira. Cualquier código que lea reservaciones debe usar
+// effectiveStatus(reservation, now), no el campo `status` crudo, para
+// disponibilidad/conteos. src/services/reservations.ts ya hace esto en
+// las funciones de lectura y además escribe el status corregido de forma
+// oportunista cuando lo detecta.
 export type ReservationStatus = 'solicitada' | 'pagada' | 'cancelada' | 'finalizada'
 
 export interface Reservation {
@@ -70,8 +85,12 @@ export interface Reservation {
   // además de los strings porque firestore.rules no puede comparar
   // request.time de forma confiable contra strings 'HH:mm' — con
   // Timestamp sí se puede validar anticipación mínima/máxima al crear, y
-  // el auto-release por falta de pago (issue 4/7).
+  // el auto-release por falta de pago.
   startAt: Timestamp
   endAt: Timestamp
+  // startAt - court.settings.paymentDeadlineHours, calculado al crear.
+  // Deadline para que el tesorero confirme el pago antes de que se libere
+  // el horario — ver effectiveStatus() en reservationRules.ts.
+  paymentDueAt: Timestamp
   createdAt: Timestamp
 }

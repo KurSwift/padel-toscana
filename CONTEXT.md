@@ -72,9 +72,25 @@ si el admin no ve las notificaciones, ese es el primer lugar a revisar.
   pago) → `cancelada` | `finalizada`. `solicitada` y `pagada` "ocupan" el
   horario (cuentan para traslapes y para el límite de reservaciones activas
   por usuario) — ver `OCCUPYING_STATUSES` en `src/services/reservationRules.ts`.
-  `cancelada` y `finalizada` no ocupan. No hay todavía transición automática
-  a `finalizada` ni auto-liberación por falta de pago — eso es el issue 4/7
-  del épico #10 (deadline de pago + expiración "lazy").
+  `cancelada` y `finalizada` no ocupan.
+- **Expiración "lazy" del status** (issue 4/7 del épico #10 — decisión
+  explícita: sin Cloud Functions, para quedarse en el plan Spark de
+  Firebase): una `solicitada` se libera (efectivamente `cancelada`) si
+  nadie confirma el pago antes de `paymentDueAt` (`startAt -
+  court.settings.paymentDeadlineHours`, default 12h); una `solicitada` o
+  `pagada` se vuelve efectivamente `finalizada` al pasar `endAt`. Nada
+  corrige el campo `status` en Firestore en el instante exacto en que
+  expira — `effectiveStatus(reservation, now)` en `reservationRules.ts`
+  calcula el status real a partir del guardado + la hora actual, y
+  `src/services/reservations.ts` la usa en **toda** lectura de
+  reservaciones (para disponibilidad, conteos y lo que ve la UI) y además
+  dispara, sin esperar, una escritura correctiva en Firestore cuando
+  detecta que el status guardado quedó desactualizado — así el dato queda
+  consistente para la siguiente persona que lea, sin depender de que sea
+  la misma que lo dejó vencer. `firestore.rules` permite que *cualquier*
+  usuario autenticado (no solo dueño/tesorero/admin) haga esas dos
+  transiciones específicas, siempre que `request.time` (reloj del
+  servidor) ya haya pasado `paymentDueAt`/`endAt`.
 - `createReservation()` valida en cliente: horario dentro de rango, tope
   duro de 2h (independiente de `court.settings.maxDurationHours`, por si
   quedó una configuración vieja más permisiva), anticipación mínima
@@ -83,19 +99,20 @@ si el admin no ve las notificaciones, ese es el primer lugar a revisar.
   al crear), límite de reservaciones activas por usuario
   (`maxActiveReservationsPerUser`, default 2), y que no haya traslape de
   horario. **La mayoría de estas reglas se repiten en `firestore.rules`**
-  (duración, ventana de anticipación, transición de status) porque las
-  validaciones de cliente no son suficientes por sí solas: alguien podría
-  escribir directo a Firestore. **Excepción:** el límite de activas y los
-  traslapes NO se pueden validar en rules (requieren contar/leer otras
-  reservaciones, no un `get()` puntual) — quedan solo del lado del cliente.
-  Si cambias una regla de negocio, revisa `AGENTS.md` → "La regla más
-  importante del repo" antes de asumir que basta un solo lado.
+  (duración, ventana de anticipación, `paymentDueAt`, transición de status)
+  porque las validaciones de cliente no son suficientes por sí solas:
+  alguien podría escribir directo a Firestore. **Excepción:** el límite de
+  activas y los traslapes NO se pueden validar en rules (requieren
+  contar/leer otras reservaciones, no un `get()` puntual) — quedan solo del
+  lado del cliente. Si cambias una regla de negocio, revisa `AGENTS.md` →
+  "La regla más importante del repo" antes de asumir que basta un solo lado.
 - Transiciones de status van por `cancelReservation()` (dueño/admin, →
   `cancelada`), `confirmPayment()` (tesorero/admin, `solicitada` →
   `pagada`) y `setReservationStatus()` (override libre, solo admin) en
-  `src/services/reservations.ts`. Quién puede hacer qué transición está
-  centralizado en `canTransition()` (`src/services/reservationRules.ts`),
-  espejo puro de la matriz en `firestore.rules`. Nunca se borra el
+  `src/services/reservations.ts`, más las dos transiciones automáticas de
+  arriba. Quién puede hacer qué transición manual está centralizado en
+  `canTransition()` (`src/services/reservationRules.ts`), espejo puro de la
+  matriz en `firestore.rules`. Nunca se borra el
   documento (`allow delete: if false`).
 
 ## Panel de administración (`/admin`)
@@ -121,7 +138,7 @@ Tres pestañas:
 | `addresses/{addressKey}` | `{ uids: string[] }` | Máximo 2 `uids`. Lectura pública (se usa antes de autenticar, para validar disponibilidad de domicilio en el registro). |
 | `mail/{autoId}` | `{ to, message: { subject, html } }` | Solo creación por la app; lectura/actualización/borrado bloqueados — los procesa la extensión de correo. |
 | `courts/{courtId}` | `Court` (incluye `CourtSettings`) | Lectura para cualquier usuario autenticado, escritura solo admin. |
-| `reservations/{id}` | `Reservation` | Ver reglas de creación/actualización arriba. `startAt`/`endAt` son `Timestamp`; el resto de fecha/hora sigue siendo strings (`date`, `startTime`, `endTime`). Índices compuestos en `firestore.indexes.json` para las queries por `date+status`, `courtId+date+status`, `userId+status+date` — siguen sirviendo con `where('status','in',[...])` porque Firestore indexa `in` igual que una igualdad. |
+| `reservations/{id}` | `Reservation` | Ver reglas de creación/actualización arriba. `startAt`/`endAt`/`paymentDueAt` son `Timestamp`; el resto de fecha/hora sigue siendo strings (`date`, `startTime`, `endTime`). El campo `status` puede estar desactualizado — ver "Expiración lazy" arriba. Índices compuestos en `firestore.indexes.json` para las queries por `date+status`, `courtId+date+status`, `userId+status+date` — siguen sirviendo con `where('status','in',[...])` porque Firestore indexa `in` igual que una igualdad. |
 
 Los tipos TypeScript en `src/types/index.ts` son la fuente de verdad del
 shape de estos documentos en el cliente.

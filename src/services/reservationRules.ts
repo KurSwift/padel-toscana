@@ -56,6 +56,40 @@ export function isWithinMaxAdvanceWindow(startAt: Date, now: Date, maxDaysAhead:
   return startAt.getTime() - now.getTime() <= maxDaysAhead * 24 * 60 * 60 * 1000
 }
 
+// paymentDueAt = startAt - paymentDeadlineHours, calculado al crear una
+// reservación. Espejo puro de la resta equivalente en firestore.rules
+// (isPaymentDueAtValid) — si cambia la fórmula, hay que actualizar ambos.
+export function computePaymentDueAt(startAt: Date, paymentDeadlineHours: number): Date {
+  return new Date(startAt.getTime() - paymentDeadlineHours * 60 * 60 * 1000)
+}
+
+// Calcula el status "real" de una reservación en el momento `now`, sin
+// necesidad de que nadie haya escrito el cambio en Firestore todavía —
+// expiración "lazy" (issue 4/7 del épico #10, decisión: sin Cloud
+// Functions, para quedarnos en el plan Spark). src/services/reservations.ts
+// usa esto en cada lectura para (a) calcular disponibilidad con el status
+// real, y (b) escribir oportunistamente el status corregido cuando lo
+// detecta. El orden de los checks importa: una 'solicitada' que nunca se
+// pagó SIEMPRE se libera como 'cancelada', nunca 'finalizada', incluso si
+// también ya pasó su `endAt` — porque paymentDueAt siempre es anterior (o
+// igual) a endAt, así que si el pago nunca llegó, la reservación nunca fue
+// legítima y no tiene sentido marcarla como "ocurrida".
+export function effectiveStatus(
+  reservation: { status: ReservationStatus; paymentDueAt: Date; endAt: Date },
+  now: Date,
+): ReservationStatus {
+  if (reservation.status === 'solicitada' && now > reservation.paymentDueAt) {
+    return 'cancelada'
+  }
+  if (
+    (reservation.status === 'solicitada' || reservation.status === 'pagada') &&
+    now > reservation.endAt
+  ) {
+    return 'finalizada'
+  }
+  return reservation.status
+}
+
 // Espejo puro de la matriz de transición de firestore.rules — si cambia la
 // máquina de estados de una reservación, hay que actualizar esta función Y
 // las rules (ver AGENTS.md). No decide si la reservación existe o si los
