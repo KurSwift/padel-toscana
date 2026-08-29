@@ -15,6 +15,10 @@ export interface CourtSettings {
   // confirma el pago (paymentDueAt = startAt - paymentDeadlineHours).
   // Default 12. Ver effectiveStatus() en reservationRules.ts (issue 4/7).
   paymentDeadlineHours: number
+  // Monto en pesos que el colono debe pagar al tesorero para confirmar la
+  // reservación. Default sugerido 300. Editable por admin (issue 6/7 del
+  // épico #10) — aquí solo se declara el campo y se usa para mostrarlo.
+  reservationFee: number
 }
 
 export interface Court {
@@ -92,5 +96,12 @@ export interface Reservation {
   // Deadline para que el tesorero confirme el pago antes de que se libere
   // el horario — ver effectiveStatus() en reservationRules.ts.
   paymentDueAt: Timestamp
+  // Total de asistentes (1–10), no solo los que caben jugando a la vez —
+  // el máximo de 4 en cancha es solo informativo en la UI, no se valida.
+  playerCount: number
+  // Nombre del residente a cargo de la reservación. Default: profile.name
+  // del usuario que reserva, pero editable como texto libre por si la va a
+  // usar alguien más del domicilio — no hay selector de usuarios.
+  residentInChargeName: string
   createdAt: Timestamp
 }

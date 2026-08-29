@@ -71,7 +71,9 @@ service cloud.firestore {
           && request.resource.data.durationHours == resource.data.durationHours
           && request.resource.data.startAt       == resource.data.startAt
           && request.resource.data.endAt         == resource.data.endAt
-          && request.resource.data.paymentDueAt  == resource.data.paymentDueAt;
+          && request.resource.data.paymentDueAt  == resource.data.paymentDueAt
+          && request.resource.data.playerCount   == resource.data.playerCount
+          && request.resource.data.residentInChargeName == resource.data.residentInChargeName;
     }
 
     // ── Users ──────────────────────────────────────────────────────────────
@@ -147,6 +149,12 @@ service cloud.firestore {
         && request.resource.data.status == 'solicitada'
         // 2 = MAX_RESERVATION_DURATION_HOURS en src/services/reservationRules.ts
         && request.resource.data.durationHours <= 2
+        // 1-10 = MIN/MAX_PLAYER_COUNT en src/services/reservationRules.ts
+        && request.resource.data.playerCount is int
+        && request.resource.data.playerCount >= 1
+        && request.resource.data.playerCount <= 10
+        && request.resource.data.residentInChargeName is string
+        && request.resource.data.residentInChargeName.size() > 0
         && request.resource.data.startAt is timestamp
         && request.resource.data.endAt is timestamp
         && request.resource.data.paymentDueAt is timestamp
@@ -155,7 +163,8 @@ service cloud.firestore {
         && isPaymentDueAtValid(request.resource.data.courtId)
         && request.resource.data.keys().hasAll([
              'courtId', 'userId', 'userName', 'date', 'startTime', 'endTime',
-             'durationHours', 'status', 'startAt', 'endAt', 'paymentDueAt', 'createdAt'
+             'durationHours', 'status', 'startAt', 'endAt', 'paymentDueAt',
+             'playerCount', 'residentInChargeName', 'createdAt'
            ]);
 
       // Matriz de transición:

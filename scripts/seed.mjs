@@ -31,6 +31,7 @@ const DEFAULT_COURT_SETTINGS = {
   daysAheadAllowed: 7,
   minLeadHours: 24,
   paymentDeadlineHours: 12,
+  reservationFee: 300,
 }
 
 const COURTS = [
@@ -118,11 +119,13 @@ async function seedReservations() {
       ownerUid: 'seed-active-1', status: 'solicitada',
       date: tomorrowDate, startTime: '10:00', endTime: '11:00',
       startAt: new Date(`${tomorrowDate}T10:00:00`), endAt: new Date(`${tomorrowDate}T11:00:00`),
+      playerCount: 4, residentInChargeName: 'Ana Activa',
     },
     {
       ownerUid: 'seed-active-2', status: 'pagada',
       date: tomorrowDate, startTime: '17:00', endTime: '18:00',
       startAt: new Date(`${tomorrowDate}T17:00:00`), endAt: new Date(`${tomorrowDate}T18:00:00`),
+      playerCount: 6, residentInChargeName: 'Beto Activo',
     },
     {
       // Ya expirada por falta de pago — ver comentario arriba.
@@ -131,6 +134,7 @@ async function seedReservations() {
       startTime: `${String(soon.getHours()).padStart(2, '0')}:00`,
       endTime: `${String(soonEnd.getHours()).padStart(2, '0')}:00`,
       startAt: soon, endAt: soonEnd,
+      playerCount: 4, residentInChargeName: 'Ana Activa',
     },
   ]
 
@@ -151,6 +155,8 @@ async function seedReservations() {
       startAt: Timestamp.fromDate(s.startAt),
       endAt: Timestamp.fromDate(s.endAt),
       paymentDueAt: Timestamp.fromDate(paymentDueAt),
+      playerCount: s.playerCount,
+      residentInChargeName: s.residentInChargeName,
       createdAt: Timestamp.now(),
     })
   }

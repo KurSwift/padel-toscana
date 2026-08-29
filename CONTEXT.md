@@ -114,6 +114,24 @@ si el admin no ve las notificaciones, ese es el primer lugar a revisar.
   `canTransition()` (`src/services/reservationRules.ts`), espejo puro de la
   matriz en `firestore.rules`. Nunca se borra el
   documento (`allow delete: if false`).
+- Al reservar, `BookingSheet` pide **cuántos jugadores en total** (1–10,
+  `playerCount` — el máximo de 4 jugando a la vez en cancha es solo
+  informativo en la UI, no se valida) y el **residente a cargo**
+  (`residentInChargeName`, precargado con `profile.name` pero editable como
+  texto libre, por si la usará alguien más del domicilio; no hay selector
+  de usuarios registrados). Al confirmar, antes de cerrar el sheet, muestra
+  el aviso de pago: monto (`court.settings.reservationFee`, default
+  sugerido 300, editable por admin — issue 6/7) y fecha/hora límite
+  (`paymentDueAt`, formateada con `formatDateTimeShort()` en
+  `src/utils/time.ts`).
+- `StatusBadge` (`src/components/StatusBadge.tsx`) centraliza el texto y
+  color de los 4 estados ("Pendiente de pago", "Confirmada", "Cancelada",
+  "Finalizada") — usado en `MyReservations` y en el bloque de "tu
+  reservación" de `SlotsGrid`. En la práctica, como esas dos vistas solo
+  reciben reservaciones cuyo status *efectivo* sigue ocupando el horario
+  (ver expiración lazy arriba), en el día a día solo se ven ahí los badges
+  de `solicitada`/`pagada` — `cancelada`/`finalizada` quedan listos para
+  cuando el panel admin (issue 6/7) muestre historial completo.
 
 ## Panel de administración (`/admin`)
 
@@ -138,7 +156,7 @@ Tres pestañas:
 | `addresses/{addressKey}` | `{ uids: string[] }` | Máximo 2 `uids`. Lectura pública (se usa antes de autenticar, para validar disponibilidad de domicilio en el registro). |
 | `mail/{autoId}` | `{ to, message: { subject, html } }` | Solo creación por la app; lectura/actualización/borrado bloqueados — los procesa la extensión de correo. |
 | `courts/{courtId}` | `Court` (incluye `CourtSettings`) | Lectura para cualquier usuario autenticado, escritura solo admin. |
-| `reservations/{id}` | `Reservation` | Ver reglas de creación/actualización arriba. `startAt`/`endAt`/`paymentDueAt` son `Timestamp`; el resto de fecha/hora sigue siendo strings (`date`, `startTime`, `endTime`). El campo `status` puede estar desactualizado — ver "Expiración lazy" arriba. Índices compuestos en `firestore.indexes.json` para las queries por `date+status`, `courtId+date+status`, `userId+status+date` — siguen sirviendo con `where('status','in',[...])` porque Firestore indexa `in` igual que una igualdad. |
+| `reservations/{id}` | `Reservation` | Ver reglas de creación/actualización arriba. `startAt`/`endAt`/`paymentDueAt` son `Timestamp`; el resto de fecha/hora sigue siendo strings (`date`, `startTime`, `endTime`). El campo `status` puede estar desactualizado — ver "Expiración lazy" arriba. `playerCount`/`residentInChargeName` capturados en `BookingSheet`. Índices compuestos en `firestore.indexes.json` para las queries por `date+status`, `courtId+date+status`, `userId+status+date` — siguen sirviendo con `where('status','in',[...])` porque Firestore indexa `in` igual que una igualdad. |
 
 Los tipos TypeScript en `src/types/index.ts` son la fuente de verdad del
 shape de estos documentos en el cliente.

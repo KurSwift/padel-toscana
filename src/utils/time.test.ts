@@ -10,6 +10,8 @@ import {
   generateTimeSlots,
   getAvailableDurations,
   toDate,
+  toTimeString,
+  formatDateTimeShort,
 } from './time'
 
 describe('addHours', () => {
@@ -99,6 +101,24 @@ describe('toDate', () => {
     const a = toDate('2026-08-29', '09:00')
     const b = toDate('2026-08-29', '10:00')
     expect(b.getTime() - a.getTime()).toBe(60 * 60 * 1000)
+  })
+})
+
+describe('toTimeString', () => {
+  it('convierte un Date a HH:mm con padding', () => {
+    expect(toTimeString(new Date(2026, 7, 29, 9, 5))).toBe('09:05')
+  })
+
+  it('es el inverso de toDate para la parte de hora', () => {
+    const d = toDate('2026-08-29', '22:00')
+    expect(toTimeString(d)).toBe('22:00')
+  })
+})
+
+describe('formatDateTimeShort', () => {
+  it('combina fecha y hora en un solo string', () => {
+    // 2026-08-29 es sábado
+    expect(formatDateTimeShort(new Date(2026, 7, 29, 22, 0))).toBe('Sáb 29 ago · 10:00 PM')
   })
 })
 
