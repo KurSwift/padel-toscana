@@ -22,6 +22,7 @@ npm run seed        # prepobla el emulador con datos de ejemplo
 npm run push-to-prod  # migra colecciones seleccionadas emulador → producción (dry-run por default)
 npm run test        # corre la suite de Vitest una vez (CI-friendly)
 npm run test:watch  # Vitest en modo watch, para desarrollo
+npm run test:e2e    # Playwright — flujo crítico E2E contra los emuladores (ver e2e/)
 ```
 
 No hay lint script configurado en `package.json`. Los gates de calidad
@@ -33,6 +34,19 @@ pura. Corre ambos antes de dar por terminado un cambio no trivial.
 `firebase-tools` y `firebase-admin` están como devDependencies (no hace
 falta instalar nada global). El proyecto está enlazado vía `.firebaserc`
 (`padel-toscana`) — si necesitas otro proyecto, `firebase use --add`.
+
+`npm run test:e2e` (Playwright, `e2e/`) no es parte de los gates automáticos
+de arriba — necesita los emuladores corriendo (`npm run emulators` +
+`npm run seed`) y un `npm run dev` en paralelo (Playwright reusa uno ya
+levantado en `:5173`, o levanta el suyo). Corre el único flujo crítico que
+cubre hoy: registro → aprobación de admin → reserva → confirmación de pago
+→ cancelación, generando un usuario/teléfono/domicilio nuevo en cada corrida
+para no depender de cuántas reservaciones de ejemplo acumule ya el emulador
+(`npm run seed` no es idempotente para `reservations`, ver "Emuladores,
+seeds y push-to-prod" más abajo). `e2e/helpers.ts` automatiza el login por
+teléfono leyendo la OTP directo del endpoint de testing del emulador de
+Auth (`/emulator/v1/projects/{id}/verificationCodes`) — no hay SMS real que
+esperar.
 
 ## Flujo de trabajo
 
@@ -73,6 +87,9 @@ scripts/
   seed.mjs               # prepobla el emulador (firebase-admin, nunca toca producción)
   push-to-prod.mjs        # migra colecciones seleccionadas emulador → producción
   migrate-users-role.mjs  # one-off: isAdmin (bool) → role (string) en usuarios existentes de prod
+e2e/                      # Playwright — npm run test:e2e, ver más abajo
+  helpers.ts              # login/registro por teléfono (OTP vía emulador), logout
+  critical-flow.spec.ts   # registro → aprobación → reserva → pago → cancelación
 ```
 
 Alias de import: `@/` → `src/` (configurado en `vite.config.ts` y
@@ -189,8 +206,13 @@ npm run dev                        # terminal 2
   explícitamente a los puertos del emulador — nunca toca producción. Crea
   usuarios de Auth con `uid` fijo y su perfil correspondiente en Firestore
   (un usuario por rol — admin, colono activo x2, colono pendiente,
-  tesorero), dos canchas, y una reservación de ejemplo. Es **idempotente**:
-  correrlo de nuevo actualiza los mismos documentos en vez de duplicarlos.
+  tesorero), dos canchas, y tres reservaciones de ejemplo. Usuarios y
+  canchas son **idempotentes** (`.set()` con id fijo: correrlo de nuevo
+  actualiza los mismos documentos). Las reservaciones de ejemplo **no** —
+  se crean con `.add()`, así que cada corrida agrega tres nuevas en vez de
+  reemplazar las anteriores; si necesitas un estado limpio de
+  reservaciones, borra la colección `reservations` a mano desde la
+  Emulator UI antes de volver a sembrar.
   Si cambias `DEFAULT_COURT_SETTINGS` en `src/services/courts.ts`, actualiza
   también la copia duplicada en este script (comentario lo señala).
 - **`npm run migrate-users-role`** (`scripts/migrate-users-role.mjs`)

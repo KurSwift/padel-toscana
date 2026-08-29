@@ -60,15 +60,3 @@ Puntos a definir antes de implementar:
   `VALID_STREETS`, máximo 2 por domicilio, etc. — mismas reglas que
   `registerUser()`).
 
-## 4. Tests de componentes/E2E
-
-Hoy `npm run test` (Vitest) solo cubre lógica de negocio pura
-(`reservationRules.ts`, `userRules.ts`, `utils/time.ts`) — no hay tests
-que rendericen componentes React ni que ejerciten flujos completos
-(registro, reservar, cancelar, confirmar pago) contra el emulador.
-Candidatos:
-- Testing Library (`@testing-library/react`) + Vitest para tests de
-  componentes aislados (ej. `BookingSheet`, `StatusBadge`).
-- Playwright (ya se usó ad-hoc para verificación manual en este repo, ver
-  historial de conversación) para 2-3 flujos E2E críticos contra el
-  emulador: registro → aprobación → reservar → pagar → cancelar.

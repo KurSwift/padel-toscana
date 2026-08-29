@@ -38,6 +38,10 @@ const useEmulators = import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS =
 if (useEmulators) {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
   connectFirestoreEmulator(db, '127.0.0.1', 8080)
+  // Evita que el login por teléfono dependa de resolver el reCAPTCHA real
+  // de Google (lento e intermitente contra servicios externos) — el
+  // emulador de Auth no lo necesita para generar/validar el código OTP.
+  auth.settings.appVerificationDisabledForTesting = true
   // eslint-disable-next-line no-console
   console.info('[firebase] Usando emuladores locales — Auth :9099, Firestore :8080')
 }
