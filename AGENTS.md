@@ -118,9 +118,15 @@ npm run dev                        # terminal 2
 ```
 
 - **`npm run emulators`** (`firebase emulators:start`) requiere Java (JRE)
-  para el emulador de Firestore. Persiste datos entre corridas en
-  `.emulator-data/` (gitignored) vía `--import`/`--export-on-exit`. El
-  emulador de Hosting corre en el puerto `5050` (no `5000`) porque en macOS
+  para el emulador de Firestore — instálalo con `brew install openjdk` si
+  `java -version` falla. El script `emulators` ya agrega al `PATH` las
+  ubicaciones típicas de Homebrew (`/opt/homebrew/opt/openjdk/bin` en Apple
+  Silicon, `/usr/local/opt/openjdk/bin` en Intel), porque `openjdk` es
+  keg-only y por default no queda en el `PATH` de tu shell — así que no
+  necesitas editar tu `.zshrc`/`.bash_profile` para que este comando
+  funcione. Persiste datos entre corridas en `.emulator-data/` (gitignored)
+  vía `--import`/`--export-on-exit`. El emulador de Hosting corre en el
+  puerto `5050` (no `5000`) porque en macOS
   el `5000` suele estar tomado por AirPlay Receiver.
 - **`npm run seed`** (`scripts/seed.mjs`) usa `firebase-admin` apuntado
   explícitamente a los puertos del emulador — nunca toca producción. Crea
