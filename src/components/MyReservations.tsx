@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { Reservation } from '@/types'
-import { formatDateShort, formatTime } from '@/utils/time'
+import { formatDateShort, formatTime, formatDateTimeShort } from '@/utils/time'
 import { cancelReservation } from '@/services/reservations'
+import StatusBadge from '@/components/StatusBadge'
 
 interface Props {
   reservations: Reservation[]
@@ -44,12 +45,20 @@ export default function MyReservations({ reservations, courtName }: Props) {
           className="bg-white rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3"
         >
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-800">
-              {formatDateShort(r.date)}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-gray-800">
+                {formatDateShort(r.date)}
+              </p>
+              <StatusBadge status={r.status} />
+            </div>
             <p className="text-xs text-gray-500 mt-0.5">
               {formatTime(r.startTime)} – {formatTime(r.endTime)} · {courtName}
             </p>
+            {r.status === 'solicitada' && (
+              <p className="text-xs text-amber-600 mt-1">
+                Paga antes de {formatDateTimeShort(r.paymentDueAt.toDate())}
+              </p>
+            )}
           </div>
           <button
             onClick={() => handleCancel(r.id)}

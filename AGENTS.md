@@ -61,7 +61,7 @@ src/
   firebase.ts          # init de app/auth/db/app-check — config está hardcodeada aquí
   App.tsx              # rutas (react-router)
   context/AuthContext   # user de Firebase Auth + su UserProfile (Firestore), vía onSnapshot
-  components/           # UI reutilizable (BookingSheet, SlotsGrid, DateSelector, ProtectedRoute...)
+  components/           # UI reutilizable (BookingSheet, SlotsGrid, DateSelector, StatusBadge, ProtectedRoute...)
   pages/                 # HomePage, AdminPage, LoginPage, RegisterPage
   services/              # única capa que toca Firestore/Auth directamente (auth, courts, reservations, users)
   hooks/useCourtData     # combina cancha activa + reservaciones del día + reservaciones del usuario
@@ -123,8 +123,9 @@ Alias de import: `@/` → `src/` (configurado en `vite.config.ts` y
 
 **`firestore.rules` duplica intencionalmente varias validaciones que también
 existen en `src/services/*`** (tope de duración, ventana de anticipación
-mín/máx, traslapes de horario, quién puede aprobar/rechazar usuarios, quién
-puede cambiar `role`/`status`, la matriz de transición de status de una
+mín/máx, rango de `playerCount`, que `residentInChargeName` no esté vacío,
+traslapes de horario, quién puede aprobar/rechazar usuarios, quién puede
+cambiar `role`/`status`, la matriz de transición de status de una
 reservación). Esto es deliberado: el cliente valida para dar buen UX
 (mensajes de error específicos), pero las rules son la única barrera real
 contra un cliente malicioso. **Si cambias una regla de negocio en

@@ -21,6 +21,8 @@ import {
   isDurationWithinHardCap,
   isLeadTimeSufficient,
   isWithinMaxAdvanceWindow,
+  isPlayerCountValid,
+  isResidentInChargeNameValid,
   computePaymentDueAt,
   effectiveStatus,
   OCCUPYING_STATUSES,
@@ -33,6 +35,8 @@ const ERRORS: Record<string, string> = {
   'duration-too-long': 'La duración máxima de una reservación es de 2 horas.',
   'lead-time-too-short': 'Debes reservar con al menos 24 horas de anticipación.',
   'too-far-ahead': 'No puedes reservar con tanta anticipación todavía.',
+  'invalid-player-count': 'El número de jugadores debe ser entre 1 y 10.',
+  'resident-in-charge-required': 'Indica el nombre del residente a cargo.',
 }
 
 export function reservationErrorMessage(code: string): string {
@@ -79,11 +83,11 @@ function toOccupyingReservations(docs: QueryDocumentSnapshot<DocumentData>[]): R
 
 // Crea una reservación en status 'solicitada' (ocupa el horario, pendiente
 // de pago hasta paymentDueAt — ver effectiveStatus() para el auto-release).
-// Valida, en este orden: horario dentro de rango, tope duro de 2h,
-// anticipación mínima/máxima, límite de reservaciones activas del usuario,
-// y traslapes. Estas mismas validaciones (salvo el límite de activas, que
-// requiere un conteo que las rules no pueden hacer) se repiten en
-// firestore.rules.
+// Valida, en este orden: horario dentro de rango, tope duro de 2h, rango de
+// jugadores (1-10) y que haya residente a cargo, anticipación mínima/máxima,
+// límite de reservaciones activas del usuario, y traslapes. Estas mismas
+// validaciones (salvo el límite de activas, que requiere un conteo que las
+// rules no pueden hacer) se repiten en firestore.rules.
 export async function createReservation(params: {
   court: Court
   userId: string
@@ -92,12 +96,17 @@ export async function createReservation(params: {
   date: string
   startTime: string
   durationHours: number
+  playerCount: number
+  residentInChargeName: string
 }): Promise<void> {
-  const { court, userId, userName, userAddress, date, startTime, durationHours } = params
+  const { court, userId, userName, userAddress, date, startTime, durationHours, playerCount } = params
+  const residentInChargeName = params.residentInChargeName.trim()
   const endTime = addHours(startTime, durationHours)
 
   if (endTime > court.settings.closeTime) throw new Error('outside-hours')
   if (!isDurationWithinHardCap(durationHours)) throw new Error('duration-too-long')
+  if (!isPlayerCountValid(playerCount)) throw new Error('invalid-player-count')
+  if (!isResidentInChargeNameValid(residentInChargeName)) throw new Error('resident-in-charge-required')
 
   const startAt = toDate(date, startTime)
   const endAt = toDate(date, endTime)
@@ -150,6 +159,8 @@ export async function createReservation(params: {
     startAt: Timestamp.fromDate(startAt),
     endAt: Timestamp.fromDate(endAt),
     paymentDueAt: Timestamp.fromDate(computePaymentDueAt(startAt, court.settings.paymentDeadlineHours)),
+    playerCount,
+    residentInChargeName,
     createdAt: serverTimestamp(),
   })
 }

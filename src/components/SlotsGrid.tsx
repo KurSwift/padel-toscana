@@ -5,6 +5,7 @@ import {
   getAvailableDurations,
   todayString,
 } from '@/utils/time'
+import StatusBadge from '@/components/StatusBadge'
 
 interface Props {
   court: Court
@@ -77,7 +78,12 @@ export default function SlotsGrid({
                   </span>
                 </div>
                 <p className={`text-xs mt-0.5 ml-[4.5rem] flex items-center gap-1.5 ${isMine ? 'text-brand-600 font-medium' : 'text-gray-400'}`}>
-                  {isMine ? 'Tu reservación' : (
+                  {isMine ? (
+                    <>
+                      <span>Tu reservación</span>
+                      <StatusBadge status={covering.status} />
+                    </>
+                  ) : (
                     <>
                       <span className="truncate">{covering.userName.split(' ')[0]}</span>
                       <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ${isMine ? 'bg-brand-200 text-brand-700' : 'bg-gray-200 text-gray-500'}`}>

@@ -17,6 +17,11 @@ export const OCCUPYING_STATUSES = ['solicitada', 'pagada'] as const
 // el reglamento de colonos ya no permite.
 export const MAX_RESERVATION_DURATION_HOURS = 2
 
+// Rango total de asistentes permitido (no solo los que caben jugando a la
+// vez — 4 en cancha es solo informativo, no una segunda validación).
+export const MIN_PLAYER_COUNT = 1
+export const MAX_PLAYER_COUNT = 10
+
 // Determina si el rango [startTime, endTime) se traslapa con alguna
 // reservación existente. Traslapa si empieza antes de que la otra termine
 // y termina después de que la otra empieza (comparación de strings 'HH:mm',
@@ -88,6 +93,16 @@ export function effectiveStatus(
     return 'finalizada'
   }
   return reservation.status
+}
+
+// ¿El número total de asistentes está dentro del rango permitido (1–10)?
+export function isPlayerCountValid(playerCount: number): boolean {
+  return Number.isInteger(playerCount) && playerCount >= MIN_PLAYER_COUNT && playerCount <= MAX_PLAYER_COUNT
+}
+
+// ¿El nombre del residente a cargo no está vacío (ignorando espacios)?
+export function isResidentInChargeNameValid(name: string): boolean {
+  return name.trim().length > 0
 }
 
 // Espejo puro de la matriz de transición de firestore.rules — si cambia la

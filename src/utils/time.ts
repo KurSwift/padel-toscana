@@ -44,6 +44,21 @@ export function toDateString(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
+// Inverso de toDate() para la parte de hora: Date (hora local) → 'HH:mm'.
+export function toTimeString(date: Date): string {
+  const h = String(date.getHours()).padStart(2, '0')
+  const m = String(date.getMinutes()).padStart(2, '0')
+  return `${h}:${m}`
+}
+
+// Fecha + hora legibles en un solo string, p. ej. para mostrar
+// paymentDueAt ("Vie 30 ago · 10:00 PM"). Compone los helpers de arriba —
+// una sola fuente de verdad para este formato en vez de repetirlo en cada
+// componente que necesite mostrar un Timestamp.
+export function formatDateTimeShort(date: Date): string {
+  return `${formatDateShort(toDateString(date))} · ${formatTime(toTimeString(date))}`
+}
+
 export function todayString(): string {
   return toDateString(new Date())
 }

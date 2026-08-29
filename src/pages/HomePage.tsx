@@ -33,7 +33,14 @@ export default function HomePage() {
     navigate('/login')
   }
 
-  async function handleConfirmBooking(durationHours: number) {
+  // No cierra el sheet al confirmar con éxito — BookingSheet se queda
+  // abierto mostrando el aviso de pago (monto + fecha límite) hasta que el
+  // usuario lo cierre explícitamente. Solo lo cerramos aquí si falla.
+  async function handleConfirmBooking(params: {
+    durationHours: number
+    playerCount: number
+    residentInChargeName: string
+  }) {
     if (!court || !user || !profile || !selectedSlot) return
     try {
       await createReservation({
@@ -43,13 +50,12 @@ export default function HomePage() {
         userAddress: profile.address,
         date: selectedDate,
         startTime: selectedSlot.startTime,
-        durationHours,
+        ...params,
       })
-      toast.success('¡Reservación confirmada!')
-      setSelectedSlot(null)
     } catch (err) {
       toast.error(reservationErrorMessage((err as Error).message))
       setSelectedSlot(null)
+      throw err
     }
   }
 
@@ -162,11 +168,14 @@ export default function HomePage() {
       </main>
 
       {/* Booking bottom sheet */}
-      {selectedSlot && (
+      {selectedSlot && profile && (
         <BookingSheet
           date={selectedDate}
           startTime={selectedSlot.startTime}
           availableDurations={selectedSlot.availableDurations}
+          defaultResidentName={profile.name}
+          reservationFee={court.settings.reservationFee}
+          paymentDeadlineHours={court.settings.paymentDeadlineHours}
           onConfirm={handleConfirmBooking}
           onClose={() => setSelectedSlot(null)}
         />

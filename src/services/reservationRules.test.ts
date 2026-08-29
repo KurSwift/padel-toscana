@@ -8,6 +8,8 @@ import {
   canTransition,
   computePaymentDueAt,
   effectiveStatus,
+  isPlayerCountValid,
+  isResidentInChargeNameValid,
 } from './reservationRules'
 
 describe('hasOverlap', () => {
@@ -230,5 +232,40 @@ describe('effectiveStatus', () => {
   it('finalizada nunca cambia, sin importar cuánto tiempo pase', () => {
     const now = new Date(endAt.getTime() + 365 * 24 * 60 * 60 * 1000)
     expect(effectiveStatus(reservation('finalizada'), now)).toBe('finalizada')
+  })
+})
+
+describe('isPlayerCountValid', () => {
+  it('acepta el rango 1–10', () => {
+    expect(isPlayerCountValid(1)).toBe(true)
+    expect(isPlayerCountValid(4)).toBe(true)
+    expect(isPlayerCountValid(10)).toBe(true)
+  })
+
+  it('rechaza 0 y valores negativos', () => {
+    expect(isPlayerCountValid(0)).toBe(false)
+    expect(isPlayerCountValid(-1)).toBe(false)
+  })
+
+  it('rechaza más de 10', () => {
+    expect(isPlayerCountValid(11)).toBe(false)
+  })
+
+  it('rechaza valores no enteros', () => {
+    expect(isPlayerCountValid(2.5)).toBe(false)
+  })
+})
+
+describe('isResidentInChargeNameValid', () => {
+  it('acepta un nombre no vacío', () => {
+    expect(isResidentInChargeNameValid('Ana Activa')).toBe(true)
+  })
+
+  it('rechaza una cadena vacía', () => {
+    expect(isResidentInChargeNameValid('')).toBe(false)
+  })
+
+  it('rechaza una cadena de solo espacios', () => {
+    expect(isResidentInChargeNameValid('   ')).toBe(false)
   })
 })

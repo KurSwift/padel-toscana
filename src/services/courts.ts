@@ -21,6 +21,7 @@ export const DEFAULT_COURT_SETTINGS: CourtSettings = {
   daysAheadAllowed: 7,
   minLeadHours: 24,
   paymentDeadlineHours: 12,
+  reservationFee: 300,
 }
 
 export async function getActiveCourts(): Promise<Court[]> {
