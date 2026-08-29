@@ -34,6 +34,31 @@ service cloud.firestore {
         && userData.get('status', 'active') == 'active';
     }
 
+    // Ventana de anticipación válida para crear una reservación en esta
+    // cancha: entre minLeadHours y daysAheadAllowed (issue 3/7 del épico
+    // #10 — antes de startAt/endAt, esto no se podía validar de forma
+    // confiable en rules porque solo existían strings 'HH:mm').
+    function isWithinLeadTimeWindow(courtId) {
+      let settings = get(/databases/$(database)/documents/courts/$(courtId)).data.settings;
+      return request.resource.data.startAt >= request.time + duration.value(settings.minLeadHours * 60, 'm')
+          && request.resource.data.startAt <= request.time + duration.value(settings.daysAheadAllowed * 24 * 60, 'm');
+    }
+
+    // Compara los campos "de identidad" de una reservación entre el
+    // documento existente y el propuesto — usado para asegurar que una
+    // transición de status no cambie nada más (ver canTransition() en
+    // src/services/reservationRules.ts, el espejo puro de esta matriz).
+    function reservationCoreFieldsUnchanged() {
+      return request.resource.data.userId        == resource.data.userId
+          && request.resource.data.courtId       == resource.data.courtId
+          && request.resource.data.date          == resource.data.date
+          && request.resource.data.startTime     == resource.data.startTime
+          && request.resource.data.endTime       == resource.data.endTime
+          && request.resource.data.durationHours == resource.data.durationHours
+          && request.resource.data.startAt       == resource.data.startAt
+          && request.resource.data.endAt         == resource.data.endAt;
+    }
+
     // ── Users ──────────────────────────────────────────────────────────────
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
@@ -89,29 +114,51 @@ service cloud.firestore {
     }
 
     // ── Reservations ───────────────────────────────────────────────────────
+    // Máquina de estados: solicitada → pagada → cancelada | finalizada.
+    // Ver canTransition() en src/services/reservationRules.ts — si cambia
+    // esta matriz, hay que actualizar esa función Y estas rules.
     match /reservations/{reservationId} {
       allow read: if isAuthenticated();
 
-      // Only active (approved) users can create reservations
+      // Solo usuarios activos (aprobados) pueden crear reservaciones.
+      // Status inicial siempre 'solicitada'. Tope duro de 2h y ventana de
+      // anticipación (min/max) validados aquí — el límite de reservaciones
+      // activas por usuario NO se puede validar en rules (requeriría un
+      // conteo de query, no un get() de un documento puntual); ese límite
+      // queda solo del lado del cliente, mismo gap que ya existía antes.
       allow create: if isActiveUser()
         && request.resource.data.userId == request.auth.uid
-        && request.resource.data.status == 'active'
+        && request.resource.data.status == 'solicitada'
+        // 2 = MAX_RESERVATION_DURATION_HOURS en src/services/reservationRules.ts
+        && request.resource.data.durationHours <= 2
+        && request.resource.data.startAt is timestamp
+        && request.resource.data.endAt is timestamp
+        && request.resource.data.startAt < request.resource.data.endAt
+        && isWithinLeadTimeWindow(request.resource.data.courtId)
         && request.resource.data.keys().hasAll([
-             'courtId', 'userId', 'userName', 'date',
-             'startTime', 'endTime', 'durationHours', 'status', 'createdAt'
+             'courtId', 'userId', 'userName', 'date', 'startTime', 'endTime',
+             'durationHours', 'status', 'startAt', 'endAt', 'createdAt'
            ]);
 
+      // Matriz de transición:
+      //   solicitada → cancelada : dueño o admin
+      //   pagada     → cancelada : dueño o admin
+      //   solicitada → pagada    : tesorero o admin
+      //   cualquier otra transición : solo admin
+      // Ninguna transición no-admin puede tocar los demás campos.
       allow update: if (
           isOwner(resource.data.userId)
-          && resource.data.status == 'active'
-          && request.resource.data.status == 'cancelled'
-          && request.resource.data.userId      == resource.data.userId
-          && request.resource.data.courtId     == resource.data.courtId
-          && request.resource.data.date        == resource.data.date
-          && request.resource.data.startTime   == resource.data.startTime
-          && request.resource.data.endTime     == resource.data.endTime
-          && request.resource.data.durationHours == resource.data.durationHours
-        ) || isAdmin();
+          && resource.data.status in ['solicitada', 'pagada']
+          && request.resource.data.status == 'cancelada'
+          && reservationCoreFieldsUnchanged()
+        )
+        || (
+          isTesorero()
+          && resource.data.status == 'solicitada'
+          && request.resource.data.status == 'pagada'
+          && reservationCoreFieldsUnchanged()
+        )
+        || isAdmin();
 
       allow delete: if false;
     }

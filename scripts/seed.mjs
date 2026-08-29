@@ -25,10 +25,11 @@ const DEFAULT_COURT_SETTINGS = {
   openTime: '07:00',
   closeTime: '23:00',
   minDurationHours: 1,
-  maxDurationHours: 3,
+  maxDurationHours: 2,
   slotIntervalMinutes: 60,
-  maxActiveReservationsPerUser: 1,
+  maxActiveReservationsPerUser: 2,
   daysAheadAllowed: 7,
+  minLeadHours: 24,
 }
 
 const COURTS = [
@@ -90,23 +91,38 @@ async function seedUsersAndAddresses() {
   }
 }
 
-// Una reservación de ejemplo hoy, para poder probar cancelación y las
-// vistas de "Mis reservaciones" / panel admin sin reservar manualmente.
+// Dos reservaciones de ejemplo para mañana (respetando minLeadHours: 24),
+// una 'solicitada' y otra 'pagada', para poder probar cancelación,
+// confirmación de pago y las vistas de "Mis reservaciones" / panel admin
+// sin reservar manualmente. El seed usa firebase-admin y no pasa por
+// firestore.rules, así que puede escribir cualquier status directo.
 async function seedReservations() {
-  const today = new Date().toISOString().slice(0, 10)
-  const owner = SEED_USERS.find((u) => u.uid === 'seed-active-1')
-  await db.collection('reservations').add({
-    courtId: COURTS[0].id,
-    userId: owner.uid,
-    userName: owner.name,
-    userAddress: `${owner.street} ${owner.streetNumber}`,
-    date: today,
-    startTime: '10:00',
-    endTime: '11:00',
-    durationHours: 1,
-    status: 'active',
-    createdAt: Timestamp.now(),
-  })
+  const tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const date = tomorrow.toISOString().slice(0, 10)
+
+  const sample = [
+    { ownerUid: 'seed-active-1', startTime: '10:00', endTime: '11:00', status: 'solicitada' },
+    { ownerUid: 'seed-active-2', startTime: '17:00', endTime: '18:00', status: 'pagada' },
+  ]
+
+  for (const s of sample) {
+    const owner = SEED_USERS.find((u) => u.uid === s.ownerUid)
+    await db.collection('reservations').add({
+      courtId: COURTS[0].id,
+      userId: owner.uid,
+      userName: owner.name,
+      userAddress: `${owner.street} ${owner.streetNumber}`,
+      date,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      durationHours: 1,
+      status: s.status,
+      startAt: Timestamp.fromDate(new Date(`${date}T${s.startTime}:00`)),
+      endAt: Timestamp.fromDate(new Date(`${date}T${s.endTime}:00`)),
+      createdAt: Timestamp.now(),
+    })
+  }
 }
 
 async function main() {

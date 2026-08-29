@@ -122,13 +122,30 @@ Alias de import: `@/` → `src/` (configurado en `vite.config.ts` y
 ## La regla más importante del repo
 
 **`firestore.rules` duplica intencionalmente varias validaciones que también
-existen en `src/services/*`** (límite de reservaciones activas, traslapes de
-horario, quién puede aprobar/rechazar usuarios, quién puede cambiar
-`isAdmin`/`status`). Esto es deliberado: el cliente valida para dar buen UX
+existen en `src/services/*`** (tope de duración, ventana de anticipación
+mín/máx, traslapes de horario, quién puede aprobar/rechazar usuarios, quién
+puede cambiar `role`/`status`, la matriz de transición de status de una
+reservación). Esto es deliberado: el cliente valida para dar buen UX
 (mensajes de error específicos), pero las rules son la única barrera real
 contra un cliente malicioso. **Si cambias una regla de negocio en
 `src/services/`, revisa si `firestore.rules` necesita el mismo cambio, y
 viceversa.** No asumas que basta con tocar un solo lado.
+
+**Excepción conocida:** el límite de reservaciones activas por usuario
+(`maxActiveReservationsPerUser`) y la detección de traslapes de horario
+(`hasOverlap`) **no** se pueden validar en `firestore.rules` — requerirían
+contar/leer todas las demás reservaciones de un usuario o cancha, y las
+rules solo pueden hacer `get()` de documentos puntuales, no queries
+agregadas. Esas dos validaciones viven solo en `src/services/reservations.ts`;
+un cliente que escriba directo a Firestore podría saltárselas. Ver el gap
+correspondiente en `CONTEXT.md`.
+
+**Máquina de estados de reservaciones:** `canTransition(actor, from, to)`
+en `src/services/reservationRules.ts` es el espejo puro de la matriz de
+transición en `firestore.rules` (bloque `match /reservations/{id}` →
+`allow update`). Si cambias quién puede mover una reservación de un status
+a otro, actualiza **ambos** — hay tests exhaustivos de `canTransition` en
+`reservationRules.test.ts` que sirven de referencia de la matriz vigente.
 
 ## Emuladores, seeds y push-to-prod
 

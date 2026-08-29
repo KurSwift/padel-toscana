@@ -6,6 +6,7 @@ import { Court, CourtSettings, UserProfile, UserRole, Reservation } from '@/type
 import { getAllCourts, updateCourtSettings, toggleCourtActive, createCourt, DEFAULT_COURT_SETTINGS } from '@/services/courts'
 import { getAllUsers, setUserRole, approveUser, rejectUser } from '@/services/users'
 import { canChangeRole } from '@/services/userRules'
+import { MAX_RESERVATION_DURATION_HOURS } from '@/services/reservationRules'
 import { subscribeToAllReservationsByDate, cancelReservation } from '@/services/reservations'
 import { todayString, addDays, formatDateLong, formatTime } from '@/utils/time'
 
@@ -276,7 +277,10 @@ function CourtCard({
     setDirty(true)
   }
 
-  const durations = [1, 2, 3]
+  // Tope duro de 2h del reglamento de colonos (MAX_RESERVATION_DURATION_HOURS)
+  // — la UI ni siquiera ofrece configurar más que eso, independientemente
+  // de lo que ya tenga guardado un court.settings viejo.
+  const durations = Array.from({ length: MAX_RESERVATION_DURATION_HOURS }, (_, i) => i + 1)
 
   return (
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
@@ -387,6 +391,17 @@ function CourtCard({
                 max={30}
                 value={settings.daysAheadAllowed}
                 onChange={(e) => update({ daysAheadAllowed: Number(e.target.value) })}
+                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs text-gray-500 mb-1 block">Anticipación mínima (horas)</span>
+              <input
+                type="number"
+                min={1}
+                max={168}
+                value={settings.minLeadHours}
+                onChange={(e) => update({ minLeadHours: Number(e.target.value) })}
                 className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
               />
             </label>

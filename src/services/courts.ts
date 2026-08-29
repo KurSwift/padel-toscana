@@ -15,10 +15,11 @@ export const DEFAULT_COURT_SETTINGS: CourtSettings = {
   openTime: '07:00',
   closeTime: '23:00',
   minDurationHours: 1,
-  maxDurationHours: 3,
+  maxDurationHours: 2,
   slotIntervalMinutes: 60,
-  maxActiveReservationsPerUser: 1,
+  maxActiveReservationsPerUser: 2,
   daysAheadAllowed: 7,
+  minLeadHours: 24,
 }
 
 export async function getActiveCourts(): Promise<Court[]> {

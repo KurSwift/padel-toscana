@@ -9,6 +9,7 @@ import {
   addDays,
   generateTimeSlots,
   getAvailableDurations,
+  toDate,
 } from './time'
 
 describe('addHours', () => {
@@ -81,6 +82,23 @@ describe('generateTimeSlots', () => {
 
   it('devuelve arreglo vacío cuando open === close', () => {
     expect(generateTimeSlots('08:00', '08:00', 60)).toEqual([])
+  })
+})
+
+describe('toDate', () => {
+  it('combina fecha y hora en un Date de hora local', () => {
+    const d = toDate('2026-08-29', '14:30')
+    expect(d.getFullYear()).toBe(2026)
+    expect(d.getMonth()).toBe(7)
+    expect(d.getDate()).toBe(29)
+    expect(d.getHours()).toBe(14)
+    expect(d.getMinutes()).toBe(30)
+  })
+
+  it('produce un Date distinto para horas distintas del mismo día', () => {
+    const a = toDate('2026-08-29', '09:00')
+    const b = toDate('2026-08-29', '10:00')
+    expect(b.getTime() - a.getTime()).toBe(60 * 60 * 1000)
   })
 })
 
