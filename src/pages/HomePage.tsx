@@ -103,6 +103,12 @@ export default function HomePage() {
             </button>
           )}
           <button
+            onClick={() => navigate('/ayuda')}
+            className="text-xs font-medium text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition"
+          >
+            Ayuda
+          </button>
+          <button
             onClick={handleSignOut}
             className="text-xs font-medium text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition"
           >

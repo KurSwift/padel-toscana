@@ -38,12 +38,20 @@ export default function AdminPage() {
           <h1 className="text-lg font-bold text-gray-800">Panel Admin</h1>
           <p className="text-xs text-gray-500">{profile?.name}</p>
         </div>
-        <button
-          onClick={() => navigate('/')}
-          className="text-xs font-medium text-brand-600 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition"
-        >
-          ← Volver
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/ayuda')}
+            className="text-xs font-medium text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition"
+          >
+            Ayuda
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="text-xs font-medium text-brand-600 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition"
+          >
+            ← Volver
+          </button>
+        </div>
       </header>
 
       {/* Tab bar */}
