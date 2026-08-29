@@ -103,20 +103,27 @@ Candidatos, de más simple/barato a más trabajo:
   colonos reales bloqueados — si algo se rompe, revertir es inmediato
   (`enforcementMode: UNENFORCED`).*
 - ~~Rate limiting explícito dentro de `createReservation`~~ — **hecho en
-  código** (2026-08-29, `functions/src/rateLimit.ts` +
-  `functions/src/index.ts`, `firestore.rules`), **pero no desplegado a
-  producción todavía**: falta `firebase deploy --only functions,firestore:rules`
-  (o equivalente). Verificado que el deploy actual de la función es de
-  antes del merge, y el ruleset activo de Firestore no tiene el bloque
-  `rateLimits/{uid}` nuevo (aunque igual está bloqueado por default-deny
-  mientras tanto — no es un hueco de seguridad, solo falta la protección
-  de rate limit en sí). Ventana fija: máximo 10 llamadas por uid cada 5
+  código y desplegado a producción** (2026-08-29,
+  `functions/src/rateLimit.ts` + `functions/src/index.ts`,
+  `firestore.rules`). Ventana fija: máximo 10 llamadas por uid cada 5
   minutos. Probado contra el emulador de Functions (Auth + App Check
   debug token reales): la llamada 11 dentro de la ventana responde
-  `resource-exhausted`.
+  `resource-exhausted`. Verificado en producción bajando el zip
+  desplegado de Cloud Storage y confirmando que trae el código nuevo, y
+  leyendo el ruleset activo de Firestore para confirmar el bloque
+  `rateLimits/{uid}`.
 
-Puntos a definir antes de implementar: qué nivel de protección es
-proporcional al tamaño real del proyecto vs. el esfuerzo de cada medida —
-probablemente no todas hacen falta. El budget alert no depende de decidir
-esto y se puede hacer primero, sin código.
+  *Nota para el próximo deploy de functions:* `firebase deploy --only
+  functions` (todo el codebase) puede reportar `Skipped (No changes
+  detected)` con un hash que no refleja cambios reales aunque sí los
+  haya — pasó en este deploy. Si eso ocurre, usar `--only
+  functions:<nombreDeLaFunción>` (target explícito) fuerza el redeploy
+  sin pasar por esa comparación de hash. Confirmar siempre con `gcloud
+  functions describe <nombre> --gen2 --format="value(updateTime)"` que
+  el `updateTime` avanzó después de un deploy.
+
+Con esto, los 4 candidatos de la tarea 3 están hechos y desplegados.
+Queda pendiente solo el monitoreo continuo (métricas de App Check para
+Auth, ver nota arriba) — no hay más trabajo de código identificado para
+esta tarea por ahora.
 
