@@ -102,11 +102,18 @@ Candidatos, de más simple/barato a más trabajo:
   desglosado por `security`) los próximos días para confirmar que no hay
   colonos reales bloqueados — si algo se rompe, revertir es inmediato
   (`enforcementMode: UNENFORCED`).*
-- Rate limiting explícito dentro de `createReservation` (ej. contar
-  cuántas llamadas hizo un `uid` en los últimos N minutos) — Firebase no
-  trae esto nativo en callable functions. Cloud Armor sería otra opción,
-  probablemente overkill para el tamaño de este proyecto (comunidad
-  residencial chica).
+- ~~Rate limiting explícito dentro de `createReservation`~~ — **hecho en
+  código** (2026-08-29, `functions/src/rateLimit.ts` +
+  `functions/src/index.ts`, `firestore.rules`), **pero no desplegado a
+  producción todavía**: falta `firebase deploy --only functions,firestore:rules`
+  (o equivalente). Verificado que el deploy actual de la función es de
+  antes del merge, y el ruleset activo de Firestore no tiene el bloque
+  `rateLimits/{uid}` nuevo (aunque igual está bloqueado por default-deny
+  mientras tanto — no es un hueco de seguridad, solo falta la protección
+  de rate limit en sí). Ventana fija: máximo 10 llamadas por uid cada 5
+  minutos. Probado contra el emulador de Functions (Auth + App Check
+  debug token reales): la llamada 11 dentro de la ventana responde
+  `resource-exhausted`.
 
 Puntos a definir antes de implementar: qué nivel de protección es
 proporcional al tamaño real del proyecto vs. el esfuerzo de cada medida —
