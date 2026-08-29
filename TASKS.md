@@ -75,23 +75,33 @@ Candidatos, de más simple/barato a más trabajo:
   monto. Configuración en
   `billingAccounts/016CBD-CA33C1-2510D9/budgets/277cb204-d029-4b8c-94b2-995c097086e5`.
 - ~~Activar `enforceAppCheck: true` en `createReservation`~~ — **hecho en
-  código** (2026-08-29, `functions/src/index.ts`), pero **no desplegado a
-  producción todavía** (falta `firebase deploy --only functions` o
-  equivalente vía CI/PR). Se probó contra el emulador de Functions con un
-  debug token real (creado/canjeado/borrado vía la API de
-  `firebaseappcheck.googleapis.com`, ver nota nueva en AGENTS.md): sin
+  código y desplegado a producción** (2026-08-29, `functions/src/index.ts`
+  + `firebase deploy --only functions`). Se probó contra el emulador de
+  Functions con un debug token real (creado/canjeado/borrado vía la API
+  de `firebaseappcheck.googleapis.com`, ver nota nueva en AGENTS.md): sin
   App Check token la función responde `Unauthenticated`; con un Auth
   token válido pero sin App Check token, también `Unauthenticated`; con
   ambos, pasa el gate y llega a la validación de negocio normal
   (`invalid-argument` por payload vacío). El cliente ya manda el token de
   App Check automáticamente en cada llamada (`initializeAppCheck` en
-  `src/firebase.ts`, siempre activo), así que no debería haber fricción
-  para usuarios reales al desplegar — pero falta confirmarlo en producción
-  después del deploy.
-- Activar App Check enforcement para Firebase Authentication/Identity
-  Platform — protege específicamente el envío de SMS contra bots que
-  manden OTP a números arbitrarios. Confirmar que no cause falsos
-  positivos molestando a colonos reales.
+  `src/firebase.ts`, siempre activo). *Pendiente: nadie ha confirmado
+  todavía una reservación real de punta a punta en producción después
+  del deploy — probable que funcione (el gate se probó equivalente en
+  emulador) pero no verificado directamente.*
+- ~~Activar App Check enforcement para Firebase Authentication/Identity
+  Platform~~ — **hecho** (2026-08-29, `enforcementMode: ENFORCED` para
+  `identitytoolkit.googleapis.com`, vía API de
+  `firebaseappcheck.googleapis.com`). Antes de activarlo se confirmó
+  manualmente que el flujo real de envío de OTP por teléfono en
+  producción sí manda el header `X-Firebase-AppCheck` (probado por el
+  usuario en `padel-toscana.web.app`, DevTools → Network). Métricas de
+  los 30 días previos (agregadas a nivel proyecto, no solo Auth — la API
+  de Cloud Monitoring no desglosa por servicio): ~97% de verificaciones
+  `VALID`. *Pendiente: monitorear las métricas de App Check
+  (`firebaseappcheck.googleapis.com/services/verification_count`,
+  desglosado por `security`) los próximos días para confirmar que no hay
+  colonos reales bloqueados — si algo se rompe, revertir es inmediato
+  (`enforcementMode: UNENFORCED`).*
 - Rate limiting explícito dentro de `createReservation` (ej. contar
   cuántas llamadas hizo un `uid` en los últimos N minutos) — Firebase no
   trae esto nativo en callable functions. Cloud Armor sería otra opción,
