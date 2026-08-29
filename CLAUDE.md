@@ -28,6 +28,12 @@ tocar código:
   AGENTS.md, sección "Emuladores, seeds y push-to-prod"). El emulador de
   Firestore requiere Java; si no está disponible en el entorno, avisa al
   usuario en vez de asumir que puedes levantarlo.
+- **Toda descripción de PR incluye pasos de verificación manual** (qué
+  usuario/rol de `npm run seed` usar, qué probar, qué se espera ver) —
+  no solo el test plan automatizado. Si no pudiste correr los emuladores
+  tú mismo (p. ej. sin Java en el entorno), escribe esos pasos igual para
+  que el usuario los siga, y dilo explícitamente en vez de dar la
+  verificación por hecha.
 - Si trabajas explícitamente contra producción (sin `.env.local` o con
   `VITE_USE_EMULATORS=false`), **App Check bloquea llamadas reales** hasta
   registrar un debug token en Firebase Console. Espera un `403` en
