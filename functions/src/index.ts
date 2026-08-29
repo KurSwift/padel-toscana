@@ -28,6 +28,7 @@ import {
   computePaymentDueAt,
 } from './reservationRules'
 import { toDate, addHours } from './time'
+import { checkRateLimit, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_CALLS } from './rateLimit'
 
 initializeApp()
 const db = getFirestore()
@@ -57,16 +58,40 @@ function isValidInput(data: unknown): data is CreateReservationInput {
   )
 }
 
+// Rechaza si el uid ya agotó su cupo de llamadas en la ventana actual
+// (rateLimits/{uid} — ver rateLimit.ts). Corre en su propia transacción,
+// antes de cualquier otra lectura, para que un abusador falle barato (1
+// read + 1 write) en vez de pagar el costo completo de la validación de
+// negocio en cada intento.
+async function enforceRateLimit(uid: string): Promise<void> {
+  const ref = db.doc(`rateLimits/${uid}`)
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref)
+    const state = snap.exists
+      ? { windowStart: (snap.get('windowStart') as Timestamp).toDate(), count: snap.get('count') as number }
+      : null
+    const result = checkRateLimit(state, new Date(), RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_CALLS)
+    if (!result.allowed) {
+      throw new HttpsError('resource-exhausted', 'rate-limited')
+    }
+    tx.set(ref, {
+      windowStart: Timestamp.fromDate(result.nextState.windowStart),
+      count: result.nextState.count,
+    })
+  })
+}
+
 export const createReservation = onCall(
   { region: 'us-central1', enforceAppCheck: true },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'unauthenticated')
     }
+    const uid = request.auth.uid
+    await enforceRateLimit(uid)
     if (!isValidInput(request.data)) {
       throw new HttpsError('invalid-argument', 'invalid-argument')
     }
-    const uid = request.auth.uid
     const { courtId, date, startTime, durationHours, playerCount } = request.data
     const residentInChargeName = request.data.residentInChargeName.trim()
 
