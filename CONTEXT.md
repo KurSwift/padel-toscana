@@ -26,7 +26,7 @@ Tres roles, en `UserProfile.role` (`src/types/index.ts`):
 |---|---|
 | **`colono`** | Puede reservar/cancelar sus propias reservaciones una vez aprobado. Rol por default al registrarse. |
 | **`admin`** | Aprueba/rechaza registros, gestiona canchas (horarios, reglas), ve y cancela cualquier reservación, cambia el rol de otros usuarios. Se asigna manualmente desde el panel admin — no hay auto-promoción, y un admin no puede cambiarse su propio rol. |
-| **`tesorero`** | Confirma que una reservación ya fue pagada (issue 7/7 del épico #10 — aún no implementado en la UI a esta fecha). |
+| **`tesorero`** | Confirma que una reservación `solicitada` ya fue pagada, vía `confirmPayment()` en `src/services/reservations.ts` — la vista dedicada para hacerlo aún no existe (issue 7/7 del épico #10). |
 
 Un usuario tiene además un `status`: `pending` → `active` → (o `rejected`).
 Solo usuarios `active` pueden crear reservaciones. Los usuarios creados antes
@@ -65,17 +65,38 @@ si el admin no ve las notificaciones, ese es el primer lugar a revisar.
   `court.settings` (hora apertura/cierre, intervalo). Slots pasados (si es
   hoy) o que no alcanzan la duración mínima antes del cierre se ocultan.
 - Al elegir un slot libre, `getAvailableDurations()` calcula qué duraciones
-  (1h/2h/3h) caben sin chocar con otra reservación activa.
-- `createReservation()` valida en cliente: horario dentro de rango, límite
-  de reservaciones activas por usuario (`maxActiveReservationsPerUser`,
-  default 1), y que no haya traslape de horario. **Estas mismas reglas se
-  repiten en `firestore.rules`** porque las validaciones de cliente no son
-  suficientes por sí solas: alguien podría escribir directo a Firestore. Si
-  cambias una regla de negocio (p. ej. permitir reservaciones traslapadas,
-  cambiar el límite), debes actualizar **ambos lados**.
-- Cancelar una reservación (`cancelReservation`) es un soft-delete: cambia
-  `status` a `cancelled`, nunca se borra el documento (`allow delete: if
-  false` en las rules).
+  caben sin chocar con otra reservación que "ocupe" el horario (ver abajo),
+  topado en 2h (`MAX_RESERVATION_DURATION_HOURS`).
+- **4 estados** (`ReservationStatus` en `src/types/index.ts`): `solicitada`
+  (recién creada, pendiente de pago) → `pagada` (el tesorero confirmó el
+  pago) → `cancelada` | `finalizada`. `solicitada` y `pagada` "ocupan" el
+  horario (cuentan para traslapes y para el límite de reservaciones activas
+  por usuario) — ver `OCCUPYING_STATUSES` en `src/services/reservationRules.ts`.
+  `cancelada` y `finalizada` no ocupan. No hay todavía transición automática
+  a `finalizada` ni auto-liberación por falta de pago — eso es el issue 4/7
+  del épico #10 (deadline de pago + expiración "lazy").
+- `createReservation()` valida en cliente: horario dentro de rango, tope
+  duro de 2h (independiente de `court.settings.maxDurationHours`, por si
+  quedó una configuración vieja más permisiva), anticipación mínima
+  (`minLeadHours`, default 24h) y máxima (`daysAheadAllowed`) — ambas contra
+  `startAt`/`endAt` (`Timestamp`, calculados de `date`+`startTime`/`endTime`
+  al crear), límite de reservaciones activas por usuario
+  (`maxActiveReservationsPerUser`, default 2), y que no haya traslape de
+  horario. **La mayoría de estas reglas se repiten en `firestore.rules`**
+  (duración, ventana de anticipación, transición de status) porque las
+  validaciones de cliente no son suficientes por sí solas: alguien podría
+  escribir directo a Firestore. **Excepción:** el límite de activas y los
+  traslapes NO se pueden validar en rules (requieren contar/leer otras
+  reservaciones, no un `get()` puntual) — quedan solo del lado del cliente.
+  Si cambias una regla de negocio, revisa `AGENTS.md` → "La regla más
+  importante del repo" antes de asumir que basta un solo lado.
+- Transiciones de status van por `cancelReservation()` (dueño/admin, →
+  `cancelada`), `confirmPayment()` (tesorero/admin, `solicitada` →
+  `pagada`) y `setReservationStatus()` (override libre, solo admin) en
+  `src/services/reservations.ts`. Quién puede hacer qué transición está
+  centralizado en `canTransition()` (`src/services/reservationRules.ts`),
+  espejo puro de la matriz en `firestore.rules`. Nunca se borra el
+  documento (`allow delete: if false`).
 
 ## Panel de administración (`/admin`)
 
@@ -100,7 +121,7 @@ Tres pestañas:
 | `addresses/{addressKey}` | `{ uids: string[] }` | Máximo 2 `uids`. Lectura pública (se usa antes de autenticar, para validar disponibilidad de domicilio en el registro). |
 | `mail/{autoId}` | `{ to, message: { subject, html } }` | Solo creación por la app; lectura/actualización/borrado bloqueados — los procesa la extensión de correo. |
 | `courts/{courtId}` | `Court` (incluye `CourtSettings`) | Lectura para cualquier usuario autenticado, escritura solo admin. |
-| `reservations/{id}` | `Reservation` | Ver reglas de creación/actualización arriba. Índices compuestos en `firestore.indexes.json` para las queries por `date+status`, `courtId+date+status`, `userId+status+date`. |
+| `reservations/{id}` | `Reservation` | Ver reglas de creación/actualización arriba. `startAt`/`endAt` son `Timestamp`; el resto de fecha/hora sigue siendo strings (`date`, `startTime`, `endTime`). Índices compuestos en `firestore.indexes.json` para las queries por `date+status`, `courtId+date+status`, `userId+status+date` — siguen sirviendo con `where('status','in',[...])` porque Firestore indexa `in` igual que una igualdad. |
 
 Los tipos TypeScript en `src/types/index.ts` son la fuente de verdad del
 shape de estos documentos en el cliente.
@@ -121,6 +142,13 @@ shape de estos documentos en el cliente.
   reglas de Firestore. Si se necesita lógica server-side confiable (p. ej.
   anti-doble-reserva 100% atómico), habría que introducir Functions o
   transacciones Firestore más estrictas.
+- El límite de reservaciones activas por usuario y la detección de
+  traslapes de horario solo se validan en el cliente
+  (`src/services/reservations.ts`) — `firestore.rules` no puede hacer
+  queries agregadas, solo `get()` de documentos puntuales. Un cliente que
+  escriba directo a Firestore (saltándose la app) podría crear
+  reservaciones traslapadas o exceder el límite. Mismo tipo de gap que el
+  anti-doble-reserva atómico del punto anterior.
 - Hay tests unitarios (Vitest, `npm run test`) para la lógica de negocio
   pura (`src/services/reservationRules.ts`, `src/services/userRules.ts`,
   `src/utils/time.ts`), pero no hay tests end-to-end ni de componentes.

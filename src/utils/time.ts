@@ -4,6 +4,15 @@ const MONTHS = [
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
 ]
 
+// Combina una fecha 'YYYY-MM-DD' y una hora 'HH:mm' en un Date de JS (hora
+// local). Se usa para derivar startAt/endAt (Timestamp) al crear una
+// reservación — ver src/services/reservations.ts.
+export function toDate(dateStr: string, time: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const [h, m] = time.split(':').map(Number)
+  return new Date(year, month - 1, day, h, m)
+}
+
 export function addHours(time: string, hours: number): string {
   const [h, m] = time.split(':').map(Number)
   return `${String(h + hours).padStart(2, '0')}:${String(m).padStart(2, '0')}`
