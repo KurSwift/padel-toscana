@@ -41,3 +41,52 @@ Puntos a definir antes de implementar:
   `VALID_STREETS`, máximo 2 por domicilio, etc. — mismas reglas que
   `registerUser()`).
 
+## 3. Prevenir abuso de la API (mantener el costo cerca de $0 en plan Blaze)
+
+El proyecto pasó a plan Blaze (de pago) para poder tener la Cloud Function
+`createReservation` (ver tarea de traslapes/límite de reservaciones, ya
+cerrada). Con esto, varias cosas que antes no costaban nada ahora sí tienen
+un costo real, aunque pequeño — y hoy no hay ninguna protección puesta
+específicamente contra abuso/spam:
+
+- **Envío de OTP por SMS** (`sendPhoneOtp` en `LoginPage.tsx`, tanto modo
+  "Registrarme" como "Ya tengo cuenta") **no requiere estar autenticado** —
+  cualquiera que entre a `/login` puede mandar SMS a cualquier número. Cada
+  verificación de teléfono tiene un costo real en Firebase Auth. El único
+  freno que existe hoy es el `resendTimer` de 60s, que es solo del lado del
+  cliente (no protege contra un script que pegue directo al SDK/API).
+- **`createReservation`** (la Cloud Function) no tiene `enforceAppCheck`
+  activado — quedó fuera de alcance en el PR que la introdujo por
+  fricción no comprobada con el flujo de debug-token del emulador (ver
+  nota en AGENTS.md). Cualquiera con un token de Auth válido (cualquier
+  colono activo, o alguien que se registre) puede llamarla tantas veces
+  como quiera.
+- `firestore.rules` da lectura amplia (`allow read: if isAuthenticated()`)
+  en varias colecciones — un usuario autenticado podría hacer muchas
+  lecturas si algo (o alguien) lo scriptea.
+
+Candidatos, de más simple/barato a más trabajo:
+- **Budget alert en GCP Billing** para el proyecto — no es una prevención
+  técnica, pero es la red de seguridad más rápida de poner (sin tocar
+  código) para enterarse si algo se sale de control antes de que sea un
+  problema grande.
+- Activar `enforceAppCheck: true` en `createReservation` — cierra la vía
+  de llamar la función HTTP directo sin pasar por la app real. Antes de
+  activarlo, probar que el flujo de debug-token de App Check (ya usado
+  para Auth) también funcione sin fricción para llamadas a Functions
+  contra el emulador.
+- Activar App Check enforcement para Firebase Authentication/Identity
+  Platform — protege específicamente el envío de SMS contra bots que
+  manden OTP a números arbitrarios. Confirmar que no cause falsos
+  positivos molestando a colonos reales.
+- Rate limiting explícito dentro de `createReservation` (ej. contar
+  cuántas llamadas hizo un `uid` en los últimos N minutos) — Firebase no
+  trae esto nativo en callable functions. Cloud Armor sería otra opción,
+  probablemente overkill para el tamaño de este proyecto (comunidad
+  residencial chica).
+
+Puntos a definir antes de implementar: qué nivel de protección es
+proporcional al tamaño real del proyecto vs. el esfuerzo de cada medida —
+probablemente no todas hacen falta. El budget alert no depende de decidir
+esto y se puede hacer primero, sin código.
+
