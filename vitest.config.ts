@@ -12,6 +12,9 @@ export default defineConfig({
     setupFiles: ['./src/setupTests.ts'],
     // e2e/ son specs de Playwright (npm run test:e2e), no de Vitest — su
     // test() choca con el de Vitest si Vitest intenta recogerlos también.
-    exclude: [...configDefaults.exclude, 'e2e/**'],
+    // functions/ tiene su propio vitest.config.mts + tsconfig (CommonJS,
+    // sin los path aliases de la app) — se corre aparte con
+    // `npm run test:functions`, no como parte de este config.
+    exclude: [...configDefaults.exclude, 'e2e/**', 'functions/**'],
   },
 })

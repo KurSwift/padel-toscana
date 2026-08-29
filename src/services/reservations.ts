@@ -1,29 +1,23 @@
 import {
   collection,
   doc,
-  addDoc,
   updateDoc,
   query,
   where,
-  getDocs,
   onSnapshot,
-  serverTimestamp,
-  Timestamp,
   type QueryDocumentSnapshot,
   type DocumentData,
 } from 'firebase/firestore'
-import { db } from '@/firebase'
+import { httpsCallable } from 'firebase/functions'
+import { db, functions } from '@/firebase'
 import { Court, Reservation, ReservationStatus } from '@/types'
 import { addHours, toDate } from '@/utils/time'
 import {
-  hasOverlap,
-  countOccupyingReservations,
   isDurationWithinHardCap,
   isLeadTimeSufficient,
   isWithinMaxAdvanceWindow,
   isPlayerCountValid,
   isResidentInChargeNameValid,
-  computePaymentDueAt,
   effectiveStatus,
   OCCUPYING_STATUSES,
 } from '@/services/reservationRules'
@@ -87,13 +81,27 @@ function toOccupyingReservations(docs: QueryDocumentSnapshot<DocumentData>[]): R
   )
 }
 
+const createReservationCallable = httpsCallable(functions, 'createReservation')
+
 // Crea una reservación en status 'solicitada' (ocupa el horario, pendiente
 // de pago hasta paymentDueAt — ver effectiveStatus() para el auto-release).
-// Valida, en este orden: horario dentro de rango, tope duro de 2h, rango de
-// jugadores (1-10) y que haya residente a cargo, anticipación mínima/máxima,
-// límite de reservaciones activas del usuario, y traslapes. Estas mismas
-// validaciones (salvo el límite de activas, que requiere un conteo que las
-// rules no pueden hacer) se repiten en firestore.rules.
+// Valida del lado del cliente, en este orden, solo lo que NO requiere leer
+// otras reservaciones (para dar feedback instantáneo sin round-trip de
+// red): horario dentro de rango, tope duro de 2h, rango de jugadores
+// (1-10), que haya residente a cargo, y anticipación mínima/máxima. El
+// límite de reservaciones activas del usuario y los traslapes de horario
+// requieren un conteo/query agregada que un cliente podría saltarse
+// escribiendo directo a Firestore — por eso esos dos, y el write en sí,
+// los hace la Cloud Function `createReservation`
+// (functions/src/index.ts, dentro de una transacción). El cliente
+// re-valida todo lo de arriba igual, así que si la función rechaza la
+// reservación por una razón que el cliente no anticipó, el código de
+// error (`err.message`) es el mismo string que ya mapea
+// reservationErrorMessage() — no hace falta un mapeo aparte.
+// userId/userName/userAddress NO se mandan a la función: esta los deriva
+// de request.auth.uid y de users/{uid} en Firestore, para que un cliente
+// no pueda crear una reservación "como" otro usuario. Se quedan en la
+// firma de esta función solo por compatibilidad con el caller (HomePage).
 export async function createReservation(params: {
   court: Court
   userId: string
@@ -105,7 +113,7 @@ export async function createReservation(params: {
   playerCount: number
   residentInChargeName: string
 }): Promise<void> {
-  const { court, userId, userName, userAddress, date, startTime, durationHours, playerCount } = params
+  const { court, date, startTime, durationHours, playerCount } = params
   const residentInChargeName = params.residentInChargeName.trim()
   const endTime = addHours(startTime, durationHours)
 
@@ -115,7 +123,6 @@ export async function createReservation(params: {
   if (!isResidentInChargeNameValid(residentInChargeName)) throw new Error('resident-in-charge-required')
 
   const startAt = toDate(date, startTime)
-  const endAt = toDate(date, endTime)
   const now = new Date()
 
   if (!isLeadTimeSufficient(startAt, now, court.settings.minLeadHours)) {
@@ -125,50 +132,20 @@ export async function createReservation(params: {
     throw new Error('too-far-ahead')
   }
 
-  // Check user active reservation limit
-  const userSnap = await getDocs(
-    query(
-      collection(db, 'reservations'),
-      where('userId', '==', userId),
-      where('status', 'in', OCCUPYING_STATUSES),
-    ),
-  )
-  const userReservations = toOccupyingReservations(userSnap.docs)
-  if (countOccupyingReservations(userReservations) >= court.settings.maxActiveReservationsPerUser) {
-    throw new Error('max-reservations')
+  try {
+    await createReservationCallable({
+      courtId: court.id,
+      date,
+      startTime,
+      durationHours,
+      playerCount,
+      residentInChargeName,
+    })
+  } catch (err) {
+    // El SDK de Functions expone el segundo argumento de HttpsError como
+    // `.message` — mismos códigos de string que ya usa reservationErrorMessage().
+    throw new Error((err as { message?: string }).message ?? 'unknown-error')
   }
-
-  // Check for time overlaps on this court/date
-  const daySnap = await getDocs(
-    query(
-      collection(db, 'reservations'),
-      where('courtId', '==', court.id),
-      where('date', '==', date),
-      where('status', 'in', OCCUPYING_STATUSES),
-    ),
-  )
-  const existing = toOccupyingReservations(daySnap.docs)
-  if (hasOverlap(existing, startTime, endTime)) {
-    throw new Error('slot-taken')
-  }
-
-  await addDoc(collection(db, 'reservations'), {
-    courtId: court.id,
-    userId,
-    userName,
-    userAddress,
-    date,
-    startTime,
-    endTime,
-    durationHours,
-    status: 'solicitada' satisfies ReservationStatus,
-    startAt: Timestamp.fromDate(startAt),
-    endAt: Timestamp.fromDate(endAt),
-    paymentDueAt: Timestamp.fromDate(computePaymentDueAt(startAt, court.settings.paymentDeadlineHours)),
-    playerCount,
-    residentInChargeName,
-    createdAt: serverTimestamp(),
-  })
 }
 
 // El dueño (o un admin) cancela su reservación desde 'solicitada' o

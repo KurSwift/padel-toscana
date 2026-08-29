@@ -6,9 +6,13 @@ el contexto de negocio/dominio ver [CONTEXT.md](./CONTEXT.md).
 ## Stack
 
 React 19 + TypeScript + Vite 6, Tailwind CSS 3, React Router 7, Firebase v11
-(Auth, Firestore, App Check) vía SDK modular. Sin backend propio: no hay
-Cloud Functions ni servidor — toda la lógica de negocio vive en
-`src/services/*` y se refuerza en `firestore.rules`.
+(Auth, Firestore, App Check) vía SDK modular. Sin servidor propio: casi
+toda la lógica de negocio vive en `src/services/*` y se refuerza en
+`firestore.rules`. La única excepción es `functions/` (Cloud Functions v2,
+TypeScript) — una sola función (`createReservation`), que existe
+específicamente porque esa validación requiere una query agregada que
+`firestore.rules` no puede hacer (ver "La regla más importante del repo" más
+abajo). El proyecto está en plan Blaze (de pago) por esto.
 
 ## Comandos
 
@@ -17,19 +21,26 @@ npm install        # instalar dependencias
 npm run dev        # servidor de desarrollo (Vite, http://localhost:5173)
 npm run build       # tsc -b (type-check) + vite build → sale a public/
 npm run preview     # sirve el build de producción localmente
-npm run emulators   # Auth + Firestore emulators (requiere Java)
+npm run emulators   # Auth + Firestore + Functions emulators (requiere Java)
 npm run seed        # prepobla el emulador con datos de ejemplo
 npm run push-to-prod  # migra colecciones seleccionadas emulador → producción (dry-run por default)
 npm run test        # corre la suite de Vitest una vez (CI-friendly)
 npm run test:watch  # Vitest en modo watch, para desarrollo
 npm run test:e2e    # Playwright — flujo crítico E2E contra los emuladores (ver e2e/)
+npm run test:functions    # Vitest de functions/ (reglas puras duplicadas — ver functions/src/reservationRules.ts)
+npm run functions:build   # tsc de functions/ (predeploy hook también lo corre)
+npm run functions:serve   # build + solo el emulador de Functions
+npm run functions:deploy  # firebase deploy --only functions (requiere plan Blaze)
 ```
 
 No hay lint script configurado en `package.json`. Los gates de calidad
 automatizados son: el type-check que corre `tsc -b` como parte de
 `npm run build` (strict mode, `noUnusedLocals`, `noUnusedParameters` activos
 en `tsconfig.app.json`), y `npm run test` (Vitest) para la lógica de negocio
-pura. Corre ambos antes de dar por terminado un cambio no trivial.
+pura. Corre ambos antes de dar por terminado un cambio no trivial. Si el
+cambio toca `functions/` (tiene su propio `package.json`/`tsconfig.json`,
+build separado — no forma parte de `tsc -b` de la raíz), corre también
+`npm run functions:build` y `npm run test:functions`.
 
 `firebase-tools` y `firebase-admin` están como devDependencies (no hace
 falta instalar nada global). El proyecto está enlazado vía `.firebaserc`
@@ -90,6 +101,10 @@ scripts/
 e2e/                      # Playwright — npm run test:e2e, ver más abajo
   helpers.ts              # login/registro por teléfono (OTP vía emulador), logout
   critical-flow.spec.ts   # registro → aprobación → reserva → pago → cancelación
+functions/                # Cloud Functions v2 + TypeScript — build/deploy propios, ver "Comandos"
+  src/index.ts             # createReservation (onCall) — única función del repo
+  src/reservationRules.ts  # copia de la lógica pura que necesita (ver comentario de cabecera)
+  src/time.ts               # copia de src/utils/time.ts (toDate/addHours) — mismo motivo
 ```
 
 Alias de import: `@/` → `src/` (configurado en `vite.config.ts` y
@@ -139,24 +154,32 @@ Alias de import: `@/` → `src/` (configurado en `vite.config.ts` y
 ## La regla más importante del repo
 
 **`firestore.rules` duplica intencionalmente varias validaciones que también
-existen en `src/services/*`** (tope de duración, ventana de anticipación
-mín/máx, rango de `playerCount`, que `residentInChargeName` no esté vacío,
-traslapes de horario, quién puede aprobar/rechazar usuarios, quién puede
-cambiar `role`/`status`, la matriz de transición de status de una
+existen en `src/services/*`** (quién puede aprobar/rechazar usuarios, quién
+puede cambiar `role`/`status`, la matriz de transición de status de una
 reservación). Esto es deliberado: el cliente valida para dar buen UX
 (mensajes de error específicos), pero las rules son la única barrera real
 contra un cliente malicioso. **Si cambias una regla de negocio en
 `src/services/`, revisa si `firestore.rules` necesita el mismo cambio, y
 viceversa.** No asumas que basta con tocar un solo lado.
 
-**Excepción conocida:** el límite de reservaciones activas por usuario
+**Crear una reservación es la excepción a ese patrón de dos lugares — son
+tres.** El límite de reservaciones activas por usuario
 (`maxActiveReservationsPerUser`) y la detección de traslapes de horario
-(`hasOverlap`) **no** se pueden validar en `firestore.rules` — requerirían
-contar/leer todas las demás reservaciones de un usuario o cancha, y las
-rules solo pueden hacer `get()` de documentos puntuales, no queries
-agregadas. Esas dos validaciones viven solo en `src/services/reservations.ts`;
-un cliente que escriba directo a Firestore podría saltárselas. Ver el gap
-correspondiente en `CONTEXT.md`.
+(`hasOverlap`) requieren contar/leer todas las demás reservaciones de un
+usuario o cancha — algo que `firestore.rules` no puede hacer (solo `get()`
+de documentos puntuales, no queries agregadas). Por eso `allow create` en
+`reservations` es simplemente `if false`: la única vía para crear una
+reservación es la Cloud Function `createReservation`
+(`functions/src/index.ts`), que corre con Admin SDK (bypasea rules) y hace
+esas dos validaciones + el write dentro de una transacción de Firestore —
+atómico, y sin el gap que existía antes (un cliente que escribiera directo
+a Firestore podía saltarse ambas validaciones). Las reglas de negocio de
+una reservación viven ahora en tres lugares que hay que mantener en sync:
+`src/services/reservationRules.ts` (UX del cliente, feedback instantáneo),
+`functions/src/reservationRules.ts` (autoridad real), y el resto de
+`firestore.rules` para lo que NO es `create` (la matriz de transición de
+status sigue reforzada ahí, ver abajo). Si cambias una regla de negocio de
+reservaciones, revisa los tres.
 
 **Máquina de estados de reservaciones:** `canTransition(actor, from, to)`
 en `src/services/reservationRules.ts` es el espejo puro de la matriz de
@@ -165,7 +188,7 @@ transición en `firestore.rules` (bloque `match /reservations/{id}` →
 a otro, actualiza **ambos** — hay tests exhaustivos de `canTransition` en
 `reservationRules.test.ts` que sirven de referencia de la matriz vigente.
 
-**Expiración "lazy" (sin Cloud Functions):** el status guardado en Firestore
+**Expiración "lazy" (no una función programada):** el status guardado en Firestore
 de una reservación puede estar desactualizado respecto al reloj real — nadie
 lo corrige en el instante exacto en que expira. `effectiveStatus(reservation,
 now)` en `reservationRules.ts` calcula el status real; `reservations.ts` la
@@ -186,7 +209,7 @@ existe `.env.local` con `VITE_USE_EMULATORS=true` (ver `src/firebase.ts`).
 
 ```bash
 cp .env.local.example .env.local   # una vez
-npm run emulators                  # terminal 1 — Auth :9099, Firestore :8080, UI :4000
+npm run emulators                  # terminal 1 — Auth :9099, Firestore :8080, Functions :5001, UI :4000
 npm run seed                       # terminal 2 — prepobla courts/users/addresses/reservations
 npm run dev                        # terminal 2
 ```
@@ -255,4 +278,6 @@ tokens**, o las llamadas a Auth/Firestore fallan con `403`.
   borrarlo a mano desde la consola de Firebase.
 - Nuevas reglas de negocio en reservaciones casi siempre necesitan tocar
   tanto `src/services/reservations.ts` como `firestore.rules` (ver sección
-  anterior).
+  anterior) — y si la regla aplica a la creación de una reservación
+  (`createReservation`), también `functions/src/index.ts` y
+  `functions/src/reservationRules.ts`.

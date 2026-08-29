@@ -74,8 +74,11 @@ si el admin no ve las notificaciones, ese es el primer lugar a revisar.
   por usuario) — ver `OCCUPYING_STATUSES` en `src/services/reservationRules.ts`.
   `cancelada` y `finalizada` no ocupan.
 - **Expiración "lazy" del status** (issue 4/7 del épico #10 — decisión
-  explícita: sin Cloud Functions, para quedarse en el plan Spark de
-  Firebase): una `solicitada` se libera (efectivamente `cancelada`) si
+  explícita por simplicidad, no por restricción de plan: el proyecto ya
+  está en Blaze por `functions/`, pero corregir el status exacto al
+  segundo seguiría necesitando una función programada aparte, y no vale la
+  pena — "la próxima vez que alguien cargue la vista" es suficiente):
+  una `solicitada` se libera (efectivamente `cancelada`) si
   nadie confirma el pago antes de `paymentDueAt` (`startAt -
   court.settings.paymentDeadlineHours`, default 12h); una `solicitada` o
   `pagada` se vuelve efectivamente `finalizada` al pasar `endAt`. Nada
@@ -203,20 +206,22 @@ shape de estos documentos en el cliente.
 
 ## Gaps / deuda conocida (útil antes de asumir que "ya existe")
 
-- No hay Cloud Functions en este repo; toda la lógica vive en el cliente +
-  reglas de Firestore. Si se necesita lógica server-side confiable (p. ej.
-  anti-doble-reserva 100% atómico), habría que introducir Functions o
-  transacciones Firestore más estrictas.
-- El límite de reservaciones activas por usuario y la detección de
-  traslapes de horario solo se validan en el cliente
-  (`src/services/reservations.ts`) — `firestore.rules` no puede hacer
-  queries agregadas, solo `get()` de documentos puntuales. Un cliente que
-  escriba directo a Firestore (saltándose la app) podría crear
-  reservaciones traslapadas o exceder el límite. Mismo tipo de gap que el
-  anti-doble-reserva atómico del punto anterior.
-- Hay tests unitarios (Vitest, `npm run test`) para la lógica de negocio
-  pura (`src/services/reservationRules.ts`, `src/services/userRules.ts`,
-  `src/utils/time.ts`), pero no hay tests end-to-end ni de componentes.
+- Casi toda la lógica vive en el cliente + reglas de Firestore. La única
+  excepción es `functions/` (Cloud Functions v2, una sola función,
+  `createReservation`) — existe puntualmente porque crear una reservación
+  necesita validar el límite de activas por usuario y traslapes de
+  horario, algo que requiere queries agregadas que `firestore.rules` no
+  puede hacer (solo `get()` de documentos puntuales). La función corre esa
+  validación + el write dentro de una transacción de Firestore, atómico;
+  `firestore.rules` deniega `create` en `reservations` por completo
+  (`if false`) — la función es la única vía. El proyecto está en plan
+  Blaze por esto. Ver "La regla más importante del repo" en AGENTS.md.
+- Hay tests unitarios (Vitest — `npm run test` para el cliente,
+  `npm run test:functions` para `functions/`) para toda la lógica de
+  negocio pura, tests de componentes (Testing Library, ej. `BookingSheet`,
+  `StatusBadge`) y un flujo E2E crítico con Playwright
+  (`npm run test:e2e` — registro → aprobación → reserva → pago →
+  cancelación, contra los emuladores).
 - Un admin autenticado puede cambiar el `role` de **cualquier** usuario,
   incluido el suyo propio, directo contra Firestore — la restricción de "no
   puedes cambiar tu propio rol" solo existe en la UI (`canChangeRole`), no

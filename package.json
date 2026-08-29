@@ -13,7 +13,11 @@
     "migrate-users-role": "node scripts/migrate-users-role.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:functions": "npm --prefix functions run test",
+    "functions:build": "npm --prefix functions run build",
+    "functions:serve": "npm --prefix functions run serve",
+    "functions:deploy": "npm --prefix functions run deploy"
   },
   "dependencies": {
     "firebase": "^11.7.1",
