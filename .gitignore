@@ -6,6 +6,9 @@ node_modules/
 .env
 .env.local
 
+# Cache local del CLI de Firebase (hashes de deploy de hosting, etc.)
+.firebase/
+
 # Firebase CLI debug files
 firebase-debug.log
 firebase-debug.*.log

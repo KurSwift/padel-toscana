@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth, connectAuthEmulator } from 'firebase/auth'
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions'
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check'
 
 const firebaseConfig = {
@@ -29,6 +30,8 @@ initializeAppCheck(app, {
 
 export const auth = getAuth(app)
 export const db = getFirestore(app)
+// Región debe coincidir con la de functions/src/index.ts (onCall({ region }, ...)).
+export const functions = getFunctions(app, 'us-central1')
 
 // Apunta Auth/Firestore a los emuladores locales en vez de producción.
 // Actívalo copiando .env.local.example a .env.local (VITE_USE_EMULATORS=true)
@@ -38,10 +41,11 @@ const useEmulators = import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS =
 if (useEmulators) {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
   connectFirestoreEmulator(db, '127.0.0.1', 8080)
+  connectFunctionsEmulator(functions, '127.0.0.1', 5001)
   // Evita que el login por teléfono dependa de resolver el reCAPTCHA real
   // de Google (lento e intermitente contra servicios externos) — el
   // emulador de Auth no lo necesita para generar/validar el código OTP.
   auth.settings.appVerificationDisabledForTesting = true
   // eslint-disable-next-line no-console
-  console.info('[firebase] Usando emuladores locales — Auth :9099, Firestore :8080')
+  console.info('[firebase] Usando emuladores locales — Auth :9099, Firestore :8080, Functions :5001')
 }

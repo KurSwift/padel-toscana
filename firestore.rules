@@ -27,37 +27,6 @@ service cloud.firestore {
       return request.auth.uid == uid;
     }
 
-    // Treat users with no status field (registered before this feature) as active
-    function isActiveUser() {
-      let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      return isAuthenticated()
-        && userData.get('status', 'active') == 'active';
-    }
-
-    function courtSettings(courtId) {
-      return get(/databases/$(database)/documents/courts/$(courtId)).data.settings;
-    }
-
-    // Ventana de anticipación válida para crear una reservación en esta
-    // cancha: entre minLeadHours y daysAheadAllowed (issue 3/7 del épico
-    // #10 — antes de startAt/endAt, esto no se podía validar de forma
-    // confiable en rules porque solo existían strings 'HH:mm').
-    function isWithinLeadTimeWindow(courtId) {
-      let settings = courtSettings(courtId);
-      return request.resource.data.startAt >= request.time + duration.value(settings.minLeadHours * 60, 'm')
-          && request.resource.data.startAt <= request.time + duration.value(settings.daysAheadAllowed * 24 * 60, 'm');
-    }
-
-    // paymentDueAt debe ser exactamente startAt - paymentDeadlineHours —
-    // espejo de computePaymentDueAt() en src/services/reservationRules.ts.
-    // Evita que un cliente malicioso mande un paymentDueAt lejano para
-    // nunca liberar el horario si no paga.
-    function isPaymentDueAtValid(courtId) {
-      let settings = courtSettings(courtId);
-      return request.resource.data.paymentDueAt
-          == request.resource.data.startAt - duration.value(settings.paymentDeadlineHours * 60, 'm');
-    }
-
     // Compara los campos "de identidad" de una reservación entre el
     // documento existente y el propuesto — usado para asegurar que una
     // transición de status no cambie nada más (ver canTransition() y
@@ -137,35 +106,15 @@ service cloud.firestore {
     match /reservations/{reservationId} {
       allow read: if isAuthenticated();
 
-      // Solo usuarios activos (aprobados) pueden crear reservaciones.
-      // Status inicial siempre 'solicitada'. Tope duro de 2h, ventana de
-      // anticipación (min/max) y paymentDueAt validados aquí — el límite
-      // de reservaciones activas por usuario NO se puede validar en rules
-      // (requeriría un conteo de query, no un get() de un documento
-      // puntual); ese límite queda solo del lado del cliente, mismo gap
-      // que ya existía antes.
-      allow create: if isActiveUser()
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.status == 'solicitada'
-        // 2 = MAX_RESERVATION_DURATION_HOURS en src/services/reservationRules.ts
-        && request.resource.data.durationHours <= 2
-        // 1-10 = MIN/MAX_PLAYER_COUNT en src/services/reservationRules.ts
-        && request.resource.data.playerCount is int
-        && request.resource.data.playerCount >= 1
-        && request.resource.data.playerCount <= 10
-        && request.resource.data.residentInChargeName is string
-        && request.resource.data.residentInChargeName.size() > 0
-        && request.resource.data.startAt is timestamp
-        && request.resource.data.endAt is timestamp
-        && request.resource.data.paymentDueAt is timestamp
-        && request.resource.data.startAt < request.resource.data.endAt
-        && isWithinLeadTimeWindow(request.resource.data.courtId)
-        && isPaymentDueAtValid(request.resource.data.courtId)
-        && request.resource.data.keys().hasAll([
-             'courtId', 'userId', 'userName', 'date', 'startTime', 'endTime',
-             'durationHours', 'status', 'startAt', 'endAt', 'paymentDueAt',
-             'playerCount', 'residentInChargeName', 'createdAt'
-           ]);
+      // Crear una reservación requiere validar el límite de activas por
+      // usuario y traslapes de horario — queries agregadas que rules no
+      // puede hacer (solo get() de documentos puntuales). Por eso la única
+      // vía para crear es la Cloud Function `createReservation`
+      // (functions/src/index.ts): corre con Admin SDK (bypasea estas
+      // rules) y hace esas dos validaciones + el write dentro de una
+      // transacción de Firestore. Cualquier intento de creación directa
+      // desde el cliente (incluso uno estructuralmente válido) se rechaza.
+      allow create: if false;
 
       // Matriz de transición:
       //   solicitada → cancelada : dueño o admin, o CUALQUIER autenticado
