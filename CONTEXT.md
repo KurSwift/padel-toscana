@@ -136,11 +136,16 @@ si el admin no ve las notificaciones, ese es el primer lugar a revisar.
 ## Panel de administración (`/admin`)
 
 Tres pestañas:
-- **Reservaciones**: navega por fecha, ve todas las reservaciones activas del
-  día, puede cancelar cualquiera.
+- **Reservaciones**: navega por fecha, ve **todas** las reservaciones del
+  día (los 4 estados, con `StatusBadge` — a diferencia de las vistas de
+  colono, aquí no se filtra por status, ver
+  `subscribeToAllReservationsByDate` en `src/services/reservations.ts`),
+  puede cambiar el status de cualquiera a cualquier estado con un `<select>`
+  (`setReservationStatus`, sin pasar por la matriz de transición normal —
+  reforzado en rules: solo admin).
 - **Canchas**: activar/desactivar canchas, editar `CourtSettings` (horario,
-  duración mín/máx, reservaciones máximas por usuario, días de anticipación
-  permitidos), crear canchas nuevas.
+  duración mín/máx, reservaciones máximas por usuario, días de anticipación,
+  anticipación mínima, plazo de pago, monto a pagar), crear canchas nuevas.
 - **Usuarios**: aprobar/rechazar pendientes, asignar rol (colono/admin/
   tesorero) vía un selector de 3 opciones. Un admin no puede modificarse su
   propio rol — bloqueado en la UI (`canChangeRole` en
@@ -156,7 +161,7 @@ Tres pestañas:
 | `addresses/{addressKey}` | `{ uids: string[] }` | Máximo 2 `uids`. Lectura pública (se usa antes de autenticar, para validar disponibilidad de domicilio en el registro). |
 | `mail/{autoId}` | `{ to, message: { subject, html } }` | Solo creación por la app; lectura/actualización/borrado bloqueados — los procesa la extensión de correo. |
 | `courts/{courtId}` | `Court` (incluye `CourtSettings`) | Lectura para cualquier usuario autenticado, escritura solo admin. |
-| `reservations/{id}` | `Reservation` | Ver reglas de creación/actualización arriba. `startAt`/`endAt`/`paymentDueAt` son `Timestamp`; el resto de fecha/hora sigue siendo strings (`date`, `startTime`, `endTime`). El campo `status` puede estar desactualizado — ver "Expiración lazy" arriba. `playerCount`/`residentInChargeName` capturados en `BookingSheet`. Índices compuestos en `firestore.indexes.json` para las queries por `date+status`, `courtId+date+status`, `userId+status+date` — siguen sirviendo con `where('status','in',[...])` porque Firestore indexa `in` igual que una igualdad. |
+| `reservations/{id}` | `Reservation` | Ver reglas de creación/actualización arriba. `startAt`/`endAt`/`paymentDueAt` son `Timestamp`; el resto de fecha/hora sigue siendo strings (`date`, `startTime`, `endTime`). El campo `status` puede estar desactualizado — ver "Expiración lazy" arriba. `playerCount`/`residentInChargeName` capturados en `BookingSheet`. Índices compuestos en `firestore.indexes.json` para `courtId+date+status` y `userId+status+date` — siguen sirviendo con `where('status','in',[...])` porque Firestore indexa `in` igual que una igualdad. El índice `date+status` que existía se quitó (issue 6/7): la única query que lo usaba (panel admin) ya no filtra por status. |
 
 Los tipos TypeScript en `src/types/index.ts` son la fuente de verdad del
 shape de estos documentos en el cliente.

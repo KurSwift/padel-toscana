@@ -50,12 +50,11 @@ export function reservationErrorMessage(code: string): string {
 // Functions que lo corrijan en el momento exacto en que expira. Además,
 // dispara (sin esperar) una escritura correctiva en Firestore por cada doc
 // cuyo status efectivo ya no coincide con el guardado — así el dato queda
-// consistente para la siguiente lectura de cualquier usuario. Solo
-// devuelve las reservaciones cuyo status efectivo sigue "ocupando" el
-// horario (ver OCCUPYING_STATUSES); las que ya expiraron/finalizaron se
-// excluyen del resultado aunque el doc en Firestore aún no se haya
-// actualizado.
-function toOccupyingReservations(docs: QueryDocumentSnapshot<DocumentData>[]): Reservation[] {
+// consistente para la siguiente lectura de cualquier usuario. Devuelve
+// TODAS las reservaciones (los 4 estados) con su status corregido — usado
+// por AdminPage, que necesita ver el historial completo de un día, no solo
+// lo que ocupa el horario ahora mismo.
+function toEffectiveReservations(docs: QueryDocumentSnapshot<DocumentData>[]): Reservation[] {
   const now = new Date()
   const result: Reservation[] = []
 
@@ -73,12 +72,19 @@ function toOccupyingReservations(docs: QueryDocumentSnapshot<DocumentData>[]): R
       })
     }
 
-    if ((OCCUPYING_STATUSES as readonly string[]).includes(status)) {
-      result.push({ id: d.id, ...data, status } as Reservation)
-    }
+    result.push({ id: d.id, ...data, status } as Reservation)
   }
 
   return result
+}
+
+// Igual que toEffectiveReservations, pero solo devuelve las que siguen
+// "ocupando" el horario (ver OCCUPYING_STATUSES) — usado por las vistas de
+// colono, donde una reservación cancelada/finalizada no debe aparecer.
+function toOccupyingReservations(docs: QueryDocumentSnapshot<DocumentData>[]): Reservation[] {
+  return toEffectiveReservations(docs).filter((r) =>
+    (OCCUPYING_STATUSES as readonly string[]).includes(r.status),
+  )
 }
 
 // Crea una reservación en status 'solicitada' (ocupa el horario, pendiente
@@ -209,17 +215,17 @@ export function subscribeToReservations(
   )
 }
 
+// A diferencia de subscribeToReservations/subscribeToUserReservations, NO
+// filtra por status — usada por AdminPage (pestaña Reservaciones), que
+// necesita ver los 4 estados de un día, incluyendo solicitada sin pagar,
+// cancelada y finalizada (issue 6/7 del épico #10).
 export function subscribeToAllReservationsByDate(
   date: string,
   onUpdate: (reservations: Reservation[]) => void,
 ): () => void {
   return onSnapshot(
-    query(
-      collection(db, 'reservations'),
-      where('date', '==', date),
-      where('status', 'in', OCCUPYING_STATUSES),
-    ),
-    (snap) => onUpdate(toOccupyingReservations(snap.docs)),
+    query(collection(db, 'reservations'), where('date', '==', date)),
+    (snap) => onUpdate(toEffectiveReservations(snap.docs)),
   )
 }
 
