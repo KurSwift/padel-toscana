@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "emulators": "firebase emulators:start --import=./.emulator-data --export-on-exit=./.emulator-data",
+    "emulators": "PATH=\"/opt/homebrew/opt/openjdk/bin:/usr/local/opt/openjdk/bin:$PATH\" firebase emulators:start --import=./.emulator-data --export-on-exit=./.emulator-data",
     "seed": "node scripts/seed.mjs",
     "push-to-prod": "node scripts/push-to-prod.mjs"
   },
