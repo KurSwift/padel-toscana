@@ -94,6 +94,14 @@ export default function HomePage() {
               Admin
             </button>
           )}
+          {(profile?.role === 'tesorero' || profile?.role === 'admin') && (
+            <button
+              onClick={() => navigate('/tesorero')}
+              className="text-xs font-medium text-brand-600 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition"
+            >
+              Pagos
+            </button>
+          )}
           <button
             onClick={handleSignOut}
             className="text-xs font-medium text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition"

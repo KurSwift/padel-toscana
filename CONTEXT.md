@@ -26,7 +26,7 @@ Tres roles, en `UserProfile.role` (`src/types/index.ts`):
 |---|---|
 | **`colono`** | Puede reservar/cancelar sus propias reservaciones una vez aprobado. Rol por default al registrarse. |
 | **`admin`** | Aprueba/rechaza registros, gestiona canchas (horarios, reglas), ve y cancela cualquier reservación, cambia el rol de otros usuarios. Se asigna manualmente desde el panel admin — no hay auto-promoción, y un admin no puede cambiarse su propio rol. |
-| **`tesorero`** | Confirma que una reservación `solicitada` ya fue pagada, vía `confirmPayment()` en `src/services/reservations.ts` — la vista dedicada para hacerlo aún no existe (issue 7/7 del épico #10). |
+| **`tesorero`** | Confirma que una reservación `solicitada` ya fue pagada, desde `/tesorero` (`TesoreroPage.tsx`) — lista todas las `solicitada` pendientes (cualquier fecha/cancha) con un botón "Confirmar pago" (`confirmPayment()`). Un admin también puede entrar a esa ruta. |
 
 Un usuario tiene además un `status`: `pending` → `active` → (o `rejected`).
 Solo usuarios `active` pueden crear reservaciones. Los usuarios creados antes
@@ -152,6 +152,16 @@ Tres pestañas:
   `src/services/userRules.ts`); las rules **no** repiten esta restricción
   específica (un admin autenticado puede escribir cualquier `users/*` vía
   API directa), mismo gap que existía con `isAdmin` antes de esta migración.
+
+## Vista de tesorero (`/tesorero`)
+
+Página chica y separada de `/admin` a propósito (`TesoreroPage.tsx`) —
+lista todas las reservaciones `solicitada` (pendientes de pago) de
+cualquier fecha/cancha, ordenadas por `paymentDueAt` (las más urgentes
+primero), con un botón "Confirmar pago" por reservación
+(`confirmPayment()`). No hay paginación: el conjunto de `solicitada`
+siempre debería ser chico porque expiran solas (issue 4/7) si nadie las
+paga a tiempo.
 
 ## Modelo de datos (Firestore)
 

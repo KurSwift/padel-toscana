@@ -7,6 +7,7 @@ import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
 import HomePage from '@/pages/HomePage'
 import AdminPage from '@/pages/AdminPage'
+import TesoreroPage from '@/pages/TesoreroPage'
 
 export default function App() {
   return (
@@ -39,6 +40,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdminPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tesorero"
+            element={
+              <ProtectedRoute allowedRoles={['tesorero', 'admin']}>
+                <TesoreroPage />
               </ProtectedRoute>
             }
           />
