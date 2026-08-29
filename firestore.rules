@@ -34,20 +34,34 @@ service cloud.firestore {
         && userData.get('status', 'active') == 'active';
     }
 
+    function courtSettings(courtId) {
+      return get(/databases/$(database)/documents/courts/$(courtId)).data.settings;
+    }
+
     // Ventana de anticipación válida para crear una reservación en esta
     // cancha: entre minLeadHours y daysAheadAllowed (issue 3/7 del épico
     // #10 — antes de startAt/endAt, esto no se podía validar de forma
     // confiable en rules porque solo existían strings 'HH:mm').
     function isWithinLeadTimeWindow(courtId) {
-      let settings = get(/databases/$(database)/documents/courts/$(courtId)).data.settings;
+      let settings = courtSettings(courtId);
       return request.resource.data.startAt >= request.time + duration.value(settings.minLeadHours * 60, 'm')
           && request.resource.data.startAt <= request.time + duration.value(settings.daysAheadAllowed * 24 * 60, 'm');
     }
 
+    // paymentDueAt debe ser exactamente startAt - paymentDeadlineHours —
+    // espejo de computePaymentDueAt() en src/services/reservationRules.ts.
+    // Evita que un cliente malicioso mande un paymentDueAt lejano para
+    // nunca liberar el horario si no paga.
+    function isPaymentDueAtValid(courtId) {
+      let settings = courtSettings(courtId);
+      return request.resource.data.paymentDueAt
+          == request.resource.data.startAt - duration.value(settings.paymentDeadlineHours * 60, 'm');
+    }
+
     // Compara los campos "de identidad" de una reservación entre el
     // documento existente y el propuesto — usado para asegurar que una
-    // transición de status no cambie nada más (ver canTransition() en
-    // src/services/reservationRules.ts, el espejo puro de esta matriz).
+    // transición de status no cambie nada más (ver canTransition() y
+    // effectiveStatus() en src/services/reservationRules.ts).
     function reservationCoreFieldsUnchanged() {
       return request.resource.data.userId        == resource.data.userId
           && request.resource.data.courtId       == resource.data.courtId
@@ -56,7 +70,8 @@ service cloud.firestore {
           && request.resource.data.endTime       == resource.data.endTime
           && request.resource.data.durationHours == resource.data.durationHours
           && request.resource.data.startAt       == resource.data.startAt
-          && request.resource.data.endAt         == resource.data.endAt;
+          && request.resource.data.endAt         == resource.data.endAt
+          && request.resource.data.paymentDueAt  == resource.data.paymentDueAt;
     }
 
     // ── Users ──────────────────────────────────────────────────────────────
@@ -121,11 +136,12 @@ service cloud.firestore {
       allow read: if isAuthenticated();
 
       // Solo usuarios activos (aprobados) pueden crear reservaciones.
-      // Status inicial siempre 'solicitada'. Tope duro de 2h y ventana de
-      // anticipación (min/max) validados aquí — el límite de reservaciones
-      // activas por usuario NO se puede validar en rules (requeriría un
-      // conteo de query, no un get() de un documento puntual); ese límite
-      // queda solo del lado del cliente, mismo gap que ya existía antes.
+      // Status inicial siempre 'solicitada'. Tope duro de 2h, ventana de
+      // anticipación (min/max) y paymentDueAt validados aquí — el límite
+      // de reservaciones activas por usuario NO se puede validar en rules
+      // (requeriría un conteo de query, no un get() de un documento
+      // puntual); ese límite queda solo del lado del cliente, mismo gap
+      // que ya existía antes.
       allow create: if isActiveUser()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == 'solicitada'
@@ -133,19 +149,29 @@ service cloud.firestore {
         && request.resource.data.durationHours <= 2
         && request.resource.data.startAt is timestamp
         && request.resource.data.endAt is timestamp
+        && request.resource.data.paymentDueAt is timestamp
         && request.resource.data.startAt < request.resource.data.endAt
         && isWithinLeadTimeWindow(request.resource.data.courtId)
+        && isPaymentDueAtValid(request.resource.data.courtId)
         && request.resource.data.keys().hasAll([
              'courtId', 'userId', 'userName', 'date', 'startTime', 'endTime',
-             'durationHours', 'status', 'startAt', 'endAt', 'createdAt'
+             'durationHours', 'status', 'startAt', 'endAt', 'paymentDueAt', 'createdAt'
            ]);
 
       // Matriz de transición:
-      //   solicitada → cancelada : dueño o admin
+      //   solicitada → cancelada : dueño o admin, o CUALQUIER autenticado
+      //                            si ya pasó paymentDueAt (auto-release
+      //                            por falta de pago — issue 4/7)
       //   pagada     → cancelada : dueño o admin
       //   solicitada → pagada    : tesorero o admin
+      //   solicitada|pagada → finalizada : admin, o CUALQUIER autenticado
+      //                            si ya pasó endAt (issue 4/7)
       //   cualquier otra transición : solo admin
-      // Ninguna transición no-admin puede tocar los demás campos.
+      // Las dos ramas "cualquier autenticado" son las que permiten la
+      // escritura oportunista de effectiveStatus() en reservations.ts —
+      // son seguras porque dependen de request.time (reloj del servidor),
+      // no de nada que mande el cliente. Ninguna transición no-admin puede
+      // tocar los demás campos.
       allow update: if (
           isOwner(resource.data.userId)
           && resource.data.status in ['solicitada', 'pagada']
@@ -156,6 +182,20 @@ service cloud.firestore {
           isTesorero()
           && resource.data.status == 'solicitada'
           && request.resource.data.status == 'pagada'
+          && reservationCoreFieldsUnchanged()
+        )
+        || (
+          isAuthenticated()
+          && resource.data.status == 'solicitada'
+          && request.resource.data.status == 'cancelada'
+          && request.time > resource.data.paymentDueAt
+          && reservationCoreFieldsUnchanged()
+        )
+        || (
+          isAuthenticated()
+          && resource.data.status in ['solicitada', 'pagada']
+          && request.resource.data.status == 'finalizada'
+          && request.time > resource.data.endAt
           && reservationCoreFieldsUnchanged()
         )
         || isAdmin();

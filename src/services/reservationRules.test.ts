@@ -6,6 +6,8 @@ import {
   isLeadTimeSufficient,
   isWithinMaxAdvanceWindow,
   canTransition,
+  computePaymentDueAt,
+  effectiveStatus,
 } from './reservationRules'
 
 describe('hasOverlap', () => {
@@ -161,5 +163,72 @@ describe('canTransition', () => {
 
   it('no permite "transicionar" a un usuario no-admin al mismo estado', () => {
     expect(canTransition({ role: 'tesorero', isOwner: false }, 'pagada', 'pagada')).toBe(false)
+  })
+})
+
+describe('computePaymentDueAt', () => {
+  it('resta paymentDeadlineHours a startAt', () => {
+    const startAt = new Date('2026-08-30T12:00:00')
+    const dueAt = computePaymentDueAt(startAt, 12)
+    expect(dueAt.getTime()).toBe(startAt.getTime() - 12 * 60 * 60 * 1000)
+  })
+})
+
+describe('effectiveStatus', () => {
+  // startAt (implícito) 2026-08-30T12:00:00, paymentDueAt 12h antes,
+  // endAt 1h después — fixture compartida para los escenarios de tiempo.
+  const paymentDueAt = new Date('2026-08-30T00:00:00') // startAt - 12h
+  const endAt = new Date('2026-08-30T13:00:00')
+
+  function reservation(status: 'solicitada' | 'pagada' | 'cancelada' | 'finalizada') {
+    return { status, paymentDueAt, endAt }
+  }
+
+  it('solicitada, antes del deadline de pago → no cambia', () => {
+    const now = new Date('2026-08-29T23:00:00') // -1h antes de paymentDueAt
+    expect(effectiveStatus(reservation('solicitada'), now)).toBe('solicitada')
+  })
+
+  it('solicitada, exactamente en el deadline de pago → todavía no expira (comparación estricta)', () => {
+    expect(effectiveStatus(reservation('solicitada'), paymentDueAt)).toBe('solicitada')
+  })
+
+  it('solicitada, justo después del deadline de pago → se libera (cancelada)', () => {
+    const now = new Date(paymentDueAt.getTime() + 1000)
+    expect(effectiveStatus(reservation('solicitada'), now)).toBe('cancelada')
+  })
+
+  it('solicitada, mucho después de endAt sin haberse pagado → sigue siendo cancelada, NO finalizada', () => {
+    const now = new Date(endAt.getTime() + 60 * 60 * 1000) // +1h después de endAt
+    expect(effectiveStatus(reservation('solicitada'), now)).toBe('cancelada')
+  })
+
+  it('pagada, antes de endAt → no cambia', () => {
+    const now = new Date('2026-08-30T12:30:00')
+    expect(effectiveStatus(reservation('pagada'), now)).toBe('pagada')
+  })
+
+  it('pagada, después del deadline de pago (irrelevante una vez pagada) pero antes de endAt → no cambia', () => {
+    const now = new Date(paymentDueAt.getTime() + 60 * 60 * 1000) // pasó paymentDueAt, no endAt
+    expect(effectiveStatus(reservation('pagada'), now)).toBe('pagada')
+  })
+
+  it('pagada, exactamente en endAt → todavía no finaliza (comparación estricta)', () => {
+    expect(effectiveStatus(reservation('pagada'), endAt)).toBe('pagada')
+  })
+
+  it('pagada, justo después de endAt → finaliza', () => {
+    const now = new Date(endAt.getTime() + 1000)
+    expect(effectiveStatus(reservation('pagada'), now)).toBe('finalizada')
+  })
+
+  it('cancelada nunca cambia, sin importar cuánto tiempo pase', () => {
+    const now = new Date(endAt.getTime() + 365 * 24 * 60 * 60 * 1000)
+    expect(effectiveStatus(reservation('cancelada'), now)).toBe('cancelada')
+  })
+
+  it('finalizada nunca cambia, sin importar cuánto tiempo pase', () => {
+    const now = new Date(endAt.getTime() + 365 * 24 * 60 * 60 * 1000)
+    expect(effectiveStatus(reservation('finalizada'), now)).toBe('finalizada')
   })
 })

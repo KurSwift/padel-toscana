@@ -30,6 +30,7 @@ const DEFAULT_COURT_SETTINGS = {
   maxActiveReservationsPerUser: 2,
   daysAheadAllowed: 7,
   minLeadHours: 24,
+  paymentDeadlineHours: 12,
 }
 
 const COURTS = [
@@ -91,35 +92,65 @@ async function seedUsersAndAddresses() {
   }
 }
 
-// Dos reservaciones de ejemplo para mañana (respetando minLeadHours: 24),
-// una 'solicitada' y otra 'pagada', para poder probar cancelación,
-// confirmación de pago y las vistas de "Mis reservaciones" / panel admin
-// sin reservar manualmente. El seed usa firebase-admin y no pasa por
-// firestore.rules, así que puede escribir cualquier status directo.
+// Reservaciones de ejemplo para poder probar cancelación, confirmación de
+// pago, expiración "lazy" (issue 4/7) y las vistas de "Mis reservaciones" /
+// panel admin sin reservar manualmente. El seed usa firebase-admin y no
+// pasa por firestore.rules, así que puede escribir cualquier
+// status/startAt/endAt/paymentDueAt directo, incluso combinaciones que la
+// app nunca produciría por sí sola (como la ya-expirada de abajo).
 async function seedReservations() {
   const tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
-  const date = tomorrow.toISOString().slice(0, 10)
+  const tomorrowDate = tomorrow.toISOString().slice(0, 10)
+
+  // Empieza en 2h (dentro de las 24h de minLeadHours si se creara vía la
+  // app — pero el seed no pasa por esa validación) y su paymentDueAt
+  // (startAt - 12h) ya quedó en el pasado: sirve para probar que
+  // effectiveStatus() la libera de inmediato al cargar la app, sin haber
+  // tocado el documento manualmente.
+  const soon = new Date()
+  soon.setHours(soon.getHours() + 2, 0, 0, 0)
+  const soonEnd = new Date(soon)
+  soonEnd.setHours(soonEnd.getHours() + 1)
 
   const sample = [
-    { ownerUid: 'seed-active-1', startTime: '10:00', endTime: '11:00', status: 'solicitada' },
-    { ownerUid: 'seed-active-2', startTime: '17:00', endTime: '18:00', status: 'pagada' },
+    {
+      ownerUid: 'seed-active-1', status: 'solicitada',
+      date: tomorrowDate, startTime: '10:00', endTime: '11:00',
+      startAt: new Date(`${tomorrowDate}T10:00:00`), endAt: new Date(`${tomorrowDate}T11:00:00`),
+    },
+    {
+      ownerUid: 'seed-active-2', status: 'pagada',
+      date: tomorrowDate, startTime: '17:00', endTime: '18:00',
+      startAt: new Date(`${tomorrowDate}T17:00:00`), endAt: new Date(`${tomorrowDate}T18:00:00`),
+    },
+    {
+      // Ya expirada por falta de pago — ver comentario arriba.
+      ownerUid: 'seed-active-1', status: 'solicitada',
+      date: soon.toISOString().slice(0, 10),
+      startTime: `${String(soon.getHours()).padStart(2, '0')}:00`,
+      endTime: `${String(soonEnd.getHours()).padStart(2, '0')}:00`,
+      startAt: soon, endAt: soonEnd,
+    },
   ]
 
   for (const s of sample) {
     const owner = SEED_USERS.find((u) => u.uid === s.ownerUid)
+    const paymentDeadlineHours = DEFAULT_COURT_SETTINGS.paymentDeadlineHours
+    const paymentDueAt = new Date(s.startAt.getTime() - paymentDeadlineHours * 60 * 60 * 1000)
     await db.collection('reservations').add({
       courtId: COURTS[0].id,
       userId: owner.uid,
       userName: owner.name,
       userAddress: `${owner.street} ${owner.streetNumber}`,
-      date,
+      date: s.date,
       startTime: s.startTime,
       endTime: s.endTime,
       durationHours: 1,
       status: s.status,
-      startAt: Timestamp.fromDate(new Date(`${date}T${s.startTime}:00`)),
-      endAt: Timestamp.fromDate(new Date(`${date}T${s.endTime}:00`)),
+      startAt: Timestamp.fromDate(s.startAt),
+      endAt: Timestamp.fromDate(s.endAt),
+      paymentDueAt: Timestamp.fromDate(paymentDueAt),
       createdAt: Timestamp.now(),
     })
   }

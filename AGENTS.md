@@ -147,6 +147,19 @@ transición en `firestore.rules` (bloque `match /reservations/{id}` →
 a otro, actualiza **ambos** — hay tests exhaustivos de `canTransition` en
 `reservationRules.test.ts` que sirven de referencia de la matriz vigente.
 
+**Expiración "lazy" (sin Cloud Functions):** el status guardado en Firestore
+de una reservación puede estar desactualizado respecto al reloj real — nadie
+lo corrige en el instante exacto en que expira. `effectiveStatus(reservation,
+now)` en `reservationRules.ts` calcula el status real; `reservations.ts` la
+usa en cada lectura (para disponibilidad/conteos) y además escribe el
+status corregido de forma oportunista cuando lo detecta. `firestore.rules`
+permite que **cualquier usuario autenticado** (no solo dueño/tesorero/admin)
+haga esas dos transiciones específicas, pero solo si `request.time` ya pasó
+`paymentDueAt`/`endAt` — es seguro porque el tiempo lo valida el servidor,
+no el cliente. Si algún día se necesita precisión al segundo (vs. "la
+próxima vez que alguien cargue esa vista"), migrar a una Cloud Function
+programada es un cambio localizado que reutiliza `effectiveStatus()`.
+
 ## Emuladores, seeds y push-to-prod
 
 **El flujo por default para desarrollar y probar es contra los emuladores,
