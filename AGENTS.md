@@ -17,6 +17,9 @@ npm install        # instalar dependencias
 npm run dev        # servidor de desarrollo (Vite, http://localhost:5173)
 npm run build       # tsc -b (type-check) + vite build → sale a public/
 npm run preview     # sirve el build de producción localmente
+npm run emulators   # Auth + Firestore emulators (requiere Java)
+npm run seed        # prepobla el emulador con datos de ejemplo
+npm run push-to-prod  # migra colecciones seleccionadas emulador → producción (dry-run por default)
 ```
 
 No hay lint script ni test runner configurados en `package.json`. El único
@@ -25,10 +28,9 @@ de `npm run build` (strict mode, `noUnusedLocals`, `noUnusedParameters`
 activos en `tsconfig.app.json`) — corre `npm run build` antes de dar por
 terminado un cambio no trivial.
 
-No hay Firebase CLI instalado por defecto en este entorno
-(`npm install -g firebase-tools` si necesitas emuladores o deploy). No hay
-`.firebaserc` en el repo — hace falta `firebase use --add` para enlazar el
-proyecto `padel-toscana` antes de desplegar.
+`firebase-tools` y `firebase-admin` están como devDependencies (no hace
+falta instalar nada global). El proyecto está enlazado vía `.firebaserc`
+(`padel-toscana`) — si necesitas otro proyecto, `firebase use --add`.
 
 ## Flujo de trabajo
 
@@ -50,6 +52,9 @@ src/
   hooks/useCourtData     # combina cancha activa + reservaciones del día + reservaciones del usuario
   types/index.ts         # shapes de Firestore (UserProfile, Court, Reservation...) — fuente de verdad de tipos
   utils/time.ts          # helpers de fecha/hora en formato 'HH:mm' / 'YYYY-MM-DD' (strings, no Date en el modelo)
+scripts/
+  seed.mjs               # prepobla el emulador (firebase-admin, nunca toca producción)
+  push-to-prod.mjs        # migra colecciones seleccionadas emulador → producción
 ```
 
 Alias de import: `@/` → `src/` (configurado en `vite.config.ts` y
@@ -99,16 +104,47 @@ contra un cliente malicioso. **Si cambias una regla de negocio en
 `src/services/`, revisa si `firestore.rules` necesita el mismo cambio, y
 viceversa.** No asumas que basta con tocar un solo lado.
 
-## Firebase local / debugging
+## Emuladores, seeds y push-to-prod
 
-- App Check está activo incluso en dev (`src/firebase.ts`). Para que
-  Auth/Firestore funcionen en local sin bloquear por 403, hay que tomar el
-  debug token que la consola del navegador imprime y registrarlo en
-  **Firebase Console → App Check → Manage debug tokens**.
-- No hay emuladores de Firebase configurados en `firebase.json` — el dev
-  server pega directo al proyecto real `padel-toscana`. Ten cuidado con
-  datos de prueba: reservaciones/usuarios creados en dev quedan en el
-  proyecto de producción salvo que configures emuladores.
+**El flujo por default para desarrollar y probar es contra los emuladores,
+no contra producción.** `npm run dev` sin más solo pega a producción si no
+existe `.env.local` con `VITE_USE_EMULATORS=true` (ver `src/firebase.ts`).
+
+```bash
+cp .env.local.example .env.local   # una vez
+npm run emulators                  # terminal 1 — Auth :9099, Firestore :8080, UI :4000
+npm run seed                       # terminal 2 — prepobla courts/users/addresses/reservations
+npm run dev                        # terminal 2
+```
+
+- **`npm run emulators`** (`firebase emulators:start`) requiere Java (JRE)
+  para el emulador de Firestore. Persiste datos entre corridas en
+  `.emulator-data/` (gitignored) vía `--import`/`--export-on-exit`.
+- **`npm run seed`** (`scripts/seed.mjs`) usa `firebase-admin` apuntado
+  explícitamente a los puertos del emulador — nunca toca producción. Crea
+  usuarios de Auth con `uid` fijo y su perfil correspondiente en Firestore
+  (admin + residentes activos + uno pendiente), dos canchas, y una
+  reservación de ejemplo. Es **idempotente**: correrlo de nuevo actualiza
+  los mismos documentos en vez de duplicarlos. Si cambias
+  `DEFAULT_COURT_SETTINGS` en `src/services/courts.ts`, actualiza también la
+  copia duplicada en este script (comentario lo señala).
+- **`npm run push-to-prod`** (`scripts/push-to-prod.mjs`) migra colecciones
+  seleccionadas del emulador local hacia producción — pensado para llevar
+  configuración curada (p. ej. `courts`), no como sync general. Corre en
+  **dry-run por default**; solo escribe con `--confirm` explícito. Usa
+  `applicationDefault()` para las credenciales de producción (`gcloud auth
+  application-default login`, o `GOOGLE_APPLICATION_CREDENTIALS` apuntando a
+  un service account key — **nunca comitear esa key**). Sobreescribe
+  (`set`, no `merge`) documentos existentes con el mismo id; no borra nada
+  que exista en prod y no en local. Antes de correrlo con `--confirm` contra
+  `users` o `reservations`, confirma con el usuario — son datos reales de
+  personas.
+
+App Check está activo incluso en dev cuando **no** usas emuladores
+(`src/firebase.ts`) — los emuladores no pasan por App Check. Si desarrollas
+contra producción, hay que tomar el debug token que la consola del navegador
+imprime y registrarlo en **Firebase Console → App Check → Manage debug
+tokens**, o las llamadas a Auth/Firestore fallan con `403`.
 
 ## Al agregar features
 

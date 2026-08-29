@@ -9,6 +9,14 @@ node_modules/
 # Firebase CLI debug files
 firebase-debug.log
 firebase-debug.*.log
+ui-debug.log
+
+# Firebase emulator local data + downloaded binaries
+.emulator-data/
+
+# Service account keys used by scripts/push-to-prod.mjs — never commit these
+*serviceAccount*.json
+*service-account*.json
 
 # Operating System Files
 .DS_Store

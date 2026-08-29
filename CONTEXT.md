@@ -111,8 +111,6 @@ shape de estos documentos en el cliente.
 
 ## Gaps / deuda conocida (útil antes de asumir que "ya existe")
 
-- No hay `.firebaserc` en el repo — el proyecto Firebase (`padel-toscana`) se
-  debe seleccionar manualmente (`firebase use --add`) antes de desplegar.
 - No hay Cloud Functions en este repo; toda la lógica vive en el cliente +
   reglas de Firestore. Si se necesita lógica server-side confiable (p. ej.
   anti-doble-reserva 100% atómico), habría que introducir Functions o
