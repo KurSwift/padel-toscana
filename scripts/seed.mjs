@@ -41,10 +41,11 @@ const COURTS = [
 // el emulador (cualquier código OTP sirve ahí, o se lee el real en la
 // Emulator UI → Authentication).
 const SEED_USERS = [
-  { uid: 'seed-admin', phone: '+525500000001', name: 'Admin Seed', street: 'Nogal', streetNumber: '1', isAdmin: true, status: 'active' },
-  { uid: 'seed-active-1', phone: '+525500000002', name: 'Ana Activa', street: 'Olivos', streetNumber: '12', isAdmin: false, status: 'active' },
-  { uid: 'seed-active-2', phone: '+525500000003', name: 'Beto Activo', street: 'Encino', streetNumber: '5', isAdmin: false, status: 'active' },
-  { uid: 'seed-pending-1', phone: '+525500000004', name: 'Carla Pendiente', street: 'Nogal', streetNumber: '20', isAdmin: false, status: 'pending' },
+  { uid: 'seed-admin', phone: '+525500000001', name: 'Admin Seed', street: 'Nogal', streetNumber: '1', role: 'admin', status: 'active' },
+  { uid: 'seed-active-1', phone: '+525500000002', name: 'Ana Activa', street: 'Olivos', streetNumber: '12', role: 'colono', status: 'active' },
+  { uid: 'seed-active-2', phone: '+525500000003', name: 'Beto Activo', street: 'Encino', streetNumber: '5', role: 'colono', status: 'active' },
+  { uid: 'seed-pending-1', phone: '+525500000004', name: 'Carla Pendiente', street: 'Nogal', streetNumber: '20', role: 'colono', status: 'pending' },
+  { uid: 'seed-tesorero-1', phone: '+525500000005', name: 'Tere Tesorera', street: 'Encino', streetNumber: '8', role: 'tesorero', status: 'active' },
 ]
 
 // Crea (o reutiliza) el usuario de Auth para cada seed, con uid fijo, para
@@ -81,7 +82,7 @@ async function seedUsersAndAddresses() {
       address: `${u.street} ${u.streetNumber}`,
       addressNormalized: addressKey,
       phone: u.phone,
-      isAdmin: u.isAdmin,
+      role: u.role,
       status: u.status,
       createdAt: Timestamp.now(),
     })
@@ -117,7 +118,7 @@ async function main() {
 
   console.log('\nListo. Usuarios de prueba (entra por teléfono en /login):')
   for (const u of SEED_USERS) {
-    console.log(`  ${u.phone}  →  ${u.name}  (${u.isAdmin ? 'admin' : 'residente'}, ${u.status})`)
+    console.log(`  ${u.phone}  →  ${u.name}  (${u.role}, ${u.status})`)
   }
   console.log('\nEmulator UI: http://127.0.0.1:4000')
   process.exit(0)

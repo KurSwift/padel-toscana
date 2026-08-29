@@ -1,13 +1,17 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { signOut } from '@/services/auth'
+import { hasAllowedRole } from '@/services/userRules'
+import { UserRole } from '@/types'
 
 interface Props {
   children: React.ReactNode
-  requireAdmin?: boolean
+  // Si se omite, cualquier usuario autenticado y aprobado (status 'active')
+  // puede entrar. Si se pasa, el rol del usuario debe estar en la lista.
+  allowedRoles?: UserRole[]
 }
 
-export default function ProtectedRoute({ children, requireAdmin = false }: Props) {
+export default function ProtectedRoute({ children, allowedRoles }: Props) {
   const { user, profile, loading } = useAuth()
 
   if (loading) {
@@ -73,7 +77,7 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Props
     )
   }
 
-  if (requireAdmin && !profile.isAdmin) return <Navigate to="/" replace />
+  if (!hasAllowedRole(profile.role, allowedRoles)) return <Navigate to="/" replace />
 
   return <>{children}</>
 }
