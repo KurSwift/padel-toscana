@@ -8,6 +8,7 @@ import RegisterPage from '@/pages/RegisterPage'
 import HomePage from '@/pages/HomePage'
 import AdminPage from '@/pages/AdminPage'
 import TesoreroPage from '@/pages/TesoreroPage'
+import HelpPage from '@/pages/HelpPage'
 
 export default function App() {
   return (
@@ -48,6 +49,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['tesorero', 'admin']}>
                 <TesoreroPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ayuda"
+            element={
+              <ProtectedRoute>
+                <HelpPage />
               </ProtectedRoute>
             }
           />

@@ -163,6 +163,21 @@ primero), con un botón "Confirmar pago" por reservación
 siempre debería ser chico porque expiran solas (issue 4/7) si nadie las
 paga a tiempo.
 
+## Ayuda (`/ayuda`)
+
+Tutorial + preguntas frecuentes por rol (`HelpPage.tsx`), accesible desde
+un botón "Ayuda" en la barra de cualquier pantalla autenticada (`HomePage`,
+`AdminPage`, `TesoreroPage`). El contenido es **acumulativo según lo que
+cada rol puede hacer de verdad en la app**, no solo su "función principal":
+un admin ve la sección de reservar (puede hacerlo como cualquier colono),
+la de confirmar pagos (tiene acceso a `/tesorero`) y la de panel admin. Un
+tesorero ve reservar + confirmar pagos. Un colono solo ve reservar. La
+lógica vive en el arreglo `SECTIONS` dentro de `HelpPage.tsx` (cada
+sección declara `visibleTo`) — es contenido estático en el cliente, no hay
+CMS ni colección de Firestore para esto. Termina con un bloque fijo
+apuntando al grupo de WhatsApp "Reservaciones - La Toscana" para dudas o
+problemas que la ayuda no cubra.
+
 ## Modelo de datos (Firestore)
 
 | Colección | Documento | Notas |
