@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Timestamp } from 'firebase/firestore'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
-import { Court, CourtSettings, UserProfile, UserRole, Reservation, ReservationStatus } from '@/types'
+import { Court, CourtSettings, UserProfile, UserRole, Reservation, ReservationStatus, ValidStreet, VALID_STREETS } from '@/types'
 import { getAllCourts, updateCourtSettings, toggleCourtActive, createCourt, DEFAULT_COURT_SETTINGS } from '@/services/courts'
-import { getAllUsers, setUserRole, approveUser, rejectUser } from '@/services/users'
+import { getAllUsers, setUserRole, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage } from '@/services/users'
 import { canChangeRole } from '@/services/userRules'
 import { MAX_RESERVATION_DURATION_HOURS } from '@/services/reservationRules'
 import { subscribeToAllReservationsByDate, setReservationStatus } from '@/services/reservations'
@@ -470,6 +471,16 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState<string | null>(null)
 
+  // Alta de colono (ver TASKS.md) — reemplaza auto-registro como punto de
+  // entrada normal. registerUser()/approveUser()/rejectUser() de arriba
+  // siguen intactas, solo dejaron de ser el camino principal.
+  const [adding, setAdding] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newStreet, setNewStreet] = useState<ValidStreet | ''>('')
+  const [newStreetNumber, setNewStreetNumber] = useState('')
+  const [newPhoneDigits, setNewPhoneDigits] = useState('')
+  const [creating, setCreating] = useState(false)
+
   useEffect(() => {
     getAllUsers().then((u) => {
       const sorted = u.sort((a, b) => a.name.localeCompare(b.name))
@@ -478,6 +489,51 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
       setLoading(false)
     })
   }, [])
+
+  function resetCreateForm() {
+    setAdding(false)
+    setNewName('')
+    setNewStreet('')
+    setNewStreetNumber('')
+    setNewPhoneDigits('')
+  }
+
+  async function handleCreateColono() {
+    const name = newName.trim()
+    if (name.length < 2) { toast.error('Ingresa el nombre completo del colono.'); return }
+    if (!newStreet) { toast.error('Selecciona la calle.'); return }
+    if (!newStreetNumber.trim()) { toast.error('Ingresa el número del domicilio.'); return }
+    if (newPhoneDigits.length !== 10) { toast.error('El teléfono debe tener 10 dígitos.'); return }
+
+    setCreating(true)
+    try {
+      const { uid } = await adminCreateColono({
+        name,
+        street: newStreet,
+        streetNumber: newStreetNumber.trim(),
+        phone: `+52${newPhoneDigits}`,
+      })
+      const newProfile: UserProfile = {
+        uid,
+        name,
+        street: newStreet,
+        streetNumber: newStreetNumber.trim(),
+        address: `${newStreet} ${newStreetNumber.trim()}`,
+        addressNormalized: `${newStreet} ${newStreetNumber.trim()}`.toLowerCase(),
+        phone: `+52${newPhoneDigits}`,
+        role: 'colono',
+        status: 'active',
+        createdAt: Timestamp.now(),
+      }
+      setUsers((prev) => [...prev, newProfile].sort((a, b) => a.name.localeCompare(b.name)))
+      resetCreateForm()
+      toast.success(`${name} agregado.`)
+    } catch (err) {
+      toast.error(adminCreateColonoErrorMessage((err as Error).message))
+    } finally {
+      setCreating(false)
+    }
+  }
 
   async function handleApprove(u: UserProfile) {
     setActing(u.uid)
@@ -532,6 +588,82 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
 
   return (
     <div className="space-y-5">
+      {/* Alta de colono */}
+      <div>
+        {adding ? (
+          <div className="bg-white rounded-2xl px-4 py-4 shadow-sm space-y-3">
+            <p className="text-sm font-semibold text-gray-700">Nuevo colono</p>
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Ej: María García"
+              autoFocus
+              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <div className="grid grid-cols-3 gap-2">
+              {VALID_STREETS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setNewStreet(s)}
+                  className={`py-2.5 rounded-xl text-sm font-medium transition border ${
+                    newStreet === s
+                      ? 'bg-brand-600 text-white border-brand-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-brand-400'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              value={newStreetNumber}
+              onChange={(e) => setNewStreetNumber(e.target.value)}
+              placeholder="Ej: 15"
+              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <div className="flex rounded-xl border border-gray-300 overflow-hidden focus-within:ring-2 focus-within:ring-brand-500">
+              <span className="bg-gray-50 px-3 py-2.5 text-gray-500 text-sm border-r border-gray-300 flex items-center select-none">
+                🇲🇽 +52
+              </span>
+              <input
+                type="tel"
+                inputMode="numeric"
+                placeholder="5512345678"
+                value={newPhoneDigits}
+                onChange={(e) => setNewPhoneDigits(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                className="flex-1 px-3 py-2.5 text-gray-900 placeholder-gray-400 outline-none text-sm bg-white"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleCreateColono}
+                disabled={creating}
+                className="flex-1 bg-brand-600 text-white text-sm font-semibold rounded-xl py-2.5 disabled:opacity-40 flex items-center justify-center"
+              >
+                {creating ? <Spinner sm /> : 'Crear'}
+              </button>
+              <button
+                onClick={resetCreateForm}
+                disabled={creating}
+                className="flex-1 border border-gray-300 text-sm text-gray-600 rounded-xl py-2.5"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setAdding(true)}
+            className="w-full border-2 border-dashed border-gray-300 rounded-2xl py-4 text-sm text-gray-400 hover:border-brand-400 hover:text-brand-500 transition"
+          >
+            + Agregar colono
+          </button>
+        )}
+      </div>
+
       {/* Pending approvals */}
       {pending.length > 0 && (
         <div>

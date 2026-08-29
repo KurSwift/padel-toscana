@@ -19,6 +19,14 @@ hay que decidir qué pasa con usuarios existentes que se registraron con
 Google (su `UserProfile.email` pero sin `phone`) — no podrían volver a
 entrar sin agregarles un teléfono primero.*
 
+*Actualización (2026-08-29, ver tarea 4 abajo): con el alta de colonos por
+admin, Google Sign-In quedó acotado a una excepción hardcodeada en
+`LoginPage.tsx` (`GOOGLE_LOGIN_ADDRESS = 'nogal 35'`) — solo la cuenta admin
+original (que predata el modelo de alta por admin) puede usarlo; para
+cualquier otro domicilio ya no aparece el botón. Esta tarea ahora se reduce
+a migrar esa única cuenta a teléfono (o a correo, si se implementa la tarea
+4) y quitar la excepción — mucho más chico que el alcance original.*
+
 ## 2. Pre-registro de usuarios por CSV (script, no en UI)
 
 Script tipo `scripts/seed.mjs` (pero para producción, con el mismo patrón
@@ -126,4 +134,40 @@ Con esto, los 4 candidatos de la tarea 3 están hechos y desplegados.
 Queda pendiente solo el monitoreo continuo (métricas de App Check para
 Auth, ver nota arriba) — no hay más trabajo de código identificado para
 esta tarea por ahora.
+
+## 4. Follow-ups del alta de colonos por admin (2026-08-29)
+
+Contexto: se reemplazó el auto-registro como punto de entrada — el admin da
+de alta a los colonos (nombre, calle, número, teléfono) desde el panel de
+Admin (`adminCreateColono`, `functions/src/index.ts`), y `LoginPage.tsx`
+ahora es domicilio → saludo por nombre (`getResidentsByAddress`) → teléfono
+→ OTP, sin más tab de "Registrarme". `RegisterPage.tsx`/`registerUser()`/el
+flujo de aprobar-rechazar siguen intactos en el código, solo sin punto de
+entrada. Detalles completos en el PR que cierra esta tarea.
+
+Quedaron dos cosas fuera de alcance a propósito, documentadas aquí para no
+perderlas:
+
+- **Correo como método de acceso**: la tarea original pedía "teléfono y/o
+  correo" para el alta, pero se implementó solo teléfono — no existe hoy
+  ningún método de login por correo sin contraseña. Si se necesita, la
+  opción más simple es un magic link (Firebase Email Link), que puede
+  reusar la extensión de correo (Trigger Email) que ya está en el proyecto
+  para notificaciones — no requiere agregar infraestructura nueva.
+- **Rate limiting en `getResidentsByAddress`**: es el único callable de
+  toda la app que no requiere `request.auth` (corre antes de que la persona
+  entre) — funcionalmente es un oráculo de "¿existe este domicilio?". Hoy
+  solo está protegido por `enforceAppCheck`. El costo de un abuso ahí es
+  bajo (una lectura de Firestore, no SMS), así que no se consideró
+  bloqueante, pero si se quiere cerrar del todo: reusar `checkRateLimit` de
+  `functions/src/rateLimit.ts`, con una llave nueva (no hay `uid` pre-auth
+  — usar IP del caller, `request.rawRequest.ip`) y una colección
+  `lookupRateLimits/{ip}` separada de `rateLimits/{uid}` para no mezclar
+  esquemas de llave.
+
+También queda pendiente, no crítico: reconstruir el helper `registerWithPhone`
+en `e2e/helpers.ts` (se quitó — automatizar el flujo dormido de
+auto-registro ahora requeriría autenticar contra el emulador sin pasar por
+`/login`, ver nota en ese archivo) si el auto-registro se reactiva como
+entrada real algún día.
 
