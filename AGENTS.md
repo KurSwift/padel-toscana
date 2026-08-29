@@ -62,7 +62,7 @@ src/
   App.tsx              # rutas (react-router)
   context/AuthContext   # user de Firebase Auth + su UserProfile (Firestore), vía onSnapshot
   components/           # UI reutilizable (BookingSheet, SlotsGrid, DateSelector, StatusBadge, ProtectedRoute...)
-  pages/                 # HomePage, AdminPage, LoginPage, RegisterPage
+  pages/                 # HomePage, AdminPage, TesoreroPage, LoginPage, RegisterPage
   services/              # única capa que toca Firestore/Auth directamente (auth, courts, reservations, users)
   hooks/useCourtData     # combina cancha activa + reservaciones del día + reservaciones del usuario
   types/index.ts         # shapes de Firestore (UserProfile, Court, Reservation...) — fuente de verdad de tipos

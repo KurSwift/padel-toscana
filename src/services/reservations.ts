@@ -242,3 +242,17 @@ export function subscribeToUserReservations(
     (snap) => onUpdate(toOccupyingReservations(snap.docs)),
   )
 }
+
+// El tesorero ve todas las reservaciones 'solicitada' (pendientes de pago),
+// sin importar la fecha ni la cancha — issue 7/7 del épico #10. Igual que
+// las demás lecturas, corrige el status efectivo primero: una que ya
+// expiró por falta de pago (issue 4/7) no debe aparecer aquí aunque el doc
+// todavía diga 'solicitada'.
+export function subscribeToPendingPayments(
+  onUpdate: (reservations: Reservation[]) => void,
+): () => void {
+  return onSnapshot(
+    query(collection(db, 'reservations'), where('status', '==', 'solicitada')),
+    (snap) => onUpdate(toEffectiveReservations(snap.docs).filter((r) => r.status === 'solicitada')),
+  )
+}

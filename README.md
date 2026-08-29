@@ -98,7 +98,7 @@ src/
   App.tsx            # rutas
   context/           # AuthContext (usuario + perfil)
   components/        # UI reutilizable
-  pages/             # LoginPage, RegisterPage, HomePage, AdminPage
+  pages/             # LoginPage, RegisterPage, HomePage, AdminPage, TesoreroPage
   services/          # única capa que habla con Firestore/Auth
   hooks/             # useCourtData
   types/             # tipos de los documentos de Firestore
