@@ -9,7 +9,7 @@ import {
   runTransaction,
 } from 'firebase/firestore'
 import { db } from '@/firebase'
-import { UserProfile } from '@/types'
+import { UserProfile, UserRole } from '@/types'
 
 // Can be called before authentication (addresses are publicly readable)
 export async function checkAddressAvailability(
@@ -33,8 +33,12 @@ export async function getAllUsers(): Promise<UserProfile[]> {
   return snap.docs.map((d) => ({ uid: d.id, ...d.data() }) as UserProfile)
 }
 
-export async function setUserAdmin(uid: string, isAdmin: boolean): Promise<void> {
-  await updateDoc(doc(db, 'users', uid), { isAdmin })
+// Cambia el rol de un usuario (colono/admin/tesorero). Solo admins pueden
+// llamar esto en la práctica — reforzado en firestore.rules, no aquí. La
+// UI que llama esta función debe además bloquear que un admin se cambie su
+// propio rol (ver canChangeRole en userRules.ts) antes de invocarla.
+export async function setUserRole(uid: string, role: UserRole): Promise<void> {
+  await updateDoc(doc(db, 'users', uid), { role })
 }
 
 export async function approveUser(uid: string): Promise<void> {
@@ -100,7 +104,7 @@ export async function registerUser(
       addressNormalized: addressKey,
       phone: data.phone ?? null,
       email: data.email ?? null,
-      isAdmin: false,
+      role: 'colono',
       status: 'pending',
       createdAt: serverTimestamp(),
     })

@@ -22,6 +22,12 @@ export type ValidStreet = (typeof VALID_STREETS)[number]
 
 export type UserStatus = 'pending' | 'active' | 'rejected'
 
+// colono: reserva/cancela sus propias reservaciones.
+// admin: aprueba/rechaza registros, gestiona canchas, ve/gestiona todas las
+//   reservaciones, cambia el rol de otros usuarios.
+// tesorero: confirma pagos de reservaciones (issue 7/7 del épico #10).
+export type UserRole = 'colono' | 'admin' | 'tesorero'
+
 export interface UserProfile {
   uid: string
   name: string
@@ -31,7 +37,7 @@ export interface UserProfile {
   streetNumber: string
   address: string
   addressNormalized?: string
-  isAdmin: boolean
+  role: UserRole
   status?: UserStatus
   createdAt: Timestamp
 }

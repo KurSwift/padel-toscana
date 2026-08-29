@@ -65,6 +65,7 @@ App Check, así que este paso solo aplica al modo producción.)
 | `npm run emulators` | Levanta Auth + Firestore emulators (con persistencia en `.emulator-data/`) |
 | `npm run seed` | Prepobla el emulador con canchas, usuarios y una reservación de ejemplo |
 | `npm run push-to-prod` | Migra colecciones seleccionadas del emulador a producción (dry-run por default) |
+| `npm run migrate-users-role` | One-off: migra `isAdmin` (bool) a `role` en usuarios existentes de producción (dry-run por default) |
 | `npm run test` | Corre la suite de tests (Vitest) una vez |
 | `npm run test:watch` | Vitest en modo watch |
 

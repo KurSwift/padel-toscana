@@ -20,10 +20,13 @@ solicitud debe ser aprobada manualmente por un administrador.
 
 ## Roles
 
+Tres roles, en `UserProfile.role` (`src/types/index.ts`):
+
 | Rol | Descripción |
 |---|---|
-| **Residente (`isAdmin: false`)** | Puede reservar/cancelar sus propias reservaciones una vez aprobado. |
-| **Administrador (`isAdmin: true`)** | Aprueba/rechaza registros, gestiona canchas (horarios, reglas), ve y cancela cualquier reservación. Se asigna manualmente desde el panel admin — no hay auto-promoción. |
+| **`colono`** | Puede reservar/cancelar sus propias reservaciones una vez aprobado. Rol por default al registrarse. |
+| **`admin`** | Aprueba/rechaza registros, gestiona canchas (horarios, reglas), ve y cancela cualquier reservación, cambia el rol de otros usuarios. Se asigna manualmente desde el panel admin — no hay auto-promoción, y un admin no puede cambiarse su propio rol. |
+| **`tesorero`** | Confirma que una reservación ya fue pagada (issue 7/7 del épico #10 — aún no implementado en la UI a esta fecha). |
 
 Un usuario tiene además un `status`: `pending` → `active` → (o `rejected`).
 Solo usuarios `active` pueden crear reservaciones. Los usuarios creados antes
@@ -82,9 +85,12 @@ Tres pestañas:
 - **Canchas**: activar/desactivar canchas, editar `CourtSettings` (horario,
   duración mín/máx, reservaciones máximas por usuario, días de anticipación
   permitidos), crear canchas nuevas.
-- **Usuarios**: aprobar/rechazar pendientes, asignar/quitar rol admin (un
-  admin no puede modificarse su propio rol — bloqueado tanto en UI como
-  implícitamente por las rules).
+- **Usuarios**: aprobar/rechazar pendientes, asignar rol (colono/admin/
+  tesorero) vía un selector de 3 opciones. Un admin no puede modificarse su
+  propio rol — bloqueado en la UI (`canChangeRole` en
+  `src/services/userRules.ts`); las rules **no** repiten esta restricción
+  específica (un admin autenticado puede escribir cualquier `users/*` vía
+  API directa), mismo gap que existía con `isAdmin` antes de esta migración.
 
 ## Modelo de datos (Firestore)
 
@@ -115,7 +121,13 @@ shape de estos documentos en el cliente.
   reglas de Firestore. Si se necesita lógica server-side confiable (p. ej.
   anti-doble-reserva 100% atómico), habría que introducir Functions o
   transacciones Firestore más estrictas.
-- No hay suite de pruebas automatizadas (unit/e2e) configurada.
+- Hay tests unitarios (Vitest, `npm run test`) para la lógica de negocio
+  pura (`src/services/reservationRules.ts`, `src/services/userRules.ts`,
+  `src/utils/time.ts`), pero no hay tests end-to-end ni de componentes.
+- Un admin autenticado puede cambiar el `role` de **cualquier** usuario,
+  incluido el suyo propio, directo contra Firestore — la restricción de "no
+  puedes cambiar tu propio rol" solo existe en la UI (`canChangeRole`), no
+  en `firestore.rules`.
 - La extensión de correo (`mail` collection) no está declarada en
   `firebase.json` — confirmar que esté instalada en el proyecto real antes de
   depender de las notificaciones por email.

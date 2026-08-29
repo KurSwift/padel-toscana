@@ -68,9 +68,11 @@ src/
   types/index.ts         # shapes de Firestore (UserProfile, Court, Reservation...) — fuente de verdad de tipos
   utils/time.ts          # helpers de fecha/hora en formato 'HH:mm' / 'YYYY-MM-DD' (strings, no Date en el modelo)
   services/reservationRules.ts  # lógica pura de reservaciones (sin imports de firebase/*), testeada con Vitest
+  services/userRules.ts   # lógica pura de roles/permisos (mismo patrón), testeada con Vitest
 scripts/
   seed.mjs               # prepobla el emulador (firebase-admin, nunca toca producción)
   push-to-prod.mjs        # migra colecciones seleccionadas emulador → producción
+  migrate-users-role.mjs  # one-off: isAdmin (bool) → role (string) en usuarios existentes de prod
 ```
 
 Alias de import: `@/` → `src/` (configurado en `vite.config.ts` y
@@ -155,11 +157,20 @@ npm run dev                        # terminal 2
 - **`npm run seed`** (`scripts/seed.mjs`) usa `firebase-admin` apuntado
   explícitamente a los puertos del emulador — nunca toca producción. Crea
   usuarios de Auth con `uid` fijo y su perfil correspondiente en Firestore
-  (admin + residentes activos + uno pendiente), dos canchas, y una
-  reservación de ejemplo. Es **idempotente**: correrlo de nuevo actualiza
-  los mismos documentos en vez de duplicarlos. Si cambias
-  `DEFAULT_COURT_SETTINGS` en `src/services/courts.ts`, actualiza también la
-  copia duplicada en este script (comentario lo señala).
+  (un usuario por rol — admin, colono activo x2, colono pendiente,
+  tesorero), dos canchas, y una reservación de ejemplo. Es **idempotente**:
+  correrlo de nuevo actualiza los mismos documentos en vez de duplicarlos.
+  Si cambias `DEFAULT_COURT_SETTINGS` en `src/services/courts.ts`, actualiza
+  también la copia duplicada en este script (comentario lo señala).
+- **`npm run migrate-users-role`** (`scripts/migrate-users-role.mjs`)
+  one-off contra producción: convierte el campo viejo `isAdmin: boolean` de
+  usuarios existentes a `role: 'colono' | 'admin' | 'tesorero'` (`admin` si
+  `isAdmin` era `true`, `colono` si no) y borra `isAdmin`. Ningún usuario
+  existente queda como `tesorero` automáticamente — hay que asignarlo a
+  mano desde el panel admin después de correr la migración. **Dry-run por
+  default**; solo escribe con `--confirm`. Corre esto contra prod antes o
+  justo al desplegar el PR de roles, para que ningún usuario real se quede
+  sin el campo `role` que las rules ahora requieren.
 - **`npm run push-to-prod`** (`scripts/push-to-prod.mjs`) migra colecciones
   seleccionadas del emulador local hacia producción — pensado para llevar
   configuración curada (p. ej. `courts`), no como sync general. Corre en

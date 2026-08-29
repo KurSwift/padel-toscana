@@ -10,6 +10,7 @@
     "emulators": "PATH=\"/opt/homebrew/opt/openjdk/bin:/usr/local/opt/openjdk/bin:$PATH\" firebase emulators:start --import=./.emulator-data --export-on-exit=./.emulator-data",
     "seed": "node scripts/seed.mjs",
     "push-to-prod": "node scripts/push-to-prod.mjs",
+    "migrate-users-role": "node scripts/migrate-users-role.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

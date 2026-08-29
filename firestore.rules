@@ -7,9 +7,20 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
     function isAdmin() {
-      return isAuthenticated()
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      return isAuthenticated() && userRole() == 'admin';
+    }
+
+    function isTesorero() {
+      return isAuthenticated() && userRole() == 'tesorero';
+    }
+
+    function isColono() {
+      return isAuthenticated() && userRole() == 'colono';
     }
 
     function isOwner(uid) {
@@ -27,18 +38,18 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
 
-      // First-time registration: status must be 'pending', isAdmin must be false
+      // First-time registration: status must be 'pending', role must be 'colono'
       allow create: if isOwner(uid)
-        && request.resource.data.isAdmin == false
+        && request.resource.data.role == 'colono'
         && request.resource.data.status == 'pending'
         && request.resource.data.keys().hasAll([
              'name', 'street', 'streetNumber', 'address',
-             'addressNormalized', 'isAdmin', 'status', 'createdAt'
+             'addressNormalized', 'role', 'status', 'createdAt'
            ]);
 
-      // User can update profile but cannot change isAdmin or status themselves
+      // User can update profile but cannot change role or status themselves
       allow update: if (isOwner(uid)
-          && request.resource.data.isAdmin == resource.data.isAdmin
+          && request.resource.data.role == resource.data.role
           && request.resource.data.get('status', 'active') == resource.data.get('status', 'active'))
         || isAdmin();
 
