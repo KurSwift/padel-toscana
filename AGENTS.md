@@ -46,6 +46,13 @@ falta instalar nada global). El proyecto está enlazado vía `.firebaserc`
   función pura testeable (ver "Lógica de negocio pura..." en Convenciones)
   y testea esa función; no dejes una validación de negocio sin cobertura
   solo porque vive dentro de una función async.
+- **Toda PR incluye pasos de verificación manual en su descripción**,
+  además del test plan automatizado (`npm run build`/`npm run test`) —
+  sobre todo si el cambio toca UI, permisos/roles, o flujos que dependen de
+  los emuladores. Formato: qué usuario/rol usar (de los que crea `npm run
+  seed`), qué ruta o acción probar, y qué se espera ver. El objetivo es que
+  quien revisa (o retoma la tarea después) pueda reproducir la verificación
+  contra los emuladores sin tener que reconstruir el contexto desde cero.
 
 ## Estructura
 
