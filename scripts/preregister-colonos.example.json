@@ -1,0 +1,18 @@
+{
+  "colonos": [
+    {
+      "calle": "Nogal",
+      "numero_casa": 12,
+      "nombre_completo": "María García",
+      "telefono": "5512345678",
+      "email": "maria@example.com"
+    },
+    {
+      "calle": "Olivos",
+      "numero_casa": 7,
+      "nombre_completo": "Juan Pérez",
+      "telefono": "5598765432",
+      "email": ""
+    }
+  ]
+}

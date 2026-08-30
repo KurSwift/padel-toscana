@@ -27,27 +27,34 @@ cualquier otro domicilio ya no aparece el botón. Esta tarea ahora se reduce
 a migrar esa única cuenta a teléfono (o a correo, si se implementa la tarea
 4) y quitar la excepción — mucho más chico que el alcance original.*
 
-## 2. Pre-registro de usuarios por CSV (script, no en UI)
+## 2. ~~Pre-registro de usuarios por JSON (script, no en UI)~~ — hecho
 
-Script tipo `scripts/seed.mjs` (pero para producción, con el mismo patrón
-de seguridad que `scripts/push-to-prod.mjs` / `migrate-users-role.mjs`:
-dry-run por default, `--confirm` explícito) que lea un CSV de colonos
-(nombre, calle, número, teléfono) y cree sus `users/{uid}` + entradas en
-`addresses/` directamente en producción, sin pasar por el flujo de
-registro/aprobación manual de la app. Pensado para dar de alta en bloque a
-los colonos existentes al lanzar el reglamento nuevo, no como reemplazo
-del registro normal.
+**Hecho** (2026-08-30, `scripts/preregister-colonos.mjs`). Cambió de CSV a
+JSON (`{ "colonos": [{ calle, numero_casa, nombre_completo, telefono,
+email }] }` — ver `scripts/preregister-colonos.example.json`), decisión del
+usuario. Mismo patrón de seguridad que `push-to-prod.mjs`/
+`migrate-users-role.mjs`: dry-run por default, `--confirm` explícito,
+`applicationDefault()` para credenciales de producción.
 
-Puntos a definir antes de implementar:
-- ¿De dónde sale el `uid`? Si el usuario no tiene cuenta de Firebase Auth
-  todavía, hay que crearla también (como hace `seedAuthUsers()` en
-  `seed.mjs`, pero contra Auth de producción) — probablemente por
-  teléfono, ya que sería el método de login que quede tras la tarea 1.
-- ¿Qué `status` y `role` llevan estos usuarios al crearse? (`active` /
-  `colono` por default, asumo).
-- Formato exacto del CSV y validaciones (calle debe ser una de
-  `VALID_STREETS`, máximo 2 por domicilio, etc. — mismas reglas que
-  `registerUser()`).
+Decisiones tomadas (respondiendo los puntos que quedaban abiertos):
+- `uid`: lo genera Firebase Auth al crear la cuenta (`auth.createUser({
+  phoneNumber })`), mismo patrón que `adminCreateColono`
+  (`functions/src/index.ts`) — el script es efectivamente una versión
+  batch de esa función, mismo shape de `users/{uid}`/`addresses/{key}`.
+- `status`/`role`: `active`/`colono` de inmediato, sin paso de aprobación —
+  igual que el alta uno-por-uno desde AdminPage.
+- `email` del JSON se guarda como dato en el perfil, no crea ningún método
+  de acceso nuevo (login sigue siendo solo teléfono — ver tarea 4).
+- Filas inválidas (calle fuera de `VALID_STREETS`, teléfono mal formado,
+  nombre vacío, domicilio ya con 2 colonos) se omiten y se reportan al
+  final — no abortan el archivo completo. Teléfonos que ya tienen cuenta
+  se omiten silenciosamente — el script es seguro de correr más de una vez
+  sobre el mismo archivo o uno ampliado.
+
+Probado de punta a punta contra el emulador (no producción): alta exitosa,
+re-corrida idempotente (omite duplicados), calle inválida, nombre inválido,
+teléfono mal formado, domicilio lleno (2/2), y normalización de teléfono
+con/sin prefijo `+52`/`52`.
 
 ## 3. Prevenir abuso de la API (mantener el costo cerca de $0 en plan Blaze)
 
