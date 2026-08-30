@@ -8,11 +8,13 @@ el contexto de negocio/dominio ver [CONTEXT.md](./CONTEXT.md).
 React 19 + TypeScript + Vite 6, Tailwind CSS 3, React Router 7, Firebase v11
 (Auth, Firestore, App Check) vía SDK modular. Sin servidor propio: casi
 toda la lógica de negocio vive en `src/services/*` y se refuerza en
-`firestore.rules`. La única excepción es `functions/` (Cloud Functions v2,
-TypeScript) — una sola función (`createReservation`), que existe
-específicamente porque esa validación requiere una query agregada que
-`firestore.rules` no puede hacer (ver "La regla más importante del repo" más
-abajo). El proyecto está en plan Blaze (de pago) por esto.
+`firestore.rules`. La excepción es `functions/` (Cloud Functions v2,
+TypeScript) — tres funciones: `createReservation` (existe porque esa
+validación requiere una query agregada que `firestore.rules` no puede
+hacer — ver "La regla más importante del repo" más abajo), y
+`adminCreateColono`/`getResidentsByAddress` (alta de colonos por admin —
+crean cuentas de Auth ajenas y consultan `users` pre-auth, ambas cosas
+requieren Admin SDK). El proyecto está en plan Blaze (de pago) por esto.
 
 ## Comandos
 
@@ -24,6 +26,7 @@ npm run preview     # sirve el build de producción localmente
 npm run emulators   # Auth + Firestore + Functions emulators (requiere Java)
 npm run seed        # prepobla el emulador con datos de ejemplo
 npm run push-to-prod  # migra colecciones seleccionadas emulador → producción (dry-run por default)
+npm run preregister-colonos -- --file=x.json  # alta en bloque de colonos en prod desde JSON (dry-run por default)
 npm run test        # corre la suite de Vitest una vez (CI-friendly)
 npm run test:watch  # Vitest en modo watch, para desarrollo
 npm run test:e2e    # Playwright — flujo crítico E2E contra los emuladores (ver e2e/)
@@ -50,14 +53,19 @@ falta instalar nada global). El proyecto está enlazado vía `.firebaserc`
 de arriba — necesita los emuladores corriendo (`npm run emulators` +
 `npm run seed`) y un `npm run dev` en paralelo (Playwright reusa uno ya
 levantado en `:5173`, o levanta el suyo). Corre el único flujo crítico que
-cubre hoy: registro → aprobación de admin → reserva → confirmación de pago
-→ cancelación, generando un usuario/teléfono/domicilio nuevo en cada corrida
-para no depender de cuántas reservaciones de ejemplo acumule ya el emulador
-(`npm run seed` no es idempotente para `reservations`, ver "Emuladores,
-seeds y push-to-prod" más abajo). `e2e/helpers.ts` automatiza el login por
-teléfono leyendo la OTP directo del endpoint de testing del emulador de
-Auth (`/emulator/v1/projects/{id}/verificationCodes`) — no hay SMS real que
-esperar.
+cubre hoy: alta de colono por admin → login (domicilio → saludo → teléfono
+→ OTP) → reserva → confirmación de pago → cancelación, generando un
+usuario/teléfono/domicilio nuevo en cada corrida para no depender de
+cuántas reservaciones de ejemplo acumule ya el emulador (`npm run seed` no
+es idempotente para `reservations`, ver "Emuladores, seeds y
+push-to-prod" más abajo). `e2e/helpers.ts` automatiza `loginWithPhone`
+(domicilio + teléfono, la única forma de entrar hoy — ver "Flujo de alta y
+login" en CONTEXT.md) leyendo la OTP directo del endpoint de testing del
+emulador de Auth (`/emulator/v1/projects/{id}/verificationCodes`) — no hay
+SMS real que esperar. El flujo de auto-registro sigue en el código
+(`RegisterPage.tsx`) pero sin punto de entrada desde `/login`, así que ya
+no tiene helper de e2e propio (se quitó `registerWithPhone` — ver nota en
+`e2e/helpers.ts` si hace falta reconstruirlo).
 
 ## Flujo de trabajo
 
@@ -95,15 +103,18 @@ src/
   services/reservationRules.ts  # lógica pura de reservaciones (sin imports de firebase/*), testeada con Vitest
   services/userRules.ts   # lógica pura de roles/permisos (mismo patrón), testeada con Vitest
 scripts/
-  seed.mjs               # prepobla el emulador (firebase-admin, nunca toca producción)
-  push-to-prod.mjs        # migra colecciones seleccionadas emulador → producción
-  migrate-users-role.mjs  # one-off: isAdmin (bool) → role (string) en usuarios existentes de prod
+  seed.mjs                    # prepobla el emulador (firebase-admin, nunca toca producción)
+  push-to-prod.mjs             # migra colecciones seleccionadas emulador → producción
+  migrate-users-role.mjs       # one-off: isAdmin (bool) → role (string) en usuarios existentes de prod
+  preregister-colonos.mjs      # alta en bloque de colonos en prod desde un JSON (dry-run por default)
 e2e/                      # Playwright — npm run test:e2e, ver más abajo
-  helpers.ts              # login/registro por teléfono (OTP vía emulador), logout
-  critical-flow.spec.ts   # registro → aprobación → reserva → pago → cancelación
+  helpers.ts              # loginWithPhone (domicilio + teléfono + OTP vía emulador), logout
+  critical-flow.spec.ts   # alta por admin → login → reserva → pago → cancelación
 functions/                # Cloud Functions v2 + TypeScript — build/deploy propios, ver "Comandos"
-  src/index.ts             # createReservation (onCall) — única función del repo
+  src/index.ts             # createReservation, adminCreateColono, getResidentsByAddress (onCall)
   src/reservationRules.ts  # copia de la lógica pura que necesita (ver comentario de cabecera)
+  src/colonoRules.ts        # lógica pura de alta de colonos (calle válida, cupo, teléfono) — sin mirror en src/
+  src/rateLimit.ts           # rate limiting genérico (ventana fija), usado por createReservation
   src/time.ts               # copia de src/utils/time.ts (toDate/addHours) — mismo motivo
 ```
 

@@ -41,28 +41,47 @@ sitio, color de acento). Ver Epic
 tarea 5 en `TASKS.md` — la tabla de arriba sigue reflejando el estado
 actual hasta que esos issues se implementen.
 
-## Flujo de registro y aprobación
+## Flujo de alta y login (actualizado 2026-08-30 — reemplaza el auto-registro)
 
-1. Usuario abre `/login`, elige modo **Registrarme**.
-2. **Paso dirección**: elige calle + número. Se valida contra la colección
-   `addresses` que no haya ya **2 usuarios** registrados en ese domicilio
-   (`MAX_USERS_PER_ADDRESS` en `src/services/users.ts`). Este es el límite
-   de "colonos por casa".
-3. Se autentica con **Google** o **teléfono +52 vía OTP** (Firebase Auth).
-4. Si no existe perfil (`users/{uid}`) → `/registro`, donde captura su
-   nombre y confirma. `registerUser()` crea `users/{uid}` (status `pending`)
-   y actualiza `addresses/{street numero}` en una transacción atómica, y
-   además escribe un doc en `mail/` para notificar al admin por correo.
-5. Mientras `status === 'pending'`, `ProtectedRoute` bloquea el acceso y
-   muestra una pantalla de "solicitud en revisión".
-6. Admin aprueba (`approveUser` → `status: 'active'`) o rechaza
-   (`rejectUser` → borra el usuario y libera su lugar en `addresses` vía
-   transacción).
+Desde el alta de colonos por admin (ver Epic
+[#33](https://github.com/KurSwift/padel-toscana/pull/33)), ya no hay
+auto-registro por default. El flujo real:
 
-**Gap conocido:** el envío de correo depende de que la extensión oficial de
-Firebase *Trigger Email* (o equivalente) esté instalada y escuchando la
-colección `mail`. Esa extensión **no está declarada** en `firebase.json` —
-si el admin no ve las notificaciones, ese es el primer lugar a revisar.
+1. **Alta**: un admin (o `super-admin`, cuando exista — ver tarea 5 en
+   `TASKS.md`) va a `/admin` → Usuarios → "+ Agregar colono", captura
+   nombre, calle, número y teléfono. `adminCreateColono`
+   (`functions/src/index.ts`, Cloud Function con Admin SDK) crea la cuenta
+   de Firebase Auth (por teléfono) + `users/{uid}` con `status: 'active'`
+   **de inmediato** (sin paso de aprobación) + actualiza
+   `addresses/{street numero}` — mismo límite de **2 usuarios por
+   domicilio** (`MAX_USERS_PER_ADDRESS`/`isAddressAvailable` en
+   `functions/src/colonoRules.ts`) que antes.
+2. **Login** (`/login`, `LoginPage.tsx`): domicilio primero (calle +
+   número) → `getResidentsByAddress` (Cloud Function, pre-auth) busca si
+   hay un colono activo ahí y saluda por nombre ("Bienvenid@ {nombre}") →
+   teléfono +52 vía OTP (Firebase Auth). Si nadie está registrado en ese
+   domicilio, error — no hay fallback a auto-registro.
+3. **Excepción hardcodeada**: `GOOGLE_LOGIN_ADDRESS = 'nogal 35'` en
+   `LoginPage.tsx` — solo esa cuenta (la admin original, que predata este
+   modelo) puede entrar con Google. Cualquier otro domicilio solo tiene
+   teléfono.
+4. Si el perfil no existe tras autenticar, la persona no puede entrar
+   (mensaje pidiendo contactar al admin) — ya no se manda a `/registro`.
+
+**El auto-registro viejo sigue intacto en el código, solo sin punto de
+entrada** (decisión explícita — no se borró nada): `RegisterPage.tsx`,
+`registerUser()` (`src/services/users.ts`, escribe `status: 'pending'` +
+un doc en `mail/` para notificar al admin), la ruta `/registro` (sin
+guard), y `approveUser`/`rejectUser` en `AdminPage.tsx` siguen
+funcionando si alguien llega ahí por URL directa — pero `/login` ya no
+enlaza a ese flujo. También existe `scripts/preregister-colonos.mjs` para
+dar de alta en bloque desde un JSON, mismo shape que `adminCreateColono`.
+
+**Gap conocido:** el envío de correo (usado por el flujo de auto-registro
+dormido) depende de que la extensión oficial de Firebase *Trigger Email*
+(o equivalente) esté instalada y escuchando la colección `mail`. Esa
+extensión **no está declarada** en `firebase.json` — si el admin no ve
+las notificaciones, ese es el primer lugar a revisar.
 
 ## Flujo de reservación
 
@@ -205,31 +224,40 @@ shape de estos documentos en el cliente.
 
 ## Autenticación y seguridad
 
-- **Métodos**: Google (popup) y teléfono (+52 México, OTP vía
-  `RecaptchaVerifier` invisible).
+- **Métodos**: teléfono (+52 México, OTP vía `RecaptchaVerifier` invisible)
+  para todos; Google (popup) solo para el domicilio hardcodeado en
+  `LoginPage.tsx` (`GOOGLE_LOGIN_ADDRESS`) — ver "Flujo de alta y login"
+  arriba.
 - **App Check** (`src/firebase.ts`) con reCAPTCHA v3 está siempre activo,
-  incluso en dev — en local se apoya en el modo debug-token (ver README).
+  incluso en dev — en local se apoya en el modo debug-token (ver README y
+  AGENTS.md; para `npm run test:e2e` específicamente hace falta un debug
+  token fijo vía `VITE_APPCHECK_DEBUG_TOKEN`, ver AGENTS.md). Las tres
+  Cloud Functions (`createReservation`, `adminCreateColono`,
+  `getResidentsByAddress`) tienen `enforceAppCheck: true`.
 - La autorización real vive en `firestore.rules`; el cliente nunca debe ser la
   única línea de defensa para nada sensible (roles, límites, integridad de
   reservaciones).
 
 ## Gaps / deuda conocida (útil antes de asumir que "ya existe")
 
-- Casi toda la lógica vive en el cliente + reglas de Firestore. La única
-  excepción es `functions/` (Cloud Functions v2, una sola función,
-  `createReservation`) — existe puntualmente porque crear una reservación
-  necesita validar el límite de activas por usuario y traslapes de
-  horario, algo que requiere queries agregadas que `firestore.rules` no
-  puede hacer (solo `get()` de documentos puntuales). La función corre esa
-  validación + el write dentro de una transacción de Firestore, atómico;
-  `firestore.rules` deniega `create` en `reservations` por completo
-  (`if false`) — la función es la única vía. El proyecto está en plan
-  Blaze por esto. Ver "La regla más importante del repo" en AGENTS.md.
+- Casi toda la lógica vive en el cliente + reglas de Firestore. Las
+  excepciones son las tres funciones en `functions/` (Cloud Functions v2):
+  `createReservation` (existe porque crear una reservación necesita
+  validar el límite de activas por usuario y traslapes de horario, algo
+  que requiere queries agregadas que `firestore.rules` no puede hacer —
+  solo `get()` de documentos puntuales; corre esa validación + el write
+  dentro de una transacción atómica; `firestore.rules` deniega `create` en
+  `reservations` por completo, `if false` — la función es la única vía),
+  `adminCreateColono` y `getResidentsByAddress` (alta de colonos por
+  admin — necesitan Admin SDK para crear cuentas de Auth ajenas y para
+  consultar `users` antes de que la persona esté autenticada). El proyecto
+  está en plan Blaze por esto. Ver "La regla más importante del repo" en
+  AGENTS.md.
 - Hay tests unitarios (Vitest — `npm run test` para el cliente,
   `npm run test:functions` para `functions/`) para toda la lógica de
   negocio pura, tests de componentes (Testing Library, ej. `BookingSheet`,
   `StatusBadge`) y un flujo E2E crítico con Playwright
-  (`npm run test:e2e` — registro → aprobación → reserva → pago →
+  (`npm run test:e2e` — alta por admin → login → reserva → pago →
   cancelación, contra los emuladores).
 - Un admin autenticado puede cambiar el `role` de **cualquier** usuario,
   incluido el suyo propio, directo contra Firestore — la restricción de "no
