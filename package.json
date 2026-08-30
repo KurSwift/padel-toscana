@@ -11,6 +11,7 @@
     "seed": "node scripts/seed.mjs",
     "push-to-prod": "node scripts/push-to-prod.mjs",
     "migrate-users-role": "node scripts/migrate-users-role.mjs",
+    "preregister-colonos": "node scripts/preregister-colonos.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

@@ -258,6 +258,19 @@ npm run dev                        # terminal 2
   que exista en prod y no en local. Antes de correrlo con `--confirm` contra
   `users` o `reservations`, confirma con el usuario — son datos reales de
   personas.
+- **`npm run preregister-colonos -- --file=colonos.json`**
+  (`scripts/preregister-colonos.mjs`) alta en bloque de colonos existentes
+  en producción a partir de un JSON (`{ "colonos": [...] }` — ver
+  `scripts/preregister-colonos.example.json` para el shape exacto). Crea la
+  cuenta de Auth + `users/{uid}` + `addresses/{key}`, mismo shape que
+  `adminCreateColono` (`functions/src/index.ts`), con `status: 'active'` de
+  inmediato. **Dry-run por default**; solo escribe con `--confirm`. Es
+  seguro correrlo más de una vez sobre el mismo archivo (o uno ampliado) —
+  un teléfono que ya tiene cuenta se omite silenciosamente, no es un error.
+  Una fila con dato inválido (calle, teléfono, nombre, domicilio ya con 2
+  colonos) se omite y se reporta al final; no aborta el resto del archivo.
+  Antes de correrlo con `--confirm`, confirma con el usuario — son datos
+  reales de personas.
 
 App Check está activo incluso en dev cuando **no** usas emuladores
 (`src/firebase.ts`) — los emuladores no pasan por App Check. Si desarrollas
