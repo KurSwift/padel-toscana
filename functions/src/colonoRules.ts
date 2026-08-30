@@ -5,7 +5,7 @@
 // server-side; antes solo vivían en src/types/index.ts (VALID_STREETS) y
 // src/services/users.ts (MAX_USERS_PER_ADDRESS, privado ahí).
 
-export const VALID_STREETS = ['Nogal', 'Olivos', 'Encino'] as const
+export const VALID_STREETS = ['Nogal', 'Olivo', 'Encino'] as const
 export type ValidStreet = (typeof VALID_STREETS)[number]
 
 export function isValidStreet(street: string): street is ValidStreet {

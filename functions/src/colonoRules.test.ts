@@ -10,7 +10,7 @@ import {
 describe('isValidStreet', () => {
   it('acepta las tres calles válidas', () => {
     expect(isValidStreet('Nogal')).toBe(true)
-    expect(isValidStreet('Olivos')).toBe(true)
+    expect(isValidStreet('Olivo')).toBe(true)
     expect(isValidStreet('Encino')).toBe(true)
   })
 
@@ -47,7 +47,7 @@ describe('normalizeAddress', () => {
   })
 
   it('quita espacios al inicio/final del número', () => {
-    expect(normalizeAddress('Olivos', '  12  ')).toBe('olivos 12')
+    expect(normalizeAddress('Olivo', '  12  ')).toBe('olivo 12')
   })
 
   it('produce la misma llave sin importar mayúsculas en la calle', () => {
