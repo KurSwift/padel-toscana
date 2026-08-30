@@ -9,7 +9,7 @@ import { loginWithPhone, logout } from './helpers'
 // cada vez que se corre `npm run seed` (las reservaciones de ejemplo se
 // agregan con `.add()`, no son idempotentes como users/courts) y podría
 // hacer que la reservación nueva choque con `maxActiveReservationsPerUser`.
-// Mismo motivo para el número: reusar una dirección fija ("Olivos 77")
+// Mismo motivo para el número: reusar una dirección fija ("Olivo 77")
 // entre corridas la satura contra MAX_USERS_PER_ADDRESS (2) al segundo run.
 const RUN_ID = String(Date.now()).slice(-8)
 const NEW_USER_PHONE = `55${RUN_ID}`
@@ -29,7 +29,7 @@ test('alta por admin → login → reserva → pago → cancelación', async ({ 
 
   await page.getByRole('button', { name: '+ Agregar colono' }).click()
   await page.getByPlaceholder('Ej: María García').fill(NEW_USER_NAME)
-  await page.getByRole('button', { name: 'Olivos', exact: true }).click()
+  await page.getByRole('button', { name: 'Olivo', exact: true }).click()
   await page.getByPlaceholder('Ej: 15').fill(NEW_USER_STREET_NUMBER)
   await page.getByPlaceholder('5512345678').fill(NEW_USER_PHONE)
   await page.getByRole('button', { name: 'Crear' }).click()
@@ -37,7 +37,7 @@ test('alta por admin → login → reserva → pago → cancelación', async ({ 
   await logout(page)
 
   // ── Reserva ───────────────────────────────────────────────────────────
-  await loginWithPhone(page, { street: 'Olivos', streetNumber: NEW_USER_STREET_NUMBER, tenDigitPhone: NEW_USER_PHONE })
+  await loginWithPhone(page, { street: 'Olivo', streetNumber: NEW_USER_STREET_NUMBER, tenDigitPhone: NEW_USER_PHONE })
   await expect(page.getByText(`Hola, ${NEW_USER_NAME}`)).toBeVisible()
 
   // Pasado mañana: la cancha requiere minLeadHours=24 — "mañana" puede
@@ -76,7 +76,7 @@ test('alta por admin → login → reserva → pago → cancelación', async ({ 
   await logout(page)
 
   // ── Cancelación ───────────────────────────────────────────────────────
-  await loginWithPhone(page, { street: 'Olivos', streetNumber: NEW_USER_STREET_NUMBER, tenDigitPhone: NEW_USER_PHONE })
+  await loginWithPhone(page, { street: 'Olivo', streetNumber: NEW_USER_STREET_NUMBER, tenDigitPhone: NEW_USER_PHONE })
   await page.getByRole('button', { name: 'Mis reservaciones' }).click()
   const confirmedCard = page.locator('div').filter({
     has: page.getByRole('button', { name: 'Cancelar' }),

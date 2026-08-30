@@ -28,7 +28,7 @@ export interface Court {
   settings: CourtSettings
 }
 
-export const VALID_STREETS = ['Nogal', 'Olivos', 'Encino'] as const
+export const VALID_STREETS = ['Nogal', 'Olivo', 'Encino'] as const
 export type ValidStreet = (typeof VALID_STREETS)[number]
 
 export type UserStatus = 'pending' | 'active' | 'rejected'

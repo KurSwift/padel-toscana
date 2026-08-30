@@ -45,7 +45,7 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore'
 import { getAuth } from 'firebase-admin/auth'
 
 const PROJECT_ID = 'padel-toscana'
-const VALID_STREETS = ['Nogal', 'Olivos', 'Encino']
+const VALID_STREETS = ['Nogal', 'Olivo', 'Encino']
 const MAX_USERS_PER_ADDRESS = 2
 
 function parseArgs() {

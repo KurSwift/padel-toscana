@@ -11,7 +11,7 @@ los residentes de un fraccionamiento llamado "Toscana", compuesto por
 exactamente tres calles:
 
 ```
-Nogal · Olivos · Encino
+Nogal · Olivo · Encino
 ```
 
 (ver `VALID_STREETS` en `src/types/index.ts`). No es una app pública — solo

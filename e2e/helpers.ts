@@ -28,7 +28,7 @@ async function fetchOtpCode(fullPhoneNumber: string): Promise<string> {
 // getResidentsByAddress no encuentra a nadie y LoginPage no deja avanzar.
 export async function loginWithPhone(
   page: Page,
-  params: { street: 'Nogal' | 'Olivos' | 'Encino'; streetNumber: string; tenDigitPhone: string },
+  params: { street: 'Nogal' | 'Olivo' | 'Encino'; streetNumber: string; tenDigitPhone: string },
 ) {
   await page.goto('/login')
   await page.getByRole('button', { name: params.street, exact: true }).click()

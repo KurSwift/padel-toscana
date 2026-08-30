@@ -1,7 +1,7 @@
 # Padel Toscana
 
 App privada de reservación de canchas de pádel para los residentes del
-fraccionamiento Toscana (calles Nogal, Olivos y Encino). Los registros
+fraccionamiento Toscana (calles Nogal, Olivo y Encino). Los registros
 requieren aprobación de un administrador antes de poder reservar.
 
 Para el detalle del dominio (roles, flujo de registro/aprobación, modelo de
