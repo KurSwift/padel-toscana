@@ -8,8 +8,9 @@ import {
   serverTimestamp,
   runTransaction,
 } from 'firebase/firestore'
-import { db } from '@/firebase'
-import { UserProfile, UserRole } from '@/types'
+import { httpsCallable } from 'firebase/functions'
+import { db, functions } from '@/firebase'
+import { UserProfile, UserRole, ValidStreet } from '@/types'
 
 // Can be called before authentication (addresses are publicly readable)
 export async function checkAddressAvailability(
@@ -133,4 +134,61 @@ export async function registerUser(
       `,
     },
   })
+}
+
+// ── Alta de colonos por admin (ver TASKS.md) ────────────────────────────────
+// registerUser() de arriba sigue intacta — la sigue usando RegisterPage.tsx.
+// Estas dos funciones son el reemplazo como punto de entrada normal:
+// getResidentsByAddress para el saludo pre-auth de LoginPage, adminCreateColono
+// para el alta desde AdminPage. Ambas corren en functions/src/index.ts
+// (Admin SDK — el navegador no puede crear cuentas de Auth ajenas).
+
+const getResidentsByAddressCallable = httpsCallable(functions, 'getResidentsByAddress')
+const adminCreateColonoCallable = httpsCallable(functions, 'adminCreateColono')
+
+// Saludo pre-auth en LoginPage. Array vacío = "nadie registrado en este
+// domicilio" — no es un error, LoginPage lo maneja como caso normal.
+export async function getResidentsByAddress(
+  street: string,
+  streetNumber: string,
+): Promise<string[]> {
+  try {
+    const result = await getResidentsByAddressCallable({ street, streetNumber })
+    return (result.data as { names: string[] }).names
+  } catch (err) {
+    // Mismo patrón que createReservationCallable en reservations.ts: el SDK
+    // de Functions expone el segundo argumento de HttpsError como `.message`.
+    throw new Error((err as { message?: string }).message ?? 'unknown-error')
+  }
+}
+
+// Solo admin (reforzado en la función, no aquí). `phone` ya debe venir
+// formateado +52XXXXXXXXXX (mismo formato que LoginPage arma antes de
+// mandar el OTP).
+export async function adminCreateColono(data: {
+  name: string
+  street: ValidStreet
+  streetNumber: string
+  phone: string
+}): Promise<{ uid: string }> {
+  try {
+    const result = await adminCreateColonoCallable(data)
+    return result.data as { uid: string }
+  } catch (err) {
+    throw new Error((err as { message?: string }).message ?? 'unknown-error')
+  }
+}
+
+const ADMIN_CREATE_COLONO_ERRORS: Record<string, string> = {
+  'address-full': 'Este domicilio ya tiene 2 colonos registrados.',
+  'phone-already-registered': 'Este teléfono ya está registrado a otra cuenta.',
+  'invalid-name': 'Ingresa un nombre válido.',
+  'invalid-street': 'Selecciona una calle válida.',
+  'invalid-street-number': 'Ingresa el número del domicilio.',
+  'invalid-phone': 'El teléfono debe tener 10 dígitos.',
+  'admin-only': 'No tienes permisos de administrador.',
+}
+
+export function adminCreateColonoErrorMessage(code: string): string {
+  return ADMIN_CREATE_COLONO_ERRORS[code] ?? 'No se pudo agregar al colono. Intenta de nuevo.'
 }

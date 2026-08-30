@@ -4,8 +4,13 @@ import { RecaptchaVerifier, ConfirmationResult } from 'firebase/auth'
 import toast from 'react-hot-toast'
 import { auth } from '@/firebase'
 import { signInWithGoogle, sendPhoneOtp, verifyOtp, signOut } from '@/services/auth'
-import { checkAddressAvailability, checkUserExists } from '@/services/users'
+import { getResidentsByAddress, checkUserExists } from '@/services/users'
 import { VALID_STREETS, ValidStreet } from '@/types'
+
+// Excepción hardcodeada: esta es la única cuenta que predata el modelo de
+// alta por admin (entra con Google, no con teléfono asignado) — ver
+// TASKS.md. Cualquier otro domicilio solo tiene la opción de teléfono.
+const GOOGLE_LOGIN_ADDRESS = 'nogal 35'
 
 const ERROR_MESSAGES: Record<string, string> = {
   'auth/invalid-phone-number': 'Número de teléfono inválido.',
@@ -23,19 +28,18 @@ function getErrorMessage(err: unknown): string {
 }
 
 const RESEND_SECONDS = 60
-type Mode = 'login' | 'register'
 type Step = 'address' | 'phone' | 'otp'
 
 export default function LoginPage() {
   const navigate = useNavigate()
 
-  const [mode, setMode] = useState<Mode>('register')
   const [step, setStep] = useState<Step>('address')
 
-  // Address (register mode only)
+  // Address
   const [street, setStreet] = useState<ValidStreet | ''>('')
   const [streetNumber, setStreetNumber] = useState('')
   const [addressLoading, setAddressLoading] = useState(false)
+  const [residentNames, setResidentNames] = useState<string[]>([])
 
   // Auth
   const [phone, setPhone] = useState('')
@@ -53,15 +57,6 @@ export default function LoginPage() {
 
   useEffect(() => () => { recaptchaRef.current?.clear() }, [])
 
-  function switchMode(m: Mode) {
-    setMode(m)
-    setStep(m === 'register' ? 'address' : 'phone')
-    setStreet('')
-    setStreetNumber('')
-    setPhone('')
-    setOtp('')
-  }
-
   function getVerifier(): RecaptchaVerifier {
     if (!recaptchaRef.current) {
       recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' })
@@ -77,22 +72,14 @@ export default function LoginPage() {
   async function afterAuth(uid: string) {
     const exists = await checkUserExists(uid)
     if (exists) {
-      if (mode === 'register') {
-        toast.success('Ya tenías cuenta, te iniciamos sesión.', { duration: 3000 })
-      }
       navigate('/')
       return
     }
-    if (mode === 'register') {
-      navigate('/registro')
-      return
-    }
-    // Login mode: no profile found
     await signOut()
-    toast.error('No encontramos tu cuenta. ¿Eres nuevo? Usa "Registrarme".', { duration: 5000 })
+    toast.error('No encontramos tu cuenta. Contacta al administrador.', { duration: 5000 })
   }
 
-  // ── Address check (register only) ─────────────────────────────────────────
+  // ── Address check ───────────────────────────────────────────────────────
 
   async function handleAddressContinue() {
     if (!street || !streetNumber.trim()) {
@@ -101,14 +88,12 @@ export default function LoginPage() {
     }
     setAddressLoading(true)
     try {
-      const available = await checkAddressAvailability(street, streetNumber)
-      if (!available) {
-        toast.error('Este domicilio ya tiene 2 usuarios registrados. Contacta al administrador.', { duration: 5000 })
+      const names = await getResidentsByAddress(street, streetNumber)
+      if (names.length === 0) {
+        toast.error('No encontramos un colono registrado en este domicilio. Contacta al administrador.', { duration: 5000 })
         return
       }
-      // Persist address so it survives any auth redirects
-      sessionStorage.setItem('reg_street', street)
-      sessionStorage.setItem('reg_streetNumber', streetNumber.trim())
+      setResidentNames(names)
       setStep('phone')
     } catch {
       toast.error('No se pudo verificar el domicilio. Intenta de nuevo.')
@@ -185,26 +170,9 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold text-gray-900">Padel Toscana</h1>
         </div>
 
-        {/* Mode toggle */}
-        <div className="flex border-b border-gray-100 mb-6">
-          {(['register', 'login'] as Mode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => switchMode(m)}
-              className={`flex-1 py-3 text-sm font-semibold transition border-b-2 ${
-                mode === m
-                  ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              {m === 'login' ? 'Ya tengo cuenta' : 'Registrarme'}
-            </button>
-          ))}
-        </div>
+        <div className="px-8 pb-8 pt-2">
 
-        <div className="px-8 pb-8">
-
-          {/* ── Address step (register only) ── */}
+          {/* ── Address step ── */}
           {step === 'address' && (
             <>
               <div className="mb-5">
@@ -252,33 +220,38 @@ export default function LoginPage() {
           {/* ── Auth step ── */}
           {step === 'phone' && (
             <>
-              {/* Address badge (register mode) */}
-              {mode === 'register' && (
-                <button
-                  onClick={() => setStep('address')}
-                  className="flex items-center gap-2 text-sm mb-5 w-full"
-                >
-                  <span className="bg-brand-50 border border-brand-200 text-brand-700 px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5">
-                    🏠 {street} {streetNumber}
-                  </span>
-                  <span className="text-xs text-gray-400 hover:text-gray-600">Cambiar</span>
-                </button>
-              )}
-
               <button
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-xl py-3 px-4 text-gray-700 font-medium hover:bg-gray-50 transition disabled:opacity-50 mb-5"
+                onClick={() => setStep('address')}
+                className="flex items-center gap-2 text-sm mb-5 w-full"
               >
-                <GoogleIcon />
-                Continuar con Google
+                <span className="bg-brand-50 border border-brand-200 text-brand-700 px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5">
+                  🏠 {street} {streetNumber}
+                </span>
+                <span className="text-xs text-gray-400 hover:text-gray-600">Cambiar</span>
               </button>
 
-              <div className="flex items-center gap-3 mb-5">
-                <div className="flex-1 h-px bg-gray-200" />
-                <span className="text-sm text-gray-400">o</span>
-                <div className="flex-1 h-px bg-gray-200" />
-              </div>
+              <p className="text-sm text-gray-600 mb-5">
+                Bienvenid@ <span className="font-semibold text-gray-900">{residentNames.join(' y ')}</span>, ingresa tu número de teléfono para continuar
+              </p>
+
+              {`${street} ${streetNumber}`.trim().toLowerCase() === GOOGLE_LOGIN_ADDRESS && (
+                <>
+                  <button
+                    onClick={handleGoogleSignIn}
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-xl py-3 px-4 text-gray-700 font-medium hover:bg-gray-50 transition disabled:opacity-50 mb-5"
+                  >
+                    <GoogleIcon />
+                    Continuar con Google
+                  </button>
+
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="flex-1 h-px bg-gray-200" />
+                    <span className="text-sm text-gray-400">o</span>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
+                </>
+              )}
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Número de celular</label>

@@ -18,42 +18,26 @@ async function fetchOtpCode(fullPhoneNumber: string): Promise<string> {
   return match.code
 }
 
-// Flujo de login por teléfono en /login (modo "Ya tengo cuenta"), leyendo
-// el código OTP directo del emulador de Auth en vez de una SMS real. El
-// RecaptchaVerifier invisible de LoginPage no bloquea esto: el SDK de
-// Firebase lo omite automáticamente cuando detecta que Auth está
-// conectado al emulador (connectAuthEmulator en src/firebase.ts).
-export async function loginWithPhone(page: Page, tenDigitPhone: string) {
-  await page.goto('/login')
-  await page.getByRole('button', { name: 'Ya tengo cuenta' }).click()
-  await page.getByPlaceholder('5512345678').fill(tenDigitPhone)
-  await page.getByRole('button', { name: 'Enviar código' }).click()
-
-  // exact: true es necesario — el placeholder del teléfono ("5512345678")
-  // contiene "123456" como substring, y getByPlaceholder matchea por
-  // substring por default.
-  const otpInput = page.getByPlaceholder('123456', { exact: true })
-  await expect(otpInput).toBeVisible()
-  const code = await fetchOtpCode(`+52${tenDigitPhone}`)
-  await otpInput.fill(code)
-  await page.getByRole('button', { name: 'Verificar' }).click()
-}
-
-// Registro completo (modo "Registrarme"): domicilio → teléfono/OTP → nombre.
-// Deja al usuario autenticado con perfil en status 'pending' (ver
-// registerUser en src/services/users.ts) — necesita aprobación de un admin
-// antes de poder usar la app.
-export async function registerWithPhone(
+// Flujo de login por teléfono en /login: domicilio (saludo por nombre) →
+// teléfono → OTP, leyendo el código directo del emulador de Auth en vez de
+// una SMS real. El RecaptchaVerifier invisible de LoginPage no bloquea
+// esto: el SDK de Firebase lo omite automáticamente cuando detecta que Auth
+// está conectado al emulador (connectAuthEmulator en src/firebase.ts).
+// Requiere que ya exista un colono activo en ese domicilio (dado de alta
+// por un admin — ver adminCreateColono en functions/src/index.ts) o
+// getResidentsByAddress no encuentra a nadie y LoginPage no deja avanzar.
+export async function loginWithPhone(
   page: Page,
-  params: { street: 'Nogal' | 'Olivos' | 'Encino'; streetNumber: string; tenDigitPhone: string; name: string },
+  params: { street: 'Nogal' | 'Olivos' | 'Encino'; streetNumber: string; tenDigitPhone: string },
 ) {
   await page.goto('/login')
-  await page.getByRole('button', { name: 'Registrarme' }).click()
   await page.getByRole('button', { name: params.street, exact: true }).click()
   await page.getByPlaceholder('Ej: 15').fill(params.streetNumber)
   await page.getByRole('button', { name: 'Continuar' }).click()
 
-  await page.getByPlaceholder('5512345678').fill(params.tenDigitPhone)
+  const phoneInput = page.getByPlaceholder('5512345678')
+  await expect(phoneInput).toBeVisible()
+  await phoneInput.fill(params.tenDigitPhone)
   await page.getByRole('button', { name: 'Enviar código' }).click()
 
   // exact: true es necesario — el placeholder del teléfono ("5512345678")
@@ -64,11 +48,18 @@ export async function registerWithPhone(
   const code = await fetchOtpCode(`+52${params.tenDigitPhone}`)
   await otpInput.fill(code)
   await page.getByRole('button', { name: 'Verificar' }).click()
-
-  await expect(page).toHaveURL(/\/registro/)
-  await page.getByPlaceholder('Ej: María García').fill(params.name)
-  await page.getByRole('button', { name: 'Entrar a Padel Toscana' }).click()
 }
+
+// NOTA: existía un helper `registerWithPhone` que automatizaba el
+// auto-registro (modo "Registrarme" en /login, ya sin punto de entrada en
+// la UI — ver TASKS.md). RegisterPage.tsx/registerUser() siguen intactos y
+// funcionales, pero automatizar ese flujo ahora requeriría autenticar en el
+// emulador sin pasar por /login (la UI que lo disparaba desapareció), lo
+// cual implica exponer el objeto `auth` del cliente para pruebas o mintear
+// un custom token con el Admin SDK — suficiente complejidad/fragilidad para
+// una ruta que ya no es parte del flujo normal de la app que no vale la
+// pena mantenerla cubierta por e2e por ahora. Si se reactiva el
+// auto-registro como entrada real, vale la pena reconstruir este helper.
 
 // Cierra sesión desde cualquier página protegida (home, admin, tesorero,
 // pantalla de "solicitud en revisión") para dejar el navegador listo para

@@ -266,13 +266,25 @@ imprime y registrarlo en **Firebase Console → App Check → Manage debug
 tokens**, o las llamadas a Auth/Firestore fallan con `403`.
 
 **Excepción:** el emulador de Functions sí aplica `enforceAppCheck: true` en
-callables (`createReservation`) — el Admin SDK verifica el token contra el
-backend real de App Check aunque la función corra local, no hay bypass. Un
-debug token registrado (Console o API de `firebaseappcheck.googleapis.com`)
-funciona igual ahí que en producción: el cliente manda
-`X-Firebase-AppCheck` con el JWT que resulta de canjear el debug token, y
-`onCall` lo acepta. Verificado 2026-08-29 contra el emulador local con un
-debug token de prueba (creado y borrado vía API, no quedó registrado).
+callables (`createReservation`, `adminCreateColono`, `getResidentsByAddress`)
+— el Admin SDK verifica el token contra el backend real de App Check aunque
+la función corra local, no hay bypass. Un debug token registrado (Console o
+API de `firebaseappcheck.googleapis.com`) funciona igual ahí que en
+producción: el cliente manda `X-Firebase-AppCheck` con el JWT que resulta de
+canjear el debug token, y `onCall` lo acepta. Verificado 2026-08-29 contra el
+emulador local con un debug token de prueba (creado y borrado vía API, no
+quedó registrado).
+
+**Para `npm run test:e2e` (Playwright) específicamente**: cada test arranca
+un contexto de navegador nuevo, así que el debug token generado por default
+(`FIREBASE_APPCHECK_DEBUG_TOKEN = true` en `src/firebase.ts`, uno nuevo por
+sesión) nunca alcanza a registrarse a tiempo — cualquier callable con
+`enforceAppCheck` (incluyendo `getResidentsByAddress`, que corre en el
+primer paso de `LoginPage`) falla con `Unauthenticated` y Playwright ve el
+toast de error genérico, no un timeout obvio de App Check. Fija
+`VITE_APPCHECK_DEBUG_TOKEN` en `.env.local` a un UUID propio y regístralo
+una vez (Console o API) — ver `.env.local.example`. Sin esto, `npm run
+test:e2e` falla en el primer paso que llame a cualquier función protegida.
 
 ## Al agregar features
 

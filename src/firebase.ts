@@ -18,9 +18,19 @@ const app = initializeApp(firebaseConfig)
 
 // In dev, the SDK prints a debug token to the console.
 // Register that token in Firebase Console → App Check → Manage debug tokens.
+//
+// VITE_APPCHECK_DEBUG_TOKEN (opcional, .env.local): fija el debug token a
+// un valor conocido en vez de dejar que el SDK genere uno nuevo por sesión
+// de navegador. Necesario para e2e/Playwright — cada test corre en un
+// contexto de navegador nuevo, así que un token generado con `= true` nunca
+// llegaría a registrarse a tiempo. Registra ese valor una vez vía Firebase
+// Console → App Check → Manage debug tokens (o la API de
+// firebaseappcheck.googleapis.com) y los runs de e2e siguientes lo
+// reutilizan sin fricción. Sin esta variable, el comportamiento interactivo
+// normal (`= true`, un token nuevo impreso en consola cada vez) sigue igual.
 if (import.meta.env.DEV) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ;(self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true
+  ;(self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN || true
 }
 
 initializeAppCheck(app, {
