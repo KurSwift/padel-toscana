@@ -33,6 +33,14 @@ Solo usuarios `active` pueden crear reservaciones. Los usuarios creados antes
 de que existiera este campo se tratan como `active` por default (ver
 `isActiveUser()` en `firestore.rules` y los fallbacks `?? 'active'` en la UI).
 
+**Planeado, no implementado todavía** (2026-08-30): un cuarto rol
+`super-admin` — le quitaría a `admin` la capacidad de cambiar roles
+(exclusiva de `super-admin`) y agregaría un panel avanzado (logo del
+sitio, color de acento). Ver Epic
+[#43](https://github.com/KurSwift/padel-toscana/issues/43) en GitHub y
+tarea 5 en `TASKS.md` — la tabla de arriba sigue reflejando el estado
+actual hasta que esos issues se implementen.
+
 ## Flujo de registro y aprobación
 
 1. Usuario abre `/login`, elige modo **Registrarme**.

@@ -178,3 +178,18 @@ auto-registro ahora requeriría autenticar contra el emulador sin pasar por
 `/login`, ver nota en ese archivo) si el auto-registro se reactiva como
 entrada real algún día.
 
+## 5. Rol super-admin + panel avanzado (2026-08-30) — tracked en GitHub, no aquí
+
+Planeado (branch/PR-per-issue, no implementado todavía) como issues de
+GitHub en vez de prosa en este archivo — ver **Epic
+[#43](https://github.com/KurSwift/padel-toscana/issues/43)**: nuevo rol
+`super-admin` con un panel más avanzado en Admin (asignar roles — el
+`admin` normal deja de poder hacerlo —, subir el logo del sitio, elegir
+color de acento). Desglosado en 5 sub-issues en orden de dependencia
+(#38 → #39 → #40 → #41/#42). Feature flags para super-admin quedó como
+issue aparte, sin diseñar todavía ([#44](https://github.com/KurSwift/padel-toscana/issues/44)).
+
+Plan completo (contexto de la exploración, decisiones tomadas) en
+`/Users/ernestosanchezkuri/.claude/plans/snug-percolating-feigenbaum.md`
+si se retoma en una sesión sin ese historial de conversación.
+
