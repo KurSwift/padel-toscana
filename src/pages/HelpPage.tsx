@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import { useSiteSettings } from '@/context/SiteSettingsContext'
 import { UserRole } from '@/types'
 import Header from '@/components/Header'
 
@@ -123,6 +124,7 @@ const SECTIONS: HelpSection[] = [
 
 export default function HelpPage() {
   const { profile } = useAuth()
+  const { whatsappUrl } = useSiteSettings()
   const navigate = useNavigate()
 
   const sections = SECTIONS.filter(
@@ -182,9 +184,20 @@ export default function HelpPage() {
 
         <div className="bg-brand-50 border border-brand-200 rounded-2xl p-4 text-center">
           <p className="text-sm text-brand-800 font-medium">¿Tienes dudas o algo no funciona?</p>
-          <p className="text-sm text-brand-700 mt-1">
-            Escribe al grupo de WhatsApp "Reservaciones - La Toscana".
-          </p>
+          {whatsappUrl ? (
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block text-sm text-brand-700 mt-1 font-semibold underline underline-offset-2"
+            >
+              Escríbenos por WhatsApp
+            </a>
+          ) : (
+            <p className="text-sm text-brand-700 mt-1">
+              Escribe al grupo de WhatsApp "Reservaciones - La Toscana".
+            </p>
+          )}
         </div>
       </main>
     </div>

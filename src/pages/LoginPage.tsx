@@ -7,6 +7,7 @@ import { signInWithGoogle, sendPhoneOtp, verifyOtp, signOut } from '@/services/a
 import { getResidentsByAddress, checkUserExists } from '@/services/users'
 import { VALID_STREETS, ValidStreet } from '@/types'
 import Logo from '@/components/Logo'
+import { useSiteSettings } from '@/context/SiteSettingsContext'
 
 // Excepción hardcodeada: esta es la única cuenta que predata el modelo de
 // alta por admin (entra con Google, no con teléfono asignado) — ver
@@ -33,6 +34,7 @@ type Step = 'address' | 'phone' | 'otp'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const { siteName } = useSiteSettings()
 
   const [step, setStep] = useState<Step>('address')
 
@@ -168,7 +170,7 @@ export default function LoginPage() {
           <div className="mx-auto mb-4 w-fit">
             <Logo size="lg" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Padel Toscana</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{siteName}</h1>
         </div>
 
         <div className="px-8 pb-8 pt-2">

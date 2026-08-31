@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
+import { useSiteSettings } from '@/context/SiteSettingsContext'
 import { registerUser, checkAddressAvailability } from '@/services/users'
 import { signOut } from '@/services/auth'
 import { VALID_STREETS, ValidStreet } from '@/types'
@@ -10,6 +11,7 @@ type RegStep = 'address' | 'name'
 
 export default function RegisterPage() {
   const { user, profile, loading } = useAuth()
+  const { siteName } = useSiteSettings()
   const navigate = useNavigate()
 
   // Address — from sessionStorage (fast path) or collected in-page (fallback)
@@ -216,7 +218,7 @@ export default function RegisterPage() {
             >
               {submitting
                 ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                : 'Entrar a Padel Toscana'
+                : `Entrar a ${siteName}`
               }
             </button>
           </form>

@@ -95,9 +95,10 @@ src/
   App.tsx              # rutas (react-router)
   context/AuthContext   # user de Firebase Auth + su UserProfile (Firestore), vía onSnapshot
   context/ThemeContext   # paletteId activo (settings/theme en Firestore), vía onSnapshot — mismo molde que AuthContext
+  context/SiteSettingsContext  # siteName/whatsappUrl (settings/general), mismo molde — también fija document.title
   components/           # UI reutilizable (Header, Logo, BookingSheet, SlotsGrid, DateSelector, StatusBadge, ProtectedRoute...)
   pages/                 # HomePage, AdminPage, TesoreroPage, HelpPage, LoginPage, RegisterPage
-  services/              # única capa que toca Firestore/Auth/Storage directamente (auth, courts, reservations, users, branding, theme)
+  services/              # única capa que toca Firestore/Auth/Storage directamente (auth, courts, reservations, users, branding, theme, siteSettings)
   theme/palettes.ts      # paletas de acento predefinidas (id, name, tones 50–900) — Epic #43, issue 5/5
   hooks/useCourtData     # combina cancha activa + reservaciones del día + reservaciones del usuario
   types/index.ts         # shapes de Firestore (UserProfile, Court, Reservation...) — fuente de verdad de tipos
@@ -105,6 +106,7 @@ src/
   services/reservationRules.ts  # lógica pura de reservaciones (sin imports de firebase/*), testeada con Vitest
   services/userRules.ts   # lógica pura de roles/permisos (mismo patrón), testeada con Vitest
   services/brandingRules.ts  # lógica pura de validación del logo del sitio (mismo patrón), testeada con Vitest
+  services/siteSettingsRules.ts  # lógica pura de validación de nombre/link de WhatsApp (mismo patrón), testeada con Vitest
 scripts/
   seed.mjs                    # prepobla el emulador (firebase-admin, nunca toca producción)
   push-to-prod.mjs             # migra colecciones seleccionadas emulador → producción

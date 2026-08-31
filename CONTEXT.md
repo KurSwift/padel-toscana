@@ -57,6 +57,16 @@ que `admin`. Todo vive en `/admin` → pestaña "Avanzado" (`AdvancedTab` en
   correo en `src/services/users.ts` se quedan en verde fijo (archivos
   estáticos o HTML de correo ya enviado, fuera de alcance de un cambio en
   runtime de React).
+- **Nombre del sitio y contacto** (2026-08-31, fuera de los 5 issues
+  originales del Epic — extensión pedida después de cerrarlo): mismo
+  patrón que logo/color — `settings/general` (`{ siteName, whatsappUrl }`)
+  vía `SiteSettingsContext.tsx`. El nombre reemplaza el "Padel Toscana"
+  hardcodeado en Home/Login/RegisterPage y fija `document.title` en
+  runtime; el link de WhatsApp reemplaza el texto plano de la tarjeta de
+  contacto en `HelpPage` (si no hay link configurado, se queda igual que
+  antes). Misma limitación de archivos estáticos que el color: `manifest.json`,
+  los meta tags de `index.html`, y el subject/body del email en
+  `src/services/users.ts` se quedan con "Padel Toscana" fijo.
 
 Promover a alguien a `super-admin` sigue sin tener UI — requiere editar
 el doc `users/{uid}` directo en Firestore (consola o script).
@@ -238,6 +248,7 @@ problemas que la ayuda no cubra.
 | `rateLimits/{uid}` | `{ windowStart: Timestamp, count: number }` | Rate limiting de `createReservation` (ventana fija, ver `functions/src/rateLimit.ts`). Solo la Cloud Function (Admin SDK) la toca — bloqueada por completo para el cliente en `firestore.rules`. |
 | `courts/{courtId}` | `Court` (incluye `CourtSettings`) | Lectura para cualquier usuario autenticado, escritura solo admin. |
 | `settings/theme` | `{ paletteId: string }` | Paleta de acento activa (Epic #43, issue 5/5 — ver `src/theme/palettes.ts`). Lectura pública (se necesita antes de autenticar, en `/login`), escritura solo super-admin. Si no existe, se asume la paleta default (`'green'`). |
+| `settings/general` | `{ siteName: string, whatsappUrl?: string }` | Nombre del sitio (Home/Login/RegisterPage y `document.title`) y link de contacto de WhatsApp (tarjeta al final de `HelpPage`). Mismas reglas que `settings/theme`: lectura pública, escritura solo super-admin. Si no existe o `whatsappUrl` está vacío, cae a los defaults/texto plano de siempre — ver `src/context/SiteSettingsContext.tsx`. |
 | `reservations/{id}` | `Reservation` | Ver reglas de creación/actualización arriba. `startAt`/`endAt`/`paymentDueAt` son `Timestamp`; el resto de fecha/hora sigue siendo strings (`date`, `startTime`, `endTime`). El campo `status` puede estar desactualizado — ver "Expiración lazy" arriba. `playerCount`/`residentInChargeName` capturados en `BookingSheet`. Índices compuestos en `firestore.indexes.json` para `courtId+date+status` y `userId+status+date` — siguen sirviendo con `where('status','in',[...])` porque Firestore indexa `in` igual que una igualdad. El índice `date+status` que existía se quitó (issue 6/7): la única query que lo usaba (panel admin) ya no filtra por status. |
 
 Los tipos TypeScript en `src/types/index.ts` son la fuente de verdad del
