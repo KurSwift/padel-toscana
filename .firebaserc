@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "padel-toscana"
-  }
+  },
+  "targets": {
+    "padel-toscana": {
+      "hosting": {
+        "toscana-residencial": [
+          "reservaciones-toscana-residencial"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
