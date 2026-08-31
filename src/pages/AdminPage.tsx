@@ -5,16 +5,18 @@ import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
 import { Court, CourtSettings, UserProfile, UserRole, Reservation, ReservationStatus, ValidStreet, VALID_STREETS } from '@/types'
 import { getAllCourts, updateCourtSettings, toggleCourtActive, createCourt, DEFAULT_COURT_SETTINGS } from '@/services/courts'
-import { getAllUsers, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage } from '@/services/users'
+import { getAllUsers, setUserRole, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage } from '@/services/users'
+import { canAssignRole, canChangeRole } from '@/services/userRules'
 import { MAX_RESERVATION_DURATION_HOURS } from '@/services/reservationRules'
 import { subscribeToAllReservationsByDate, setReservationStatus } from '@/services/reservations'
 import { todayString, addDays, formatDateLong, formatTime } from '@/utils/time'
 import StatusBadge, { RESERVATION_STATUS_LABELS } from '@/components/StatusBadge'
 
-type Tab = 'reservations' | 'courts' | 'users'
+type Tab = 'reservations' | 'courts' | 'users' | 'avanzado'
 
-// Asignar rol vive solo en el panel avanzado de super-admin (Epic #43) —
-// aquí el rol de cada usuario se muestra de solo lectura.
+// Etiquetas de rol, compartidas entre UsersTab (solo lectura) y AdvancedTab
+// (donde sí se puede editar — asignar rol es exclusivo de super-admin, Epic
+// #43, ver AdvancedTab más abajo).
 const ROLE_LABELS: Record<UserRole, string> = {
   colono: 'Colono',
   admin: 'Admin',
@@ -22,11 +24,22 @@ const ROLE_LABELS: Record<UserRole, string> = {
   'super-admin': 'Super Admin',
 }
 
+const TAB_LABELS: Record<Tab, string> = {
+  reservations: 'Reservaciones',
+  courts: 'Canchas',
+  users: 'Usuarios',
+  avanzado: 'Avanzado',
+}
+
 export default function AdminPage() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>('reservations')
   const [pendingCount, setPendingCount] = useState(0)
+  const isSuperAdmin = profile?.role === 'super-admin'
+  const tabs: Tab[] = isSuperAdmin
+    ? ['reservations', 'courts', 'users', 'avanzado']
+    : ['reservations', 'courts', 'users']
 
   useEffect(() => {
     getAllUsers().then((users) =>
@@ -59,7 +72,7 @@ export default function AdminPage() {
 
       {/* Tab bar */}
       <div className="bg-white border-b border-gray-200 flex">
-        {(['reservations', 'courts', 'users'] as Tab[]).map((t) => (
+        {tabs.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -69,7 +82,7 @@ export default function AdminPage() {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            {t === 'reservations' ? 'Reservaciones' : t === 'courts' ? 'Canchas' : 'Usuarios'}
+            {TAB_LABELS[t]}
             {t === 'users' && pendingCount > 0 && (
               <span className="absolute top-2 right-1/4 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
                 {pendingCount}
@@ -83,6 +96,7 @@ export default function AdminPage() {
         {tab === 'reservations' && <ReservationsTab />}
         {tab === 'courts' && <CourtsTab />}
         {tab === 'users' && <UsersTab onPendingChange={setPendingCount} />}
+        {tab === 'avanzado' && isSuperAdmin && <AdvancedTab />}
       </main>
     </div>
   )
@@ -724,7 +738,118 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
   )
 }
 
+// ── Advanced Tab (super-admin) ────────────────────────────────────────────────
+// Asignar roles es exclusivo de super-admin (Epic #43, issue #38) — se movió
+// aquí desde UsersTab. Solo se monta si profile.role === 'super-admin' (ver
+// AdminPage), pero handleChangeRole igual re-chequea canAssignRole por si
+// este componente se llega a renderizar desde otro lado en el futuro.
+
+function AdvancedTab() {
+  const { user: currentUser, profile } = useAuth()
+  const [users, setUsers] = useState<UserProfile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [acting, setActing] = useState<string | null>(null)
+
+  useEffect(() => {
+    getAllUsers().then((u) => {
+      const active = u
+        .filter((x) => !x.status || x.status === 'active')
+        .sort((a, b) => a.name.localeCompare(b.name))
+      setUsers(active)
+      setLoading(false)
+    })
+  }, [])
+
+  async function handleChangeRole(u: UserProfile, role: UserRole) {
+    if (!canAssignRole(profile?.role ?? 'colono')) {
+      toast.error('No tienes permiso para asignar roles.')
+      return
+    }
+    if (!canChangeRole(currentUser?.uid ?? '', u.uid)) {
+      toast.error('No puedes modificar tu propio rol.')
+      return
+    }
+    if (role === u.role) return
+    setActing(u.uid)
+    try {
+      await setUserRole(u.uid, role)
+      setUsers((prev) => prev.map((x) => x.uid === u.uid ? { ...x, role } : x))
+      toast.success(`Rol de ${u.name} actualizado a ${ROLE_LABELS[role]}.`)
+    } catch {
+      toast.error('No se pudo cambiar el rol.')
+    } finally {
+      setActing(null)
+    }
+  }
+
+  if (loading) return <div className="flex justify-center py-8"><Spinner /></div>
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+          Asignar roles ({users.length})
+        </p>
+        <div className="space-y-2">
+          {users.map((u) => (
+            <div key={u.uid} className="bg-white rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-800 truncate">
+                  {u.name}
+                  {u.uid === currentUser?.uid && (
+                    <span className="ml-1.5 text-xs text-gray-400">(tú)</span>
+                  )}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {u.street} {u.streetNumber}
+                </p>
+              </div>
+              <RoleSelector
+                role={u.role}
+                disabled={acting === u.uid || u.uid === currentUser?.uid}
+                onChange={(role) => handleChangeRole(u, role)}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Shared ─────────────────────────────────────────────────────────────────────
+
+// Selector de rol (colono/admin/tesorero/super-admin), usado en AdvancedTab.
+// `disabled` cubre tanto el estado "guardando" como el caso de un super-admin
+// viendo su propia fila (no puede cambiarse su rol, ver canChangeRole).
+function RoleSelector({
+  role,
+  disabled,
+  onChange,
+}: {
+  role: UserRole
+  disabled: boolean
+  onChange: (role: UserRole) => void
+}) {
+  return (
+    <div className="shrink-0 flex flex-wrap justify-end gap-1 bg-gray-100 rounded-full p-0.5">
+      {(Object.keys(ROLE_LABELS) as UserRole[]).map((r) => (
+        <button
+          key={r}
+          onClick={() => onChange(r)}
+          disabled={disabled}
+          className={`text-xs font-medium px-2.5 py-1 rounded-full transition disabled:opacity-40 ${
+            role === r
+              ? 'bg-brand-600 text-white'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          {ROLE_LABELS[r]}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 function Spinner({ sm }: { sm?: boolean }) {
   const size = sm ? 'w-4 h-4 border-2' : 'w-8 h-8 border-4'
