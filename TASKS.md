@@ -383,3 +383,26 @@ Plan completo (contexto de la exploración, decisiones tomadas) en
 `/Users/ernestosanchezkuri/.claude/plans/snug-percolating-feigenbaum.md`
 si se retoma en una sesión sin ese historial de conversación.
 
+## 6. Reservación de la casa club (2026-08-31) — tracked en GitHub, no aquí
+
+Nuevo recurso reservable (además de las canchas de padel) en el mismo
+portal — ver **Epic [#60](https://github.com/KurSwift/padel-toscana/issues/60)**
+en GitHub, desglosado en 8 sub-issues en orden de dependencia
+(#61 → #62 → #63 → #64/#65 → #66 → #67 → #68), ninguno implementado
+todavía.
+
+Investigación previa a la épica encontró que el modelo de datos
+(`Court`/`CourtSettings`), `firestore.rules`, y `createReservation` ya
+son genéricos por `courtId` — el trabajo real es reglas de negocio
+nuevas (depósito con devolución parcial, tope mensual, cancelación con
+plazo, día completo en vez de horario) más un bug real ya identificado
+(el conteo de reservaciones activas por usuario es global entre
+recursos, no por tipo — issue #63 lo arregla). El issue #68
+(calendario público, sin login, para compartir con el guardia/grupo de
+WhatsApp) es la primera excepción deliberada al modelo "100% privado
+por invitación" del sitio — ver PRD.md § 9.
+
+Contexto completo de las decisiones (depósito, tope mensual, formato
+del calendario) en `PRD.md` § 14 y en el historial de esta conversación
+si se retoma sin ese contexto.
+

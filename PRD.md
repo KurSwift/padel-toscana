@@ -158,9 +158,9 @@ Reglas transversales:
   esta comunidad específica, no como producto genérico para múltiples
   HOAs/fraccionamientos con configuración por cliente.
 - **Múltiples deportes o instalaciones (por ahora).** Solo canchas de
-  padel hoy. Hay una solicitud real de habilitar la reservación de la
-  casa club en este mismo portal — no descartada, pendiente de diseño
-  (ver Pregunta abierta en la sección 14).
+  padel hoy. La reservación de la casa club ya está planeada — Epic
+  [#60](https://github.com/KurSwift/padel-toscana/issues/60) en
+  GitHub — pero no implementada todavía (ver sección 14).
 - **App nativa (iOS/Android).** Solo web responsive; no hay planes de
   apps nativas.
 - **Soporte offline.** La app requiere conexión a internet — no hay
@@ -334,16 +334,20 @@ _(Entidades conceptuales — el schema exacto de campos/tipos vive en
 
 ## 14. Preguntas abiertas
 
-- **Reservación de la casa club.** Llegó una solicitud real de habilitar
-  esto en el mismo portal. Recomendación: mismo proyecto, no uno
-  aparte — reutiliza Auth/Firestore/Storage/App Check ya provisionados
-  (costo marginal ~$0) y evita que el colono necesite loguearse por
-  separado en dos sistemas. Modelarla como otro doc en `courts` con un
-  campo `type` (`'cancha' | 'casa-club'`) para distinguirla, ya que
-  `Court`/`CourtSettings` no tiene nada específico de padel. Pendiente
-  de resolver antes de implementar: hoy `useCourtData` asume una sola
-  cancha activa — falta el selector de "qué recurso estoy reservando"
-  en el Home.
+- ~~**Reservación de la casa club.**~~ — **resuelta** (2026-08-31): ya
+  no es una pregunta abierta, quedó planeada como Epic
+  [#60](https://github.com/KurSwift/padel-toscana/issues/60) en
+  GitHub, desglosada en 8 issues en orden de dependencia (#61-#68).
+  Mismo proyecto, no uno aparte — reutiliza Auth/Firestore/Storage/App
+  Check ya provisionados. Reglas de negocio reales quedaron definidas
+  (reservación por día completo, depósito de $3,000 con $2,000
+  reembolsables, cancelación con 48h de anticipación, tope de 2 al mes
+  por usuario, aforo de 30) — ver el Epic para el detalle completo. La
+  sección 7 (Fuera de alcance) y la 9 (Seguridad y privacidad) de este
+  documento seguirán describiendo el estado *actual* hasta que la
+  épica se implemente — en particular, el calendario público (issue
+  #68) va a ser la primera excepción deliberada al modelo "100%
+  privado por invitación".
 - El Compromiso SLC de arriba ("sin excepciones documentadas") está en
   tensión directa con trabajo ya desplegado: las features de
   nombre-del-sitio/logo/color-de-acento (extensiones del Epic #43)
