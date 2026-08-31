@@ -54,7 +54,7 @@ const SECTIONS: HelpSection[] = [
   },
   {
     title: 'Confirmar pagos (tesorero)',
-    visibleTo: ['tesorero', 'admin'],
+    visibleTo: ['tesorero', 'admin', 'super-admin'],
     steps: [
       'Entra a "Pagos" en la barra de arriba.',
       'Verás la lista de reservaciones pendientes de pago, ordenadas de la más urgente a la menos urgente.',
@@ -78,12 +78,12 @@ const SECTIONS: HelpSection[] = [
   },
   {
     title: 'Panel de administración',
-    visibleTo: ['admin'],
+    visibleTo: ['admin', 'super-admin'],
     steps: [
       'Entra a "Admin" en la barra de arriba.',
       'Pestaña "Reservaciones": ve todas las reservaciones de un día (los 4 estados) y cambia el estado de cualquiera si hace falta.',
       'Pestaña "Canchas": activa/desactiva canchas, y ajusta horarios, duración, límites de anticipación, plazo de pago y el monto a cobrar.',
-      'Pestaña "Usuarios": aprueba o rechaza solicitudes de registro nuevas, y asigna el rol de cada colono (Colono/Admin/Tesorero).',
+      'Pestaña "Usuarios": aprueba o rechaza solicitudes de registro nuevas, y agrega colonos nuevos directamente.',
     ],
     faq: [
       {
@@ -92,11 +92,7 @@ const SECTIONS: HelpSection[] = [
       },
       {
         q: '¿Cómo hago a alguien tesorero?',
-        a: 'Pestaña Usuarios → usa el selector de rol junto a su nombre.',
-      },
-      {
-        q: '¿Puedo cambiarme mi propio rol?',
-        a: 'No — por seguridad, un admin no puede modificar su propio rol. Pide a otro admin que lo haga.',
+        a: 'Asignar roles es exclusivo de super-admin, desde el panel avanzado — pídeselo a un super-admin.',
       },
       {
         q: '¿Cómo cambio el monto que se cobra por reservación?',

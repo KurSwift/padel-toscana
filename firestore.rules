@@ -11,8 +11,18 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
+    // super-admin es superset de admin (entra al panel normal también, ver
+    // Epic #43) — isAdmin() lo incluye a propósito para que todas las
+    // reglas que ya chequean isAdmin() (courts, addresses, reservations,
+    // lectura/borrado de users) sigan funcionando sin tocarlas una por una.
+    // La única capacidad EXCLUSIVA de super-admin (asignar roles) usa
+    // isSuperAdmin() aparte, ver la regla users/{uid} abajo.
     function isAdmin() {
-      return isAuthenticated() && userRole() == 'admin';
+      return isAuthenticated() && userRole() in ['admin', 'super-admin'];
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && userRole() == 'super-admin';
     }
 
     function isTesorero() {
@@ -58,11 +68,14 @@ service cloud.firestore {
              'addressNormalized', 'role', 'status', 'createdAt'
            ]);
 
-      // User can update profile but cannot change role or status themselves
+      // User can update profile but cannot change role or status themselves.
+      // Admin puede editar cualquier campo salvo `role` (asignar roles es
+      // exclusivo de super-admin, ver isSuperAdmin() arriba y Epic #43).
       allow update: if (isOwner(uid)
           && request.resource.data.role == resource.data.role
           && request.resource.data.get('status', 'active') == resource.data.get('status', 'active'))
-        || isAdmin();
+        || (isAdmin() && request.resource.data.role == resource.data.role)
+        || isSuperAdmin();
 
       allow delete: if isAdmin();
     }

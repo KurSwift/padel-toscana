@@ -134,6 +134,11 @@ describe('canTransition', () => {
     expect(canTransition({ role: 'admin', isOwner: false }, 'solicitada', 'pagada')).toBe(true)
   })
 
+  it('super-admin puede hacer cualquier transición, igual que admin', () => {
+    expect(canTransition({ role: 'super-admin', isOwner: false }, 'finalizada', 'solicitada')).toBe(true)
+    expect(canTransition({ role: 'super-admin', isOwner: false }, 'solicitada', 'pagada')).toBe(true)
+  })
+
   it('el dueño puede cancelar desde solicitada', () => {
     expect(canTransition({ role: 'colono', isOwner: true }, 'solicitada', 'cancelada')).toBe(true)
   })

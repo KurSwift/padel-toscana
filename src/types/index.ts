@@ -35,9 +35,13 @@ export type UserStatus = 'pending' | 'active' | 'rejected'
 
 // colono: reserva/cancela sus propias reservaciones.
 // admin: aprueba/rechaza registros, gestiona canchas, ve/gestiona todas las
-//   reservaciones, cambia el rol de otros usuarios.
+//   reservaciones. Ya no cambia el rol de otros usuarios — eso quedó
+//   exclusivo de super-admin (Epic #43).
 // tesorero: confirma pagos de reservaciones (issue 7/7 del épico #10).
-export type UserRole = 'colono' | 'admin' | 'tesorero'
+// super-admin: superset de admin (entra al panel normal también) + panel
+//   avanzado propio (asignar roles, logo del sitio, color de acento — ver
+//   Epic #43 en GitHub).
+export type UserRole = 'colono' | 'admin' | 'tesorero' | 'super-admin'
 
 export interface UserProfile {
   uid: string

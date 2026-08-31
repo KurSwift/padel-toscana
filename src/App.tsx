@@ -39,7 +39,7 @@ export default function App() {
           <Route
             path="/admin"
             element={
-              <ProtectedRoute allowedRoles={['admin']}>
+              <ProtectedRoute allowedRoles={['admin', 'super-admin']}>
                 <AdminPage />
               </ProtectedRoute>
             }
@@ -47,7 +47,7 @@ export default function App() {
           <Route
             path="/tesorero"
             element={
-              <ProtectedRoute allowedRoles={['tesorero', 'admin']}>
+              <ProtectedRoute allowedRoles={['tesorero', 'admin', 'super-admin']}>
                 <TesoreroPage />
               </ProtectedRoute>
             }

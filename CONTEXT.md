@@ -20,26 +20,33 @@ solicitud debe ser aprobada manualmente por un administrador.
 
 ## Roles
 
-Tres roles, en `UserProfile.role` (`src/types/index.ts`):
+Cuatro roles, en `UserProfile.role` (`src/types/index.ts`):
 
 | Rol | Descripción |
 |---|---|
 | **`colono`** | Puede reservar/cancelar sus propias reservaciones una vez aprobado. Rol por default al registrarse. |
-| **`admin`** | Aprueba/rechaza registros, gestiona canchas (horarios, reglas), ve y cancela cualquier reservación, cambia el rol de otros usuarios. Se asigna manualmente desde el panel admin — no hay auto-promoción, y un admin no puede cambiarse su propio rol. |
-| **`tesorero`** | Confirma que una reservación `solicitada` ya fue pagada, desde `/tesorero` (`TesoreroPage.tsx`) — lista todas las `solicitada` pendientes (cualquier fecha/cancha) con un botón "Confirmar pago" (`confirmPayment()`). Un admin también puede entrar a esa ruta. |
+| **`admin`** | Aprueba/rechaza registros, gestiona canchas (horarios, reglas), ve y cancela cualquier reservación. Ya no cambia el rol de otros usuarios — eso quedó exclusivo de `super-admin` (ver abajo). |
+| **`tesorero`** | Confirma que una reservación `solicitada` ya fue pagada, desde `/tesorero` (`TesoreroPage.tsx`) — lista todas las `solicitada` pendientes (cualquier fecha/cancha) con un botón "Confirmar pago" (`confirmPayment()`). Un admin/super-admin también puede entrar a esa ruta. |
+| **`super-admin`** | Superset de `admin` — entra a `/admin` con las mismas capacidades, más asignar el rol de cualquier otro usuario (exclusivo suyo, ver `canAssignRole()` en `src/services/userRules.ts` e `isSuperAdmin()` en `firestore.rules`). Se asigna a mano en Firestore (bootstrap), no hay UI de auto-promoción. |
 
 Un usuario tiene además un `status`: `pending` → `active` → (o `rejected`).
 Solo usuarios `active` pueden crear reservaciones. Los usuarios creados antes
 de que existiera este campo se tratan como `active` por default (ver
 `isActiveUser()` en `firestore.rules` y los fallbacks `?? 'active'` en la UI).
 
-**Planeado, no implementado todavía** (2026-08-30): un cuarto rol
-`super-admin` — le quitaría a `admin` la capacidad de cambiar roles
-(exclusiva de `super-admin`) y agregaría un panel avanzado (logo del
-sitio, color de acento). Ver Epic
+**Estado del épico de super-admin** (2026-08-30): el rol base ya está
+implementado — `super-admin` existe en `UserRole`, `firestore.rules` lo
+reconoce (`isAdmin()` lo incluye como superset; `isSuperAdmin()` es la
+única vía para cambiar `role` de otro usuario), `adminCreateColono` lo
+acepta igual que `admin`, y la asignación de roles se quitó por completo
+del tab Usuarios normal (issue [#38](https://github.com/KurSwift/padel-toscana/issues/38),
+cerrado). **Todavía no existe ninguna UI para asignar roles** — el panel
+avanzado de super-admin (asignar roles, logo del sitio, color de acento)
+es el resto del roadmap, ver Epic
 [#43](https://github.com/KurSwift/padel-toscana/issues/43) en GitHub y
-tarea 5 en `TASKS.md` — la tabla de arriba sigue reflejando el estado
-actual hasta que esos issues se implementen.
+tarea 5 en `TASKS.md`. Hasta que el issue #39 se implemente, promover a
+alguien a `super-admin` requiere editar el doc `users/{uid}` directo en
+Firestore (consola o script), no hay botón en la app.
 
 ## Flujo de alta y login (actualizado 2026-08-30 — reemplaza el auto-registro)
 
@@ -47,8 +54,8 @@ Desde el alta de colonos por admin (ver Epic
 [#33](https://github.com/KurSwift/padel-toscana/pull/33)), ya no hay
 auto-registro por default. El flujo real:
 
-1. **Alta**: un admin (o `super-admin`, cuando exista — ver tarea 5 en
-   `TASKS.md`) va a `/admin` → Usuarios → "+ Agregar colono", captura
+1. **Alta**: un admin (o `super-admin` — ver "Roles" arriba) va a
+   `/admin` → Usuarios → "+ Agregar colono", captura
    nombre, calle, número y teléfono. `adminCreateColono`
    (`functions/src/index.ts`, Cloud Function con Admin SDK) crea la cuenta
    de Firebase Auth (por teléfono) + `users/{uid}` con `status: 'active'`

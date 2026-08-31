@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canChangeRole, hasAllowedRole } from './userRules'
+import { canAssignRole, canChangeRole, hasAllowedRole } from './userRules'
 
 describe('canChangeRole', () => {
   it('permite cambiar el rol de otro usuario', () => {
@@ -8,6 +8,21 @@ describe('canChangeRole', () => {
 
   it('bloquea que un usuario cambie su propio rol', () => {
     expect(canChangeRole('admin-uid', 'admin-uid')).toBe(false)
+  })
+})
+
+describe('canAssignRole', () => {
+  it('solo super-admin puede asignar roles', () => {
+    expect(canAssignRole('super-admin')).toBe(true)
+  })
+
+  it('admin ya no puede asignar roles', () => {
+    expect(canAssignRole('admin')).toBe(false)
+  })
+
+  it('tesorero y colono no pueden asignar roles', () => {
+    expect(canAssignRole('tesorero')).toBe(false)
+    expect(canAssignRole('colono')).toBe(false)
   })
 })
 
