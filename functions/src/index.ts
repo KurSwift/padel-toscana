@@ -346,3 +346,71 @@ export const adminCreateColono = onCall(
     return { uid: newUid }
   },
 )
+
+// Elimina una cuenta por completo: cuenta de Auth + doc de Firestore +
+// libera el cupo en addresses/{key}. Exclusivo de super-admin — a
+// diferencia de adminCreateColono, aquí sí importa la distinción con
+// admin (eliminar cuentas es más sensible que darlas de alta). Rechazar
+// un registro pendiente sigue siendo cosa de cualquier admin, sin pasar
+// por esta función (rejectUser() en src/services/users.ts, directo desde
+// el cliente — ver la rama `status == 'pending'` en firestore.rules).
+//
+// Orden deliberado: primero el doc de Firestore + el cupo del domicilio,
+// después la cuenta de Auth (al revés que adminCreateColono). Si el borrado
+// de Auth falla después de que el doc ya se borró, el peor caso es una
+// cuenta de Auth huérfana sin perfil — el propio AuthContext ya maneja ese
+// caso con gracia (perfil null → "contacta al admin"). Si fuera al revés
+// (Auth primero) y el doc de Firestore no se lograra borrar, quedaría un
+// usuario "fantasma" visible en el panel admin con una cuenta de Auth que
+// ya no existe — mucho más confuso y sin cupo liberado en el domicilio.
+export const adminDeleteColono = onCall(
+  { region: 'us-central1', enforceAppCheck: true },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'unauthenticated')
+    }
+    const callerSnap = await db.doc(`users/${request.auth.uid}`).get()
+    if (!callerSnap.exists || callerSnap.get('role') !== 'super-admin') {
+      throw new HttpsError('permission-denied', 'super-admin-only')
+    }
+
+    const uid = (request.data as { uid?: unknown })?.uid
+    if (typeof uid !== 'string' || !uid) {
+      throw new HttpsError('invalid-argument', 'invalid-argument')
+    }
+    // Espejo de canActOnUser() en src/services/userRules.ts — un super-admin
+    // no puede eliminarse a sí mismo (evita que el sitio se quede sin
+    // ningún super-admin, ya que no hay UI para asignar el rol de vuelta).
+    if (uid === request.auth.uid) {
+      throw new HttpsError('failed-precondition', 'cannot-delete-self')
+    }
+
+    const userRef = db.doc(`users/${uid}`)
+    const userSnap = await userRef.get()
+    if (!userSnap.exists) {
+      throw new HttpsError('not-found', 'user-not-found')
+    }
+    const addressNormalized = userSnap.get('addressNormalized') as string | undefined
+
+    await db.runTransaction(async (tx) => {
+      if (addressNormalized) {
+        const addressRef = db.doc(`addresses/${addressNormalized}`)
+        const addressSnap = await tx.get(addressRef)
+        if (addressSnap.exists) {
+          const uids = (addressSnap.get('uids') as string[]).filter((u) => u !== uid)
+          tx.update(addressRef, { uids })
+        }
+      }
+      tx.delete(userRef)
+    })
+
+    // Best-effort: si la cuenta de Auth ya no existe (o el borrado falla),
+    // el doc de Firestore y el cupo del domicilio ya quedaron consistentes
+    // arriba — ver nota de orden deliberado más arriba.
+    await getAuth().deleteUser(uid).catch((err) => {
+      if ((err as { code?: string }).code !== 'auth/user-not-found') throw err
+    })
+
+    return { success: true }
+  },
+)

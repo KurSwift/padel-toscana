@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { canAssignRole, canChangeRole, hasAllowedRole } from './userRules'
+import { canActOnUser, canAssignRole, hasAllowedRole } from './userRules'
 
-describe('canChangeRole', () => {
-  it('permite cambiar el rol de otro usuario', () => {
-    expect(canChangeRole('admin-uid', 'other-uid')).toBe(true)
+describe('canActOnUser', () => {
+  it('permite actuar sobre otro usuario (cambiar rol o eliminar)', () => {
+    expect(canActOnUser('admin-uid', 'other-uid')).toBe(true)
   })
 
-  it('bloquea que un usuario cambie su propio rol', () => {
-    expect(canChangeRole('admin-uid', 'admin-uid')).toBe(false)
+  it('bloquea que un usuario actúe sobre sí mismo', () => {
+    expect(canActOnUser('admin-uid', 'admin-uid')).toBe(false)
   })
 })
 

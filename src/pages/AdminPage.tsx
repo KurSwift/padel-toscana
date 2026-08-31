@@ -5,8 +5,8 @@ import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
 import { Court, CourtSettings, UserProfile, UserRole, Reservation, ReservationStatus, ValidStreet, VALID_STREETS } from '@/types'
 import { getAllCourts, updateCourtSettings, toggleCourtActive, createCourt, DEFAULT_COURT_SETTINGS } from '@/services/courts'
-import { getAllUsers, setUserRole, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage } from '@/services/users'
-import { canAssignRole, canChangeRole } from '@/services/userRules'
+import { getAllUsers, setUserRole, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage, deleteColono, deleteColonoErrorMessage } from '@/services/users'
+import { canAssignRole, canActOnUser } from '@/services/userRules'
 import { uploadLogo, getLogoUrl, uploadLogoErrorMessage } from '@/services/branding'
 import { setThemePalette } from '@/services/theme'
 import { updateSiteSettings, updateSiteSettingsErrorMessage } from '@/services/siteSettings'
@@ -741,16 +741,19 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
 }
 
 // ── Advanced Tab (super-admin) ────────────────────────────────────────────────
-// Asignar roles es exclusivo de super-admin (Epic #43, issue #38) — se movió
-// aquí desde UsersTab. Solo se monta si profile.role === 'super-admin' (ver
-// AdminPage), pero handleChangeRole igual re-chequea canAssignRole por si
-// este componente se llega a renderizar desde otro lado en el futuro.
+// Asignar roles y eliminar usuarios son exclusivos de super-admin (Epic #43,
+// issues #38 y siguiente) — el RoleSelector se movió aquí desde UsersTab.
+// Solo se monta si profile.role === 'super-admin' (ver AdminPage), pero
+// handleChangeRole/handleDelete igual re-chequean canAssignRole/
+// canActOnUser por si este componente se llega a renderizar desde otro
+// lado en el futuro.
 
 function AdvancedTab() {
   const { user: currentUser, profile } = useAuth()
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState<string | null>(null)
+  const [confirmingDeleteUid, setConfirmingDeleteUid] = useState<string | null>(null)
 
   useEffect(() => {
     getAllUsers().then((u) => {
@@ -767,7 +770,7 @@ function AdvancedTab() {
       toast.error('No tienes permiso para asignar roles.')
       return
     }
-    if (!canChangeRole(currentUser?.uid ?? '', u.uid)) {
+    if (!canActOnUser(currentUser?.uid ?? '', u.uid)) {
       toast.error('No puedes modificar tu propio rol.')
       return
     }
@@ -784,6 +787,24 @@ function AdvancedTab() {
     }
   }
 
+  async function handleDelete(u: UserProfile) {
+    if (!canActOnUser(currentUser?.uid ?? '', u.uid)) {
+      toast.error('No puedes eliminarte a ti mismo.')
+      return
+    }
+    setActing(u.uid)
+    try {
+      await deleteColono(u.uid)
+      setUsers((prev) => prev.filter((x) => x.uid !== u.uid))
+      toast.success(`${u.name} eliminado.`)
+    } catch (err) {
+      toast.error(deleteColonoErrorMessage((err as Error).message))
+    } finally {
+      setActing(null)
+      setConfirmingDeleteUid(null)
+    }
+  }
+
   if (loading) return <div className="flex justify-center py-8"><Spinner /></div>
 
   return (
@@ -793,27 +814,59 @@ function AdvancedTab() {
       <PaletteSection />
       <div>
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-          Asignar roles ({users.length})
+          Usuarios ({users.length})
         </p>
         <div className="space-y-2">
           {users.map((u) => (
-            <div key={u.uid} className="bg-white rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-800 truncate">
-                  {u.name}
-                  {u.uid === currentUser?.uid && (
-                    <span className="ml-1.5 text-xs text-gray-400">(tú)</span>
-                  )}
-                </p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {u.street} {u.streetNumber}
-                </p>
-              </div>
-              <RoleSelector
-                role={u.role}
-                disabled={acting === u.uid || u.uid === currentUser?.uid}
-                onChange={(role) => handleChangeRole(u, role)}
-              />
+            <div key={u.uid} className="bg-white rounded-2xl px-4 py-3 shadow-sm">
+              {confirmingDeleteUid === u.uid ? (
+                <div className="flex items-center gap-2">
+                  <p className="flex-1 text-sm text-gray-700">
+                    ¿Eliminar a <span className="font-semibold">{u.name}</span>? No se puede deshacer.
+                  </p>
+                  <button
+                    onClick={() => handleDelete(u)}
+                    disabled={acting === u.uid}
+                    className="shrink-0 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg px-3 py-1.5 disabled:opacity-40"
+                  >
+                    {acting === u.uid ? '...' : 'Eliminar'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmingDeleteUid(null)}
+                    disabled={acting === u.uid}
+                    className="shrink-0 text-xs font-medium text-gray-500 hover:text-gray-700 px-2 py-1.5 disabled:opacity-40"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">
+                      {u.name}
+                      {u.uid === currentUser?.uid && (
+                        <span className="ml-1.5 text-xs text-gray-400">(tú)</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {u.street} {u.streetNumber}
+                    </p>
+                  </div>
+                  <RoleSelector
+                    role={u.role}
+                    disabled={acting === u.uid || u.uid === currentUser?.uid}
+                    onChange={(role) => handleChangeRole(u, role)}
+                  />
+                  <button
+                    onClick={() => setConfirmingDeleteUid(u.uid)}
+                    disabled={acting !== null || u.uid === currentUser?.uid}
+                    title={u.uid === currentUser?.uid ? 'No puedes eliminarte a ti mismo' : 'Eliminar usuario'}
+                    className="shrink-0 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg p-1.5 disabled:opacity-30 disabled:hover:bg-transparent"
+                  >
+                    🗑
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -1044,7 +1097,7 @@ function PaletteSection() {
 
 // Selector de rol (colono/admin/tesorero/super-admin), usado en AdvancedTab.
 // `disabled` cubre tanto el estado "guardando" como el caso de un super-admin
-// viendo su propia fila (no puede cambiarse su rol, ver canChangeRole).
+// viendo su propia fila (no puede cambiarse su rol, ver canActOnUser).
 function RoleSelector({
   role,
   disabled,

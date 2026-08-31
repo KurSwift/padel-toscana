@@ -181,6 +181,16 @@ sigue el mismo patrón para el logo del sitio: `isValidLogoFile()`
 (`src/services/brandingRules.ts`) espeja el `allow write` de
 `branding/logo` (tipo de archivo, tamaño máximo).
 
+`allow delete` en `users/{uid}` es otro ejemplo con tres lugares en vez de
+dos: rechazar un registro `pending` sigue siendo cosa de cualquier admin
+(rama `resource.data.status == 'pending' && isAdmin()`), pero eliminar
+cualquier otro usuario es exclusivo de super-admin — reforzado ahí mismo
+(`|| isSuperAdmin()`) **y** en `adminDeleteColono`
+(`functions/src/index.ts`, que además bloquea que un super-admin se
+elimine a sí mismo, mismo check que `canActOnUser` en
+`src/services/userRules.ts` usa del lado del cliente para bloquear
+auto-cambio de rol y auto-eliminación).
+
 **Crear una reservación es la excepción a ese patrón de dos lugares — son
 tres.** El límite de reservaciones activas por usuario
 (`maxActiveReservationsPerUser`) y la detección de traslapes de horario
