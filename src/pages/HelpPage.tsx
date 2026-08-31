@@ -92,7 +92,7 @@ const SECTIONS: HelpSection[] = [
       },
       {
         q: '¿Cómo hago a alguien tesorero?',
-        a: 'Asignar roles es exclusivo de super-admin, desde el panel avanzado — pídeselo a un super-admin.',
+        a: 'Asignar roles es exclusivo de super-admin, desde la pestaña "Avanzado" — si no tienes ese rol, pídeselo a un super-admin.',
       },
       {
         q: '¿Cómo cambio el monto que se cobra por reservación?',
@@ -101,6 +101,20 @@ const SECTIONS: HelpSection[] = [
       {
         q: '¿Cómo agrego una cancha nueva?',
         a: 'Pestaña Canchas → botón "+ Agregar cancha".',
+      },
+    ],
+  },
+  {
+    title: 'Panel avanzado (super-admin)',
+    visibleTo: ['super-admin'],
+    steps: [
+      'Entra a "Admin" → pestaña "Avanzado" (solo visible para super-admin, no para admin normal).',
+      'Asignar roles: usa el selector de rol junto al nombre de cada usuario activo (Colono/Admin/Tesorero/Super Admin).',
+    ],
+    faq: [
+      {
+        q: '¿Puedo cambiarme mi propio rol?',
+        a: 'No — por seguridad, ni un admin ni un super-admin pueden modificar su propio rol. Pide a otro super-admin que lo haga.',
       },
     ],
   },

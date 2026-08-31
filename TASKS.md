@@ -199,7 +199,16 @@ issue aparte, sin diseñar todavía ([#44](https://github.com/KurSwift/padel-tos
   lectura ahí; asignar rol queda sin UI hasta el issue #39. *Pendiente:
   el bootstrap del primer super-admin (promover la cuenta admin actual a
   mano en Firestore) sigue sin hacerse — hacerlo cuando se despliegue.*
-- #39–#42 — panel avanzado, Header compartido, logo, color — sin empezar.
+- ~~#39 — Panel avanzado de super-admin (shell + asignar roles)~~ —
+  **hecho** (2026-08-30): `AdminPage.tsx` gana la pestaña "Avanzado"
+  (`Tab`/`tabs`), visible/seleccionable solo si `profile.role ===
+  'super-admin'`. Nuevo componente `AdvancedTab` con la lista de usuarios
+  activos + `RoleSelector` (el mismo control que se quitó de `UsersTab`
+  en #38, reubicado aquí) — `handleChangeRole` re-chequea `canAssignRole`
+  además de `canChangeRole` (defensa en profundidad, aunque el tab ya
+  está gateado por rol a nivel de `AdminPage`). Sin lógica pura nueva —
+  solo reusa `canAssignRole`/`canChangeRole` de #38.
+- #40–#42 — Header compartido, logo, color — sin empezar.
 
 Plan completo (contexto de la exploración, decisiones tomadas) en
 `/Users/ernestosanchezkuri/.claude/plans/snug-percolating-feigenbaum.md`
