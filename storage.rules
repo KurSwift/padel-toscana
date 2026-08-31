@@ -1,0 +1,31 @@
+rules_version = '2';
+
+// Único uso hoy: logo del sitio (Epic #43, issue 4/5). Lectura pública
+// porque LoginPage necesita mostrarlo antes de que la persona se
+// autentique. Escritura exclusiva de super-admin — mismo rol que en
+// firestore.rules (ver isSuperAdmin() ahí), pero como storage.rules no
+// puede leer Firestore con `get()` normal, usa la función especial
+// `firestore.get()` (Cross Service Rules) para consultar el mismo doc
+// users/{uid}.
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Ruta fija, sin extensión en el path — el tipo real vive en el
+    // metadata contentType del objeto (ver uploadLogo() en
+    // src/services/branding.ts). Así "subir un logo nuevo" siempre
+    // sobreescribe el mismo objeto sin dejar archivos huérfanos de un
+    // formato anterior colgando en el bucket, y el resto de la app no
+    // necesita guardar ninguna URL en Firestore — siempre es este mismo
+    // path.
+    match /branding/logo {
+      allow read: if true;
+
+      allow write: if request.auth != null
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'super-admin'
+        // Espejo de ALLOWED_LOGO_TYPES/MAX_LOGO_SIZE_BYTES en
+        // src/services/brandingRules.ts — si cambia una, hay que
+        // actualizar la otra (ver AGENTS.md).
+        && request.resource.contentType in ['image/png', 'image/jpeg', 'image/svg+xml']
+        && request.resource.size <= 5 * 1024 * 1024;
+    }
+  }
+}

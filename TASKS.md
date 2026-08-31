@@ -208,7 +208,30 @@ issue aparte, sin diseñar todavía ([#44](https://github.com/KurSwift/padel-tos
   además de `canChangeRole` (defensa en profundidad, aunque el tab ya
   está gateado por rol a nivel de `AdminPage`). Sin lógica pura nueva —
   solo reusa `canAssignRole`/`canChangeRole` de #38.
-- #40–#42 — Header compartido, logo, color — sin empezar.
+- ~~#40 — Componente Header compartido (refactor, sin logo)~~ — **hecho**
+  (2026-08-30): nuevo `src/components/Header.tsx` (`title`,
+  `titleClassName`, `subtitle`, `sticky`, slot `logo`, `children` para
+  acciones) consolidando el `<header>` que `HomePage`/`AdminPage`/
+  `TesoreroPage`/`HelpPage` armaban cada una a mano. Refactor puro, sin
+  cambio visual — cada página pasa el mismo título/clases/botones de
+  antes. `LoginPage.tsx` quedó fuera (issue #41 la tocó).
+- ~~#41 — Logo del sitio (Firebase Storage)~~ — **hecho** (2026-08-30):
+  se scaffoldeó Storage desde cero — bloque `"storage"` en
+  `firebase.json` + `storage.rules` nuevo (lectura pública, escritura
+  solo `super-admin` vía `firestore.get()` cross-service; tipo/tamaño
+  espejados en `src/services/brandingRules.ts`, testeado), `getStorage()`
+  + `connectStorageEmulator` en `src/firebase.ts` (puerto `9199`).
+  `src/services/branding.ts` (`uploadLogo`/`getLogoUrl`, ruta fija
+  `branding/logo` sin extensión — el tipo real vive en el metadata
+  `contentType` del objeto, así una subida nueva siempre sobreescribe la
+  anterior sin dejar huérfanos). UI de subida (file input + preview +
+  botón) en `AdvancedTab` (`AdminPage.tsx`, issue #39). Nuevo
+  `src/components/Logo.tsx` (tamaños `sm`/`lg`) usado por defecto en
+  `Header.tsx` (#40) y en `LoginPage.tsx` — sin logo subido, cae al
+  badge "P" verde de siempre (ahí sí hubo cambio visual respecto a #40:
+  ahora el navbar SÍ muestra el badge "P" por default, que #40 dejó
+  vacío a propósito hasta que este issue decidiera el diseño real).
+- #42 — Color de acento — sin empezar.
 
 Plan completo (contexto de la exploración, decisiones tomadas) en
 `/Users/ernestosanchezkuri/.claude/plans/snug-percolating-feigenbaum.md`
