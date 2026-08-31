@@ -6,6 +6,7 @@ import { Court, Reservation } from '@/types'
 import { getAllCourts } from '@/services/courts'
 import { subscribeToPendingPayments, confirmPayment } from '@/services/reservations'
 import { formatDateShort, formatTime } from '@/utils/time'
+import Header from '@/components/Header'
 
 export default function TesoreroPage() {
   const { profile } = useAuth()
@@ -46,26 +47,20 @@ export default function TesoreroPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm px-4 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-gray-800">Pagos pendientes</h1>
-          <p className="text-xs text-gray-500">{profile?.name}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigate('/ayuda')}
-            className="text-xs font-medium text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition"
-          >
-            Ayuda
-          </button>
-          <button
-            onClick={() => navigate('/')}
-            className="text-xs font-medium text-brand-600 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition"
-          >
-            ← Volver
-          </button>
-        </div>
-      </header>
+      <Header title="Pagos pendientes" subtitle={profile?.name}>
+        <button
+          onClick={() => navigate('/ayuda')}
+          className="text-xs font-medium text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition"
+        >
+          Ayuda
+        </button>
+        <button
+          onClick={() => navigate('/')}
+          className="text-xs font-medium text-brand-600 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition"
+        >
+          ← Volver
+        </button>
+      </Header>
 
       <main className="max-w-lg mx-auto px-4 py-5">
         {loading ? (

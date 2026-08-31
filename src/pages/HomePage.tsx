@@ -9,6 +9,7 @@ import DateSelector from '@/components/DateSelector'
 import SlotsGrid from '@/components/SlotsGrid'
 import BookingSheet from '@/components/BookingSheet'
 import MyReservations from '@/components/MyReservations'
+import Header from '@/components/Header'
 import { todayString } from '@/utils/time'
 
 interface SelectedSlot {
@@ -79,43 +80,36 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-white shadow-sm px-4 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-brand-700">Padel Toscana</h1>
-          <p className="text-xs text-gray-500">Hola, {profile?.name}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {(profile?.role === 'admin' || profile?.role === 'super-admin') && (
-            <button
-              onClick={() => navigate('/admin')}
-              className="text-xs font-medium text-brand-600 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition"
-            >
-              Admin
-            </button>
-          )}
-          {(profile?.role === 'tesorero' || profile?.role === 'admin' || profile?.role === 'super-admin') && (
-            <button
-              onClick={() => navigate('/tesorero')}
-              className="text-xs font-medium text-brand-600 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition"
-            >
-              Pagos
-            </button>
-          )}
+      <Header title="Padel Toscana" titleClassName="text-brand-700" subtitle={`Hola, ${profile?.name}`} sticky>
+        {(profile?.role === 'admin' || profile?.role === 'super-admin') && (
           <button
-            onClick={() => navigate('/ayuda')}
-            className="text-xs font-medium text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition"
+            onClick={() => navigate('/admin')}
+            className="text-xs font-medium text-brand-600 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition"
           >
-            Ayuda
+            Admin
           </button>
+        )}
+        {(profile?.role === 'tesorero' || profile?.role === 'admin' || profile?.role === 'super-admin') && (
           <button
-            onClick={handleSignOut}
-            className="text-xs font-medium text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition"
+            onClick={() => navigate('/tesorero')}
+            className="text-xs font-medium text-brand-600 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition"
           >
-            Salir
+            Pagos
           </button>
-        </div>
-      </header>
+        )}
+        <button
+          onClick={() => navigate('/ayuda')}
+          className="text-xs font-medium text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition"
+        >
+          Ayuda
+        </button>
+        <button
+          onClick={handleSignOut}
+          className="text-xs font-medium text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition"
+        >
+          Salir
+        </button>
+      </Header>
 
       {/* Tab bar */}
       <div className="sticky top-[65px] z-10 bg-white border-b border-gray-200 flex">
