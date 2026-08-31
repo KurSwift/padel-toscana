@@ -256,6 +256,31 @@ pendiente solo el bootstrap del primer super-admin en producción
 arriba) y el feature flags de super-admin, sin diseñar todavía
 ([#44](https://github.com/KurSwift/padel-toscana/issues/44)).
 
+### Extensión del panel Avanzado: nombre del sitio y contacto (2026-08-31)
+
+No es parte de los 5 issues originales del Epic — pedida después de
+cerrarlo, mismo lugar (`AdvancedTab`) y mismo patrón que logo/color.
+**Hecho**: doc `settings/general` (`{ siteName: string, whatsappUrl?:
+string }`) — reusa la regla genérica `settings/{docId}` que ya existía
+(lectura pública, escritura solo super-admin), sin tocar
+`firestore.rules`. `src/services/siteSettingsRules.ts` (`isValidSiteName`,
+`isValidWhatsappUrl` — acepta `wa.me/...` o `chat.whatsapp.com/...`,
+vacío es válido), testeado. `src/context/SiteSettingsContext.tsx` (mismo
+molde que `ThemeContext`, montado en `App.tsx` fuera de `AuthProvider`) —
+además fija `document.title` en runtime. Reemplaza el "Padel Toscana"
+hardcodeado en `HomePage`/`LoginPage`/`RegisterPage`, y el texto plano de
+contacto en `HelpPage` cae a un link real cuando hay `whatsappUrl`
+configurado (si no, se ve igual que antes). UI de edición (dos inputs +
+guardar) en `AdvancedTab`.
+
+**Misma limitación conocida que el color** (no arreglada, documentada en
+CONTEXT.md): `manifest.json`, los meta tags de `index.html`
+(`<title>`, `apple-mobile-web-app-title`), y el subject/body del email
+de nueva solicitud en `src/services/users.ts` se quedan con "Padel
+Toscana" fijo — archivos estáticos o (en el caso del email) un flujo hoy
+sin punto de entrada real (ver tarea 4 arriba), no valió la pena el
+esfuerzo de conectarlo.
+
 Plan completo (contexto de la exploración, decisiones tomadas) en
 `/Users/ernestosanchezkuri/.claude/plans/snug-percolating-feigenbaum.md`
 si se retoma en una sesión sin ese historial de conversación.

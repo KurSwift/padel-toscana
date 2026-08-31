@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
+import { useSiteSettings } from '@/context/SiteSettingsContext'
 import { useCourtData } from '@/hooks/useCourtData'
 import { createReservation, reservationErrorMessage } from '@/services/reservations'
 import { signOut } from '@/services/auth'
@@ -19,6 +20,7 @@ interface SelectedSlot {
 
 export default function HomePage() {
   const { user, profile } = useAuth()
+  const { siteName } = useSiteSettings()
   const navigate = useNavigate()
   const [selectedDate, setSelectedDate] = useState(todayString())
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null)
@@ -80,7 +82,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header title="Padel Toscana" titleClassName="text-brand-700" subtitle={`Hola, ${profile?.name}`} sticky>
+      <Header title={siteName} titleClassName="text-brand-700" subtitle={`Hola, ${profile?.name}`} sticky>
         {(profile?.role === 'admin' || profile?.role === 'super-admin') && (
           <button
             onClick={() => navigate('/admin')}

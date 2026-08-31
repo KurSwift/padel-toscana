@@ -9,7 +9,9 @@ import { getAllUsers, setUserRole, approveUser, rejectUser, adminCreateColono, a
 import { canAssignRole, canChangeRole } from '@/services/userRules'
 import { uploadLogo, getLogoUrl, uploadLogoErrorMessage } from '@/services/branding'
 import { setThemePalette } from '@/services/theme'
+import { updateSiteSettings, updateSiteSettingsErrorMessage } from '@/services/siteSettings'
 import { useTheme } from '@/context/ThemeContext'
+import { useSiteSettings } from '@/context/SiteSettingsContext'
 import { PALETTES } from '@/theme/palettes'
 import { isValidLogoFile } from '@/services/brandingRules'
 import { MAX_RESERVATION_DURATION_HOURS } from '@/services/reservationRules'
@@ -786,6 +788,7 @@ function AdvancedTab() {
 
   return (
     <div className="space-y-5">
+      <SiteSettingsSection />
       <LogoSection />
       <PaletteSection />
       <div>
@@ -814,6 +817,78 @@ function AdvancedTab() {
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Nombre del sitio y contacto de WhatsApp — settings/general en Firestore
+// (firestore.rules: mismo bloque genérico settings/{docId} que ya gatea
+// settings/theme a isSuperAdmin() para escritura, ver #42). El nombre se
+// usa en Home/Login/RegisterPage y en el título de la pestaña del
+// navegador (SiteSettingsContext.tsx); el link de WhatsApp, en la tarjeta
+// de contacto al final de HelpPage. Ninguno de los dos se propaga a
+// manifest.json/index.html (meta tags estáticos) ni a los templates HTML
+// de correo en src/services/users.ts — limitación conocida, documentada
+// en TASKS.md, mismo criterio que el logo/color con archivos estáticos.
+function SiteSettingsSection() {
+  const { siteName: currentSiteName, whatsappUrl: currentWhatsappUrl } = useSiteSettings()
+  const [siteName, setSiteName] = useState(currentSiteName)
+  const [whatsappUrl, setWhatsappUrl] = useState(currentWhatsappUrl ?? '')
+  const [saving, setSaving] = useState(false)
+
+  // Si otra sesión cambia settings/general mientras este panel está
+  // abierto (onSnapshot en SiteSettingsContext), refleja el valor nuevo —
+  // pero solo mientras el super-admin no está a la mitad de editar.
+  useEffect(() => {
+    setSiteName(currentSiteName)
+    setWhatsappUrl(currentWhatsappUrl ?? '')
+  }, [currentSiteName, currentWhatsappUrl])
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await updateSiteSettings({ siteName, whatsappUrl })
+      toast.success('Configuración actualizada.')
+    } catch (err) {
+      toast.error(updateSiteSettingsErrorMessage((err as Error).message))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+        Nombre del sitio y contacto
+      </p>
+      <div className="bg-white rounded-2xl px-4 py-4 shadow-sm space-y-3">
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Nombre del sitio</label>
+          <input
+            type="text"
+            value={siteName}
+            onChange={(e) => setSiteName(e.target.value)}
+            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Link de WhatsApp (opcional)</label>
+          <input
+            type="text"
+            value={whatsappUrl}
+            onChange={(e) => setWhatsappUrl(e.target.value)}
+            placeholder="https://chat.whatsapp.com/..."
+            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full bg-brand-600 text-white text-sm font-semibold rounded-xl py-2.5 disabled:opacity-40 flex items-center justify-center"
+        >
+          {saving ? <Spinner sm /> : 'Guardar'}
+        </button>
       </div>
     </div>
   )
