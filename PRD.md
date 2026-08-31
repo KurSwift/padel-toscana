@@ -55,9 +55,9 @@ automáticamente, en vez de depender de que una persona avise a tiempo.
 
 ## 4. Usuarios objetivo
 
-- **Colono** — residente de alguna de las ~105 casas de la comunidad
-  (calles Nogal, Olivo, Encino; número por confirmar). El usuario más
-  numeroso y frecuente. Quiere reservar una cancha sin conflicto, ver
+- **Colono** — residente de alguna de las 102 casas de la comunidad (97
+  habitadas; calles Nogal, Olivo, Encino). El usuario más numeroso y
+  frecuente. Quiere reservar una cancha sin conflicto, ver
   el estado de sus propias reservaciones (pendiente de pago / confirmada)
   y saber cuánto y cuándo pagar, sin tener que coordinar nada
   manualmente con nadie.
@@ -177,8 +177,8 @@ Reglas transversales:
 - **Cero disputas por doble-reservación o "cancha ocupada sin aviso".**
   El problema original — nadie sabía con certeza si la cancha estaba
   libre. Éxito = que eso no vuelva a pasar.
-- **Adopción real:** proporción de los ~105 domicilios con al menos un
-  colono con cuenta activa, dado que es la única vía de acceso a la
+- **Adopción real:** proporción de los 97 domicilios habitados con al
+  menos un colono con cuenta activa, dado que es la única vía de acceso a la
   cancha hoy.
 - **Cumplimiento de pago a tiempo:** proporción de reservaciones
   confirmadas por el tesorero antes del plazo, vs. liberadas
@@ -240,7 +240,7 @@ en Firestore y se pueden calcular directo de ahí sin costo adicional.
 
 Métricas mínimas a mostrar:
 - **Usuarios activos:** cantidad de colonos con cuenta activa (y su
-  proporción sobre los ~105 domicilios de la comunidad).
+  proporción sobre los 97 domicilios habitados de la comunidad).
 - **Reservaciones por semana:** volumen de reservaciones creadas en la
   semana actual.
 - **Pagos recaudados:** suma del monto de las reservaciones confirmadas
@@ -300,8 +300,9 @@ _(Entidades conceptuales — el schema exacto de campos/tipos vive en
 ## 13. Supuestos, restricciones y dependencias
 
 ### Supuestos
-- La comunidad es de tamaño fijo y chico (~105 domicilios) — el
-  producto no necesita diseñarse para escalar más allá de eso.
+- La comunidad es de tamaño fijo y chico (102 domicilios, 97
+  habitados) — el producto no necesita diseñarse para escalar más allá
+  de eso.
 - El pago ocurre fuera de la plataforma; el sistema confía en que el
   tesorero confirme honestamente, no hay verificación automática de
   pago.
