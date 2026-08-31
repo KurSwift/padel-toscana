@@ -1,5 +1,7 @@
 # Padel Toscana
 
+[![CI](https://github.com/KurSwift/padel-toscana/actions/workflows/ci.yml/badge.svg)](https://github.com/KurSwift/padel-toscana/actions/workflows/ci.yml)
+
 App privada de reservación de canchas de pádel para los residentes del
 fraccionamiento Toscana (calles Nogal, Olivo y Encino). Los registros
 requieren aprobación de un administrador antes de poder reservar.

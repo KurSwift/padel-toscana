@@ -1,0 +1,44 @@
+name: CI
+
+# Corre los mismos gates que ya documenta AGENTS.md/CLAUDE.md como
+# obligatorios antes de dar un cambio por terminado — type-check + build
+# + tests, para src/ y (si aplica) functions/. No corre test:e2e
+# (necesita los emuladores + Java + un dev server corriendo, ver
+# AGENTS.md § Emuladores) ni valida firestore.rules/storage.rules
+# (necesita el mismo entorno) — queda fuera de este CI básico a propósito.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  client:
+    name: Cliente (build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test
+
+  functions:
+    name: Functions (build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci
+        working-directory: functions
+      - run: npm run build
+        working-directory: functions
+      - run: npm run test
+        working-directory: functions
