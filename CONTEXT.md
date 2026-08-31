@@ -27,7 +27,7 @@ Cuatro roles, en `UserProfile.role` (`src/types/index.ts`):
 | **`colono`** | Puede reservar/cancelar sus propias reservaciones una vez aprobado. Rol por default al registrarse. |
 | **`admin`** | Aprueba/rechaza registros, gestiona canchas (horarios, reglas), ve y cancela cualquier reservación. Ya no cambia el rol de otros usuarios — eso quedó exclusivo de `super-admin` (ver abajo). |
 | **`tesorero`** | Confirma que una reservación `solicitada` ya fue pagada, desde `/tesorero` (`TesoreroPage.tsx`) — lista todas las `solicitada` pendientes (cualquier fecha/cancha) con un botón "Confirmar pago" (`confirmPayment()`). Un admin/super-admin también puede entrar a esa ruta. |
-| **`super-admin`** | Superset de `admin` — entra a `/admin` con las mismas capacidades, más asignar el rol de cualquier otro usuario (exclusivo suyo, ver `canAssignRole()` en `src/services/userRules.ts` e `isSuperAdmin()` en `firestore.rules`). Se asigna a mano en Firestore (bootstrap), no hay UI de auto-promoción. |
+| **`super-admin`** | Superset de `admin` — entra a `/admin` con las mismas capacidades, más asignar el rol de cualquier otro usuario y eliminar cuentas (exclusivo suyo, ver `canAssignRole()`/`canActOnUser()` en `src/services/userRules.ts`, `adminSetUserRole`/`adminDeleteColono` en `functions/src/index.ts`, e `isSuperAdmin()` en `firestore.rules`). Se asigna a mano en Firestore (bootstrap) o vía `adminSetUserRole` si ya hay otro super-admin — no hay UI de auto-promoción para el primero. |
 
 Un usuario tiene además un `status`: `pending` → `active` → (o `rejected`).
 Solo usuarios `active` pueden crear reservaciones. Los usuarios creados antes
@@ -214,17 +214,30 @@ Cuatro pestañas — la cuarta solo la ve `super-admin` (`AdminPage.tsx`,
   - **Usuarios**: mismo listado que la pestaña Usuarios, pero con
     `RoleSelector` (asignar colono/admin/tesorero/super-admin —
     `canAssignRole` en `src/services/userRules.ts`, reforzado en
-    `firestore.rules` con `isSuperAdmin()`) y un botón de eliminar por
-    usuario (con confirmación inline, sin `window.confirm`) que llama a
-    `adminDeleteColono` (`functions/src/index.ts`) — borra la cuenta de
+    `adminSetUserRole`, `functions/src/index.ts`) y un botón de eliminar
+    por usuario (con confirmación inline, sin `window.confirm`) que llama
+    a `adminDeleteColono` (`functions/src/index.ts`) — borra la cuenta de
     Auth, el doc de `users/{uid}`, y libera el cupo en
     `addresses/{key}`. Un super-admin no puede asignarse un rol distinto
     a sí mismo ni eliminarse a sí mismo (`canActOnUser` en
     `userRules.ts`, mismo check para ambas acciones — evita que el sitio
     se quede sin ningún super-admin, ya que no hay UI para asignar el rol
-    de vuelta).
+    de vuelta). Asignar rol pasa por Cloud Function (no un write directo
+    a Firestore) porque además de actualizar el doc, setea un **custom
+    claim** en el token de Auth (`request.auth.token.role`) — es lo que
+    `storage.rules` usa para autorizar la subida de logo, en vez de leer
+    Firestore directo (ver nota abajo). Los custom claims no llegan al
+    cliente hasta el próximo refresh del ID token (cerrar/abrir sesión).
   - **Logo del sitio**: sube a Firebase Storage (`branding/logo`, ruta
     fija — ver `src/services/branding.ts` y `storage.rules`).
+    `storage.rules` autoriza la escritura leyendo
+    `request.auth.token.role` del custom claim, **no** `firestore.get()`
+    — esa función (Cross Service Rules) requiere que Firestore y Storage
+    estén en la misma ubicación, y este proyecto los tiene distintos
+    (Firestore `nam5`, Storage `us-central1`); con `firestore.get()` la
+    subida fallaba con `permission denied` en producción pese a que el
+    rol fuera correcto. Ver "La regla más importante del repo" en
+    AGENTS.md para el detalle completo.
   - **Color de acento**: paletas curadas (`src/theme/palettes.ts`),
     guardadas en `settings/theme`.
   - **Nombre del sitio y contacto**: `settings/general` (`siteName`,
@@ -310,12 +323,18 @@ shape de estos documentos en el cliente.
   cancelación, contra los emuladores).
 - Un super-admin autenticado puede cambiar el `role` de **cualquier**
   usuario, incluido el suyo propio, directo contra Firestore (la rama
-  `isSuperAdmin()` de `allow update` en `users/{uid}` no distingue target)
-  — la restricción de "no puedes cambiar/eliminar tu propia cuenta" solo
-  existe en la UI (`canActOnUser` en `src/services/userRules.ts`) y en
-  `adminDeleteColono` (para eliminar, sí reforzado server-side), no en
-  `firestore.rules` para el caso de cambiar rol. Admin normal ya no puede
-  tocar `role` en absoluto (ver Epic #43, issue #38).
+  `isSuperAdmin()` de `allow update` en `users/{uid}` no distingue
+  target) — saltándose así `adminSetUserRole` (`functions/src/index.ts`,
+  el camino normal desde la UI). El doc quedaría correcto pero el
+  **custom claim del token no se actualizaría** (solo `adminSetUserRole`
+  lo setea), dejando `storage.rules` con un rol desincronizado hasta que
+  alguien vuelva a llamar esa función para ese uid. La restricción de "no
+  puedes cambiar/eliminar tu propia cuenta" solo existe en la UI
+  (`canActOnUser` en `src/services/userRules.ts`) y en
+  `adminSetUserRole`/`adminDeleteColono` (si se llaman directo, sí
+  reforzado server-side), no en `firestore.rules` para el caso de
+  cambiar rol. Admin normal ya no puede tocar `role` en absoluto (ver
+  Epic #43, issue #38).
 - La extensión de correo (`mail` collection) no está declarada en
   `firebase.json` — confirmar que esté instalada en el proyecto real antes de
   depender de las notificaciones por email.

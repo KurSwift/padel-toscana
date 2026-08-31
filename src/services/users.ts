@@ -34,12 +34,32 @@ export async function getAllUsers(): Promise<UserProfile[]> {
   return snap.docs.map((d) => ({ uid: d.id, ...d.data() }) as UserProfile)
 }
 
-// Cambia el rol de un usuario (colono/admin/tesorero). Solo admins pueden
-// llamar esto en la práctica — reforzado en firestore.rules, no aquí. La
-// UI que llama esta función debe además bloquear que un admin se cambie su
-// propio rol (ver canActOnUser en userRules.ts) antes de invocarla.
+// Cambia el rol de un usuario — exclusivo de super-admin, reforzado en la
+// función (adminSetUserRole, functions/src/index.ts), no aquí. Pasa por
+// Cloud Function (no un write directo como antes) porque además de
+// actualizar Firestore, setea un custom claim en el token de Auth que
+// storage.rules necesita (ver nota en adminSetUserRole sobre por qué no
+// se usa firestore.get() ahí). La UI que llama esta función debe además
+// bloquear que un super-admin se cambie su propio rol (ver canActOnUser
+// en userRules.ts) antes de invocarla.
+const adminSetUserRoleCallable = httpsCallable(functions, 'adminSetUserRole')
+
 export async function setUserRole(uid: string, role: UserRole): Promise<void> {
-  await updateDoc(doc(db, 'users', uid), { role })
+  try {
+    await adminSetUserRoleCallable({ uid, role })
+  } catch (err) {
+    throw new Error((err as { message?: string }).message ?? 'unknown-error')
+  }
+}
+
+const SET_USER_ROLE_ERRORS: Record<string, string> = {
+  'super-admin-only': 'Solo un super-admin puede asignar roles.',
+  'cannot-change-own-role': 'No puedes cambiar tu propio rol.',
+  'user-not-found': 'Ese usuario ya no existe.',
+}
+
+export function setUserRoleErrorMessage(code: string): string {
+  return SET_USER_ROLE_ERRORS[code] ?? 'No se pudo cambiar el rol. Intenta de nuevo.'
 }
 
 export async function approveUser(uid: string): Promise<void> {

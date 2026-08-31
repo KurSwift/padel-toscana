@@ -3,10 +3,19 @@ rules_version = '2';
 // Único uso hoy: logo del sitio (Epic #43, issue 4/5). Lectura pública
 // porque LoginPage necesita mostrarlo antes de que la persona se
 // autentique. Escritura exclusiva de super-admin — mismo rol que en
-// firestore.rules (ver isSuperAdmin() ahí), pero como storage.rules no
-// puede leer Firestore con `get()` normal, usa la función especial
-// `firestore.get()` (Cross Service Rules) para consultar el mismo doc
-// users/{uid}.
+// firestore.rules (ver isSuperAdmin() ahí), pero leído del custom claim
+// del token de Auth (request.auth.token.role), no de Firestore.
+//
+// Se probó primero con `firestore.get()` (Cross Service Rules) para leer
+// users/{uid}.role directo, igual que firestore.rules — compilaba bien
+// pero fallaba en runtime con "permission denied" en TODAS las subidas,
+// aunque el rol fuera correcto. Diagnosticado en producción: Cross
+// Service Rules requiere que Firestore y Storage estén en la MISMA
+// ubicación, y este proyecto los tiene distintos (Firestore `nam5`,
+// Storage `us-central1` — el bucket default que Firebase crea al activar
+// Storage no necesariamente queda en la misma ubicación que Firestore).
+// El custom claim se setea en adminSetUserRole (functions/src/index.ts)
+// cada vez que cambia el rol de alguien — no depende de ubicaciones.
 service firebase.storage {
   match /b/{bucket}/o {
     // Ruta fija, sin extensión en el path — el tipo real vive en el
@@ -20,7 +29,7 @@ service firebase.storage {
       allow read: if true;
 
       allow write: if request.auth != null
-        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'super-admin'
+        && request.auth.token.role == 'super-admin'
         // Espejo de ALLOWED_LOGO_TYPES/MAX_LOGO_SIZE_BYTES en
         // src/services/brandingRules.ts — si cambia una, hay que
         // actualizar la otra (ver AGENTS.md).

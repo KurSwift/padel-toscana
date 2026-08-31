@@ -312,6 +312,73 @@ de Avanzado, con confirmación inline de dos pasos (sin `window.confirm`
 — el proyecto no usa diálogos nativos del navegador) antes de llamar a
 la función.
 
+### Fix: subida de logo fallaba en producción con "permission denied" (2026-08-31)
+
+Reportado por el usuario después de desplegar el Epic #43 a producción:
+subir un logo desde Avanzado fallaba siempre con `permission denied`,
+pese a que la cuenta era `super-admin` de verdad.
+
+**Diagnóstico** (probando en vivo contra producción, logueado como el
+super-admin real, interceptando `XMLHttpRequest` desde la consola del
+navegador porque Firebase Storage usa XHR para subidas, no `fetch`):
+la petición sí mandaba `Authorization` y `X-Firebase-AppCheck`
+correctamente; cambiar color de acento y nombre del sitio (que también
+requieren `isSuperAdmin()`, pero vía `firestore.rules` normal)
+funcionaba bien. El único sospechoso: `firestore.get()` en
+`storage.rules` (Cross Service Rules), la única pieza que nunca se pudo
+probar contra un emulador real (advertido en el PR de #41). Con permiso
+explícito del usuario, se desplegó una versión temporal de
+`storage.rules` sin ese chequeo (`allow write: if request.auth != null`)
+— la subida funcionó al toque (200), confirmando la hipótesis. Se
+revirtió a la versión real de inmediato y se borró el logo de prueba
+del bucket.
+
+**Causa raíz real**: `firestore.get()`/Cross Service Rules requiere que
+Firestore y Storage estén en la **misma ubicación**. Este proyecto los
+tiene distintos: Firestore en `nam5` (multi-región Norteamérica,
+`gcloud firestore databases describe`), Storage en `us-central1`
+(región única, `gcloud storage buckets describe`) — el bucket default
+que Firebase crea al activar Storage no necesariamente queda alineado
+con una ubicación de Firestore ya elegida antes.
+
+**Fix elegido** (dos opciones evaluadas con el usuario — ver historial
+de la conversación — se descartó recrear el bucket en `nam5` por ser
+más frágil/incierto): **custom claims en el token de Auth**, el patrón
+canónico de Firebase para esto.
+- `adminSetUserRole` (nueva Cloud Function, `functions/src/index.ts`):
+  actualiza `users/{uid}.role` en Firestore **y** setea
+  `getAuth().setCustomUserClaims(uid, { role })`. Exclusivo de
+  super-admin, bloquea auto-cambio de rol (mismo check que
+  `adminDeleteColono`).
+- `src/services/users.ts`: `setUserRole()` ya no escribe Firestore
+  directo (`updateDoc`) — llama a `adminSetUserRole`. Nuevo
+  `setUserRoleErrorMessage()`, mismo patrón que `adminCreateColono`/
+  `adminDeleteColono`.
+- `storage.rules`: `allow write` en `branding/logo` ahora chequea
+  `request.auth.token.role == 'super-admin'` en vez de
+  `firestore.get(...)`. Sin restricción de ubicación, no depende de
+  ningún servicio cruzado.
+- `firestore.rules` **no cambió** — `adminSetUserRole` corre con Admin
+  SDK (bypasea rules, como `adminCreateColono`/`adminDeleteColono`). La
+  rama `isSuperAdmin()` de `allow update` en `users/{uid}` sigue
+  existiendo para permitir que la Cloud Function escriba, pero también
+  significa que un super-admin **podría** seguir escribiendo `role`
+  directo contra Firestore desde el cliente, saltándose
+  `adminSetUserRole` — el doc quedaría bien pero el custom claim NO se
+  actualizaría, dejando `storage.rules` desincronizado para ese uid
+  hasta la próxima llamada real a la función. Gap conocido, documentado
+  en CONTEXT.md, no bloqueante (nadie hace esto hoy, solo la UI llama a
+  `setUserRole()`).
+
+**Importante — custom claims no son instantáneos**: no llegan al
+cliente hasta el próximo refresh del ID token (cerrar/abrir sesión, o
+`getIdToken(true)`). La cuenta de super-admin ya promovida ANTES de este
+fix (bootstrap del Epic #43, `MF1TYSisXabd7rqfzO8WTVb130G2`) no tiene
+custom claim todavía — hace falta un backfill puntual (mismo patrón que
+el bootstrap: `getAuth().setCustomUserClaims(uid, { role: 'super-admin'
+})` vía script de una sola corrida) + pedirle a esa persona que cierre y
+vuelva a abrir sesión antes de poder subir un logo.
+
 Plan completo (contexto de la exploración, decisiones tomadas) en
 `/Users/ernestosanchezkuri/.claude/plans/snug-percolating-feigenbaum.md`
 si se retoma en una sesión sin ese historial de conversación.

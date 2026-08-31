@@ -181,6 +181,27 @@ sigue el mismo patrón para el logo del sitio: `isValidLogoFile()`
 (`src/services/brandingRules.ts`) espeja el `allow write` de
 `branding/logo` (tipo de archivo, tamaño máximo).
 
+**`storage.rules` no puede usar `firestore.get()` en este proyecto —
+lee el rol del custom claim del token (`request.auth.token.role`), no de
+Firestore.** Se intentó primero con `firestore.get()` (Cross Service
+Rules, la forma "obvia" de consultar el mismo doc `users/{uid}` que usa
+`firestore.rules`) y compilaba bien, pero fallaba en **runtime** con
+`permission denied` en todas las subidas, aunque el rol fuera correcto.
+Causa: esa función requiere que Firestore y Storage estén en la **misma
+ubicación**, y este proyecto los tiene distintos (Firestore `nam5`,
+Storage `us-central1` — el bucket default que Firebase crea al activar
+Storage no necesariamente queda alineado con la ubicación de Firestore
+ya elegida). Diagnosticado probando en vivo contra producción, no
+reproducible en el emulador (no hay Java en este entorno para
+levantarlo). El fix real: `adminSetUserRole` (`functions/src/index.ts`)
+setea un **custom claim** (`getAuth().setCustomUserClaims(uid, { role
+})`) cada vez que cambia el rol de alguien — `setUserRole()` en
+`src/services/users.ts` ya no escribe Firestore directo, pasa por esa
+función. Los custom claims no llegan al cliente hasta el próximo
+refresh del ID token (cerrar/abrir sesión, o `getIdToken(true)`) — si
+agregas una capacidad nueva gateada por rol en `storage.rules`, usa
+`request.auth.token.role`, no `firestore.get()`.
+
 `allow delete` en `users/{uid}` es otro ejemplo con tres lugares en vez de
 dos: rechazar un registro `pending` sigue siendo cosa de cualquier admin
 (rama `resource.data.status == 'pending' && isAdmin()`), pero eliminar

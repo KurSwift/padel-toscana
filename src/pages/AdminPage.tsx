@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
 import { Court, CourtSettings, UserProfile, UserRole, Reservation, ReservationStatus, ValidStreet, VALID_STREETS } from '@/types'
 import { getAllCourts, updateCourtSettings, toggleCourtActive, createCourt, DEFAULT_COURT_SETTINGS } from '@/services/courts'
-import { getAllUsers, setUserRole, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage, deleteColono, deleteColonoErrorMessage } from '@/services/users'
+import { getAllUsers, setUserRole, setUserRoleErrorMessage, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage, deleteColono, deleteColonoErrorMessage } from '@/services/users'
 import { canAssignRole, canActOnUser } from '@/services/userRules'
 import { uploadLogo, getLogoUrl, uploadLogoErrorMessage } from '@/services/branding'
 import { setThemePalette } from '@/services/theme'
@@ -780,8 +780,8 @@ function AdvancedTab() {
       await setUserRole(u.uid, role)
       setUsers((prev) => prev.map((x) => x.uid === u.uid ? { ...x, role } : x))
       toast.success(`Rol de ${u.name} actualizado a ${ROLE_LABELS[role]}.`)
-    } catch {
-      toast.error('No se pudo cambiar el rol.')
+    } catch (err) {
+      toast.error(setUserRoleErrorMessage((err as Error).message))
     } finally {
       setActing(null)
     }
