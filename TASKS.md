@@ -231,7 +231,30 @@ issue aparte, sin diseñar todavía ([#44](https://github.com/KurSwift/padel-tos
   badge "P" verde de siempre (ahí sí hubo cambio visual respecto a #40:
   ahora el navbar SÍ muestra el badge "P" por default, que #40 dejó
   vacío a propósito hasta que este issue decidiera el diseño real).
-- #42 — Color de acento — sin empezar.
+- ~~#42 — Color de acento (paletas predefinidas)~~ — **hecho**
+  (2026-08-30): `src/theme/palettes.ts` — 7 paletas curadas (las escalas
+  default de Tailwind, no hex inventados), cada una con sus 9 tonos,
+  testeadas (`palettes.test.ts`: 9 tonos por paleta, ids únicos, default
+  = verde). `tailwind.config.js` (`brand.{50..900}` → `var(--brand-*)`)
+  + `src/index.css` (`:root` con los valores actuales — sin cambio
+  visual hasta que alguien cambie de paleta). Doc `settings/theme`
+  (`{ paletteId }`) en Firestore — `firestore.rules`: lectura pública
+  (mismo criterio que `addresses`), escritura solo `isSuperAdmin()`.
+  `src/context/ThemeContext.tsx` (mismo molde que `AuthContext`,
+  `onSnapshot`, aplica los 9 `--brand-*` vía
+  `document.documentElement.style.setProperty`), montado en `App.tsx`
+  **fuera** de `AuthProvider` (el tema aplica incluso sin loguearse).
+  Galería de swatches en `AdvancedTab` (`AdminPage.tsx`) →
+  `setThemePalette()`. **Limitación conocida, no arreglada** (documentada
+  también en CONTEXT.md): `manifest.json`, `theme-color` de `index.html`,
+  `favicon.svg`, y los templates HTML de correo en `src/services/users.ts`
+  se quedan en verde fijo.
+
+**Epic #43 completo** — los 5 issues (#38–#42) están cerrados. Queda
+pendiente solo el bootstrap del primer super-admin en producción
+(promover la cuenta admin actual a mano en Firestore, ver nota en #38
+arriba) y el feature flags de super-admin, sin diseñar todavía
+([#44](https://github.com/KurSwift/padel-toscana/issues/44)).
 
 Plan completo (contexto de la exploración, decisiones tomadas) en
 `/Users/ernestosanchezkuri/.claude/plans/snug-percolating-feigenbaum.md`

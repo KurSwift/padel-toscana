@@ -99,6 +99,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ── Settings ───────────────────────────────────────────────────────────
+    // Doc único settings/theme ({ paletteId }, Epic #43 issue 5/5) — lectura
+    // abierta, mismo criterio que addresses: ThemeProvider necesita aplicar
+    // la paleta antes de que la persona se autentique (LoginPage incluida).
+    // Escritura exclusiva de super-admin.
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
     // ── Rate limits ────────────────────────────────────────────────────────
     // Escrito/leído solo por createReservation (Admin SDK, bypasea estas
     // rules) — ver functions/src/rateLimit.ts. Bloqueado explícitamente para

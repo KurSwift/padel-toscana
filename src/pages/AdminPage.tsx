@@ -8,6 +8,9 @@ import { getAllCourts, updateCourtSettings, toggleCourtActive, createCourt, DEFA
 import { getAllUsers, setUserRole, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage } from '@/services/users'
 import { canAssignRole, canChangeRole } from '@/services/userRules'
 import { uploadLogo, getLogoUrl, uploadLogoErrorMessage } from '@/services/branding'
+import { setThemePalette } from '@/services/theme'
+import { useTheme } from '@/context/ThemeContext'
+import { PALETTES } from '@/theme/palettes'
 import { isValidLogoFile } from '@/services/brandingRules'
 import { MAX_RESERVATION_DURATION_HOURS } from '@/services/reservationRules'
 import { subscribeToAllReservationsByDate, setReservationStatus } from '@/services/reservations'
@@ -784,6 +787,7 @@ function AdvancedTab() {
   return (
     <div className="space-y-5">
       <LogoSection />
+      <PaletteSection />
       <div>
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
           Asignar roles ({users.length})
@@ -899,6 +903,63 @@ function LogoSection() {
             {uploading ? <Spinner sm /> : 'Subir logo'}
           </button>
         )}
+      </div>
+    </div>
+  )
+}
+
+// Color de acento (Epic #43, issue 5/5) — paletas curadas, ver
+// src/theme/palettes.ts. ThemeProvider (montado en App.tsx) escucha
+// settings/theme por onSnapshot y recolorea toda la UI sin recargar en
+// cuanto setThemePalette() escribe. Limitación conocida (no se arregla
+// aquí): manifest.json/index.html (theme-color)/favicon.svg y los
+// templates HTML de correo en src/services/users.ts se quedan en verde
+// fijo — son archivos estáticos o HTML de correo ya enviado, fuera de
+// alcance de un cambio en runtime de React.
+function PaletteSection() {
+  const { paletteId } = useTheme()
+  const [changing, setChanging] = useState<string | null>(null)
+
+  async function handleSelect(id: string) {
+    if (id === paletteId) return
+    setChanging(id)
+    try {
+      await setThemePalette(id)
+      toast.success('Color de acento actualizado.')
+    } catch {
+      toast.error('No se pudo cambiar el color.')
+    } finally {
+      setChanging(null)
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+        Color de acento
+      </p>
+      <div className="bg-white rounded-2xl px-4 py-4 shadow-sm">
+        <div className="grid grid-cols-4 gap-3">
+          {PALETTES.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => handleSelect(p.id)}
+              disabled={changing !== null}
+              title={p.name}
+              className={`flex flex-col items-center gap-1 rounded-xl py-2 transition disabled:opacity-40 ${
+                p.id === paletteId ? 'ring-2 ring-offset-2 ring-gray-400' : ''
+              }`}
+            >
+              <span
+                className="w-8 h-8 rounded-full border border-black/5"
+                style={{ backgroundColor: p.tones[600] }}
+              />
+              <span className="text-[10px] text-gray-500 truncate w-full text-center">
+                {changing === p.id ? '...' : p.name}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
