@@ -414,3 +414,59 @@ export const adminDeleteColono = onCall(
     return { success: true }
   },
 )
+
+const VALID_ROLES = ['colono', 'admin', 'tesorero', 'super-admin']
+
+// Asignar rol es exclusivo de super-admin (Epic #43). Antes esto era un
+// write directo del cliente a users/{uid} (bloqueado del lado de
+// firestore.rules) — ahora pasa por Cloud Function porque ADEMÁS de
+// actualizar el doc, setea un custom claim en el token de Auth
+// (getAuth().setCustomUserClaims): storage.rules necesita el rol de
+// alguna forma que no dependa de `firestore.get()` (Cross Service Rules),
+// que requiere que Firestore y Storage estén en la MISMA ubicación —
+// este proyecto los tiene en ubicaciones distintas (Firestore `nam5`,
+// Storage `us-central1`, ver `gcloud firestore databases describe` /
+// `gcloud storage buckets describe`) y ese cross-service call simplemente
+// no funciona ahí: causaba "permission denied" al subir el logo aunque
+// el rol en Firestore fuera correcto (diagnosticado probando en vivo
+// contra producción). Custom claims no tienen ese problema — vive en el
+// token, no requiere ninguna llamada cross-service.
+//
+// Los custom claims no llegan al cliente hasta el próximo refresh del ID
+// token (cerrar/abrir sesión, o `user.getIdToken(true)`) — alguien recién
+// promovido ve su rol nuevo en la UI de inmediato (esa parte lee
+// Firestore), pero necesita refrescar sesión antes de que storage.rules
+// lo reconozca.
+export const adminSetUserRole = onCall(
+  { region: 'us-central1', enforceAppCheck: true },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'unauthenticated')
+    }
+    const callerSnap = await db.doc(`users/${request.auth.uid}`).get()
+    if (!callerSnap.exists || callerSnap.get('role') !== 'super-admin') {
+      throw new HttpsError('permission-denied', 'super-admin-only')
+    }
+
+    const { uid, role } = (request.data ?? {}) as { uid?: unknown; role?: unknown }
+    if (typeof uid !== 'string' || !uid || typeof role !== 'string' || !VALID_ROLES.includes(role)) {
+      throw new HttpsError('invalid-argument', 'invalid-argument')
+    }
+    // Espejo de canActOnUser() en src/services/userRules.ts — un
+    // super-admin no puede cambiarse el rol a sí mismo.
+    if (uid === request.auth.uid) {
+      throw new HttpsError('failed-precondition', 'cannot-change-own-role')
+    }
+
+    const userRef = db.doc(`users/${uid}`)
+    const userSnap = await userRef.get()
+    if (!userSnap.exists) {
+      throw new HttpsError('not-found', 'user-not-found')
+    }
+
+    await userRef.update({ role })
+    await getAuth().setCustomUserClaims(uid, { role })
+
+    return { success: true }
+  },
+)
