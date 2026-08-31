@@ -45,6 +45,16 @@ cambio toca `functions/` (tiene su propio `package.json`/`tsconfig.json`,
 build separado — no forma parte de `tsc -b` de la raíz), corre también
 `npm run functions:build` y `npm run test:functions`.
 
+**CI** (`.github/workflows/ci.yml`, GitHub Actions — gratuito, el repo es
+público): corre exactamente estos mismos cuatro comandos (build/test de
+`src/` y de `functions/`, dos jobs separados) en cada PR contra `main` y en
+cada push a `main`. Node 22 (misma versión que declara
+`functions/package.json` → `engines.node`, el runtime real de Cloud
+Functions). **No** corre `npm run test:e2e` ni valida
+`firestore.rules`/`storage.rules` — ambos necesitan los emuladores (y Java)
+corriendo, fuera de alcance de este CI básico a propósito; siguen siendo
+verificación manual (ver "Emuladores, seeds y push-to-prod" más abajo).
+
 `firebase-tools` y `firebase-admin` están como devDependencies (no hace
 falta instalar nada global). El proyecto está enlazado vía `.firebaserc`
 (`padel-toscana`) — si necesitas otro proyecto, `firebase use --add`.
