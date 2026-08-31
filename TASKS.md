@@ -281,6 +281,37 @@ Toscana" fijo — archivos estáticos o (en el caso del email) un flujo hoy
 sin punto de entrada real (ver tarea 4 arriba), no valió la pena el
 esfuerzo de conectarlo.
 
+### Extensión del panel Avanzado: eliminar usuarios (2026-08-31)
+
+Tampoco parte de los 5 issues originales — pedida después. Nueva Cloud
+Function `adminDeleteColono` (`functions/src/index.ts`, mismo patrón que
+`adminCreateColono`): borra la cuenta de Auth + el doc `users/{uid}` +
+libera el cupo en `addresses/{key}`. **Exclusivo de super-admin** (a
+diferencia de crear colonos, que admin normal también puede) — decisión
+explícita del usuario, eliminar cuentas es más sensible que darlas de
+alta.
+
+`firestore.rules`: `allow delete` en `users/{uid}` se separó en dos
+ramas — rechazar un `pending` sigue siendo cosa de cualquier admin (no
+cambia, `rejectUser()` sigue igual), eliminar cualquier otro usuario es
+exclusivo de `isSuperAdmin()`. Sin este cambio, un admin normal habría
+podido saltarse la restricción llamando al SDK del cliente directo en
+vez de pasar por la Cloud Function — la duplicación cliente/rules de
+siempre (ver AGENTS.md).
+
+`canChangeRole` en `src/services/userRules.ts` se renombró a
+`canActOnUser` — la misma regla ("no puedes actuar sobre tu propia
+cuenta") ahora protege tanto cambiar el propio rol como auto-eliminarse
+(evita que el sitio se quede sin ningún super-admin, ya que no hay UI
+para asignar el rol de vuelta). Mismo check duplicado en
+`adminDeleteColono` del lado del servidor. Tests actualizados
+(`userRules.test.ts`), sin lógica pura nueva más allá del rename.
+
+UI: botón de eliminar (ícono de bote de basura) por usuario en la lista
+de Avanzado, con confirmación inline de dos pasos (sin `window.confirm`
+— el proyecto no usa diálogos nativos del navegador) antes de llamar a
+la función.
+
 Plan completo (contexto de la exploración, decisiones tomadas) en
 `/Users/ernestosanchezkuri/.claude/plans/snug-percolating-feigenbaum.md`
 si se retoma en una sesión sin ese historial de conversación.

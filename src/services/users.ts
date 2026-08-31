@@ -37,7 +37,7 @@ export async function getAllUsers(): Promise<UserProfile[]> {
 // Cambia el rol de un usuario (colono/admin/tesorero). Solo admins pueden
 // llamar esto en la práctica — reforzado en firestore.rules, no aquí. La
 // UI que llama esta función debe además bloquear que un admin se cambie su
-// propio rol (ver canChangeRole en userRules.ts) antes de invocarla.
+// propio rol (ver canActOnUser en userRules.ts) antes de invocarla.
 export async function setUserRole(uid: string, role: UserRole): Promise<void> {
   await updateDoc(doc(db, 'users', uid), { role })
 }
@@ -191,4 +191,29 @@ const ADMIN_CREATE_COLONO_ERRORS: Record<string, string> = {
 
 export function adminCreateColonoErrorMessage(code: string): string {
   return ADMIN_CREATE_COLONO_ERRORS[code] ?? 'No se pudo agregar al colono. Intenta de nuevo.'
+}
+
+// Elimina una cuenta por completo (Auth + Firestore + libera el cupo del
+// domicilio) — exclusivo de super-admin, reforzado en la función
+// (adminDeleteColono, functions/src/index.ts), no aquí. La UI que llama
+// esta función debe además bloquear que un super-admin se elimine a sí
+// mismo (ver canActOnUser en userRules.ts) antes de invocarla.
+const adminDeleteColonoCallable = httpsCallable(functions, 'adminDeleteColono')
+
+export async function deleteColono(uid: string): Promise<void> {
+  try {
+    await adminDeleteColonoCallable({ uid })
+  } catch (err) {
+    throw new Error((err as { message?: string }).message ?? 'unknown-error')
+  }
+}
+
+const DELETE_COLONO_ERRORS: Record<string, string> = {
+  'super-admin-only': 'Solo un super-admin puede eliminar usuarios.',
+  'cannot-delete-self': 'No puedes eliminarte a ti mismo.',
+  'user-not-found': 'Ese usuario ya no existe.',
+}
+
+export function deleteColonoErrorMessage(code: string): string {
+  return DELETE_COLONO_ERRORS[code] ?? 'No se pudo eliminar al usuario. Intenta de nuevo.'
 }

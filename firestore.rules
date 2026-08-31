@@ -77,7 +77,14 @@ service cloud.firestore {
         || (isAdmin() && request.resource.data.role == resource.data.role)
         || isSuperAdmin();
 
-      allow delete: if isAdmin();
+      // Rechazar un registro pendiente (rejectUser() en src/services/users.ts)
+      // sigue siendo cosa de cualquier admin — no cambia. Eliminar a
+      // cualquier otro usuario (activo, con rol asignado) es exclusivo de
+      // super-admin (adminDeleteColono, functions/src/index.ts) — sin esta
+      // rama, un admin normal podría saltarse esa restricción llamando al
+      // SDK del cliente directo en vez de pasar por la Cloud Function.
+      allow delete: if (resource.data.status == 'pending' && isAdmin())
+        || isSuperAdmin();
     }
 
     // ── Addresses ──────────────────────────────────────────────────────────

@@ -3,11 +3,16 @@
 // src/services/reservationRules.ts para el mismo patrón.
 import { UserRole } from '@/types'
 
-// Un usuario nunca puede cambiar su propio rol, ni siquiera si es admin —
-// evita que un admin se auto-degrade por error, o se auto-promueva/quite
-// permisos de forma accidental. Espejo del check que ya existía en
-// AdminPage antes de la migración de isAdmin a role.
-export function canChangeRole(actorUid: string, targetUid: string): boolean {
+// Un usuario nunca puede actuar sobre sí mismo en acciones sensibles de
+// cuenta — cambiar su propio rol o eliminar su propia cuenta —, ni siquiera
+// si es super-admin. Evita que un admin se auto-degrade por error, se
+// auto-promueva/quite permisos de forma accidental, o (para eliminar) deje
+// el sitio sin ningún super-admin, ya que no hay UI para asignar el rol de
+// vuelta. Espejo del check que ya existía en AdminPage antes de la
+// migración de isAdmin a role; ver también adminDeleteColono en
+// functions/src/index.ts (misma regla, copiada ahí porque functions/ no
+// importa de src/).
+export function canActOnUser(actorUid: string, targetUid: string): boolean {
   return actorUid !== targetUid
 }
 

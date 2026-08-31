@@ -195,23 +195,40 @@ las notificaciones, ese es el primer lugar a revisar.
 
 ## Panel de administración (`/admin`)
 
-Tres pestañas:
+Cuatro pestañas — la cuarta solo la ve `super-admin` (`AdminPage.tsx`,
+`isSuperAdmin`/`tabs`; ver "Roles" arriba y Epic #43):
 - **Reservaciones**: navega por fecha, ve **todas** las reservaciones del
   día (los 4 estados, con `StatusBadge` — a diferencia de las vistas de
   colono, aquí no se filtra por status, ver
   `subscribeToAllReservationsByDate` en `src/services/reservations.ts`),
   puede cambiar el status de cualquiera a cualquier estado con un `<select>`
   (`setReservationStatus`, sin pasar por la matriz de transición normal —
-  reforzado en rules: solo admin).
+  reforzado en rules: solo admin/super-admin).
 - **Canchas**: activar/desactivar canchas, editar `CourtSettings` (horario,
   duración mín/máx, reservaciones máximas por usuario, días de anticipación,
   anticipación mínima, plazo de pago, monto a pagar), crear canchas nuevas.
-- **Usuarios**: aprobar/rechazar pendientes, asignar rol (colono/admin/
-  tesorero) vía un selector de 3 opciones. Un admin no puede modificarse su
-  propio rol — bloqueado en la UI (`canChangeRole` en
-  `src/services/userRules.ts`); las rules **no** repiten esta restricción
-  específica (un admin autenticado puede escribir cualquier `users/*` vía
-  API directa), mismo gap que existía con `isAdmin` antes de esta migración.
+- **Usuarios**: aprobar/rechazar pendientes, agregar colonos nuevos
+  directamente (`adminCreateColono`). El rol de cada usuario se muestra
+  aquí de **solo lectura** — asignarlo se movió a Avanzado (#38/#39).
+- **Avanzado** (`AdvancedTab`, exclusivo de super-admin):
+  - **Usuarios**: mismo listado que la pestaña Usuarios, pero con
+    `RoleSelector` (asignar colono/admin/tesorero/super-admin —
+    `canAssignRole` en `src/services/userRules.ts`, reforzado en
+    `firestore.rules` con `isSuperAdmin()`) y un botón de eliminar por
+    usuario (con confirmación inline, sin `window.confirm`) que llama a
+    `adminDeleteColono` (`functions/src/index.ts`) — borra la cuenta de
+    Auth, el doc de `users/{uid}`, y libera el cupo en
+    `addresses/{key}`. Un super-admin no puede asignarse un rol distinto
+    a sí mismo ni eliminarse a sí mismo (`canActOnUser` en
+    `userRules.ts`, mismo check para ambas acciones — evita que el sitio
+    se quede sin ningún super-admin, ya que no hay UI para asignar el rol
+    de vuelta).
+  - **Logo del sitio**: sube a Firebase Storage (`branding/logo`, ruta
+    fija — ver `src/services/branding.ts` y `storage.rules`).
+  - **Color de acento**: paletas curadas (`src/theme/palettes.ts`),
+    guardadas en `settings/theme`.
+  - **Nombre del sitio y contacto**: `settings/general` (`siteName`,
+    `whatsappUrl` opcional — ver `src/services/siteSettings.ts`).
 
 ## Vista de tesorero (`/tesorero`)
 
@@ -291,10 +308,14 @@ shape de estos documentos en el cliente.
   `StatusBadge`) y un flujo E2E crítico con Playwright
   (`npm run test:e2e` — alta por admin → login → reserva → pago →
   cancelación, contra los emuladores).
-- Un admin autenticado puede cambiar el `role` de **cualquier** usuario,
-  incluido el suyo propio, directo contra Firestore — la restricción de "no
-  puedes cambiar tu propio rol" solo existe en la UI (`canChangeRole`), no
-  en `firestore.rules`.
+- Un super-admin autenticado puede cambiar el `role` de **cualquier**
+  usuario, incluido el suyo propio, directo contra Firestore (la rama
+  `isSuperAdmin()` de `allow update` en `users/{uid}` no distingue target)
+  — la restricción de "no puedes cambiar/eliminar tu propia cuenta" solo
+  existe en la UI (`canActOnUser` en `src/services/userRules.ts`) y en
+  `adminDeleteColono` (para eliminar, sí reforzado server-side), no en
+  `firestore.rules` para el caso de cambiar rol. Admin normal ya no puede
+  tocar `role` en absoluto (ver Epic #43, issue #38).
 - La extensión de correo (`mail` collection) no está declarada en
   `firebase.json` — confirmar que esté instalada en el proyecto real antes de
   depender de las notificaciones por email.
