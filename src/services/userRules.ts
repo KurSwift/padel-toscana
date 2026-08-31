@@ -19,3 +19,10 @@ export function hasAllowedRole(role: UserRole | undefined, allowedRoles?: UserRo
   if (!allowedRoles) return true
   return role !== undefined && allowedRoles.includes(role)
 }
+
+// Asignar rol a otro usuario es exclusivo de super-admin (Epic #43) — ni
+// siquiera admin puede hacerlo, a diferencia del resto de las capacidades
+// del panel admin, donde super-admin es un superset de admin.
+export function canAssignRole(actorRole: UserRole): boolean {
+  return actorRole === 'super-admin'
+}

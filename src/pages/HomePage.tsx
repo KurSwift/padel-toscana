@@ -86,7 +86,7 @@ export default function HomePage() {
           <p className="text-xs text-gray-500">Hola, {profile?.name}</p>
         </div>
         <div className="flex items-center gap-2">
-          {profile?.role === 'admin' && (
+          {(profile?.role === 'admin' || profile?.role === 'super-admin') && (
             <button
               onClick={() => navigate('/admin')}
               className="text-xs font-medium text-brand-600 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition"
@@ -94,7 +94,7 @@ export default function HomePage() {
               Admin
             </button>
           )}
-          {(profile?.role === 'tesorero' || profile?.role === 'admin') && (
+          {(profile?.role === 'tesorero' || profile?.role === 'admin' || profile?.role === 'super-admin') && (
             <button
               onClick={() => navigate('/tesorero')}
               className="text-xs font-medium text-brand-600 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition"

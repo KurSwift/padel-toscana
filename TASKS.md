@@ -180,14 +180,26 @@ entrada real algún día.
 
 ## 5. Rol super-admin + panel avanzado (2026-08-30) — tracked en GitHub, no aquí
 
-Planeado (branch/PR-per-issue, no implementado todavía) como issues de
-GitHub en vez de prosa en este archivo — ver **Epic
+Planeado (branch/PR-per-issue) como issues de GitHub en vez de prosa en
+este archivo — ver **Epic
 [#43](https://github.com/KurSwift/padel-toscana/issues/43)**: nuevo rol
 `super-admin` con un panel más avanzado en Admin (asignar roles — el
 `admin` normal deja de poder hacerlo —, subir el logo del sitio, elegir
 color de acento). Desglosado en 5 sub-issues en orden de dependencia
 (#38 → #39 → #40 → #41/#42). Feature flags para super-admin quedó como
 issue aparte, sin diseñar todavía ([#44](https://github.com/KurSwift/padel-toscana/issues/44)).
+
+- ~~#38 — Rol super-admin: permisos base~~ — **hecho** (2026-08-30, ver
+  detalle en "Roles" de CONTEXT.md): `UserRole` incluye `'super-admin'`,
+  `isSuperAdmin()`/`isAdmin()` (superset) en `firestore.rules`,
+  `canAssignRole()` en `src/services/userRules.ts`, `adminCreateColono`
+  acepta ambos roles, `canTransition` y las rutas `/admin`/`/tesorero`
+  incluyen a super-admin. `RoleSelector`/`handleChangeRole` se quitaron
+  de `AdminPage.tsx` (UsersTab) — el rol ahora se muestra de solo
+  lectura ahí; asignar rol queda sin UI hasta el issue #39. *Pendiente:
+  el bootstrap del primer super-admin (promover la cuenta admin actual a
+  mano en Firestore) sigue sin hacerse — hacerlo cuando se despliegue.*
+- #39–#42 — panel avanzado, Header compartido, logo, color — sin empezar.
 
 Plan completo (contexto de la exploración, decisiones tomadas) en
 `/Users/ernestosanchezkuri/.claude/plans/snug-percolating-feigenbaum.md`

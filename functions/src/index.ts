@@ -269,7 +269,10 @@ export const adminCreateColono = onCall(
       throw new HttpsError('unauthenticated', 'unauthenticated')
     }
     const callerSnap = await db.doc(`users/${request.auth.uid}`).get()
-    if (!callerSnap.exists || callerSnap.get('role') !== 'admin') {
+    const callerRole = callerSnap.get('role')
+    // Crear colonos no es "asignar roles" (eso es exclusivo de super-admin,
+    // ver Epic #43) — sigue disponible para ambos.
+    if (!callerSnap.exists || (callerRole !== 'admin' && callerRole !== 'super-admin')) {
       throw new HttpsError('permission-denied', 'admin-only')
     }
     if (!isValidCreateColonoInput(request.data)) {

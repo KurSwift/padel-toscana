@@ -109,18 +109,20 @@ export function isResidentInChargeNameValid(name: string): boolean {
 // máquina de estados de una reservación, hay que actualizar esta función Y
 // las rules (ver AGENTS.md). No decide si la reservación existe o si los
 // demás campos son válidos, solo si este actor puede mover `from` a `to`.
+// super-admin es superset de admin aquí también (ver isAdmin() en
+// firestore.rules, que ya incluye a super-admin — Epic #43).
 //
 // Matriz:
-//   solicitada → cancelada : dueño o admin
-//   pagada     → cancelada : dueño o admin
-//   solicitada → pagada    : tesorero o admin
-//   cualquier otra transición : solo admin
+//   solicitada → cancelada : dueño o admin/super-admin
+//   pagada     → cancelada : dueño o admin/super-admin
+//   solicitada → pagada    : tesorero o admin/super-admin
+//   cualquier otra transición : solo admin/super-admin
 export function canTransition(
   actor: { role: UserRole; isOwner: boolean },
   from: ReservationStatus,
   to: ReservationStatus,
 ): boolean {
-  if (actor.role === 'admin') return true
+  if (actor.role === 'admin' || actor.role === 'super-admin') return true
   if (from === to) return false
   if ((from === 'solicitada' || from === 'pagada') && to === 'cancelada') {
     return actor.isOwner

@@ -5,8 +5,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
 import { Court, CourtSettings, UserProfile, UserRole, Reservation, ReservationStatus, ValidStreet, VALID_STREETS } from '@/types'
 import { getAllCourts, updateCourtSettings, toggleCourtActive, createCourt, DEFAULT_COURT_SETTINGS } from '@/services/courts'
-import { getAllUsers, setUserRole, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage } from '@/services/users'
-import { canChangeRole } from '@/services/userRules'
+import { getAllUsers, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage } from '@/services/users'
 import { MAX_RESERVATION_DURATION_HOURS } from '@/services/reservationRules'
 import { subscribeToAllReservationsByDate, setReservationStatus } from '@/services/reservations'
 import { todayString, addDays, formatDateLong, formatTime } from '@/utils/time'
@@ -14,10 +13,13 @@ import StatusBadge, { RESERVATION_STATUS_LABELS } from '@/components/StatusBadge
 
 type Tab = 'reservations' | 'courts' | 'users'
 
+// Asignar rol vive solo en el panel avanzado de super-admin (Epic #43) —
+// aquí el rol de cada usuario se muestra de solo lectura.
 const ROLE_LABELS: Record<UserRole, string> = {
   colono: 'Colono',
   admin: 'Admin',
   tesorero: 'Tesorero',
+  'super-admin': 'Super Admin',
 }
 
 export default function AdminPage() {
@@ -563,24 +565,6 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
     }
   }
 
-  async function handleChangeRole(u: UserProfile, role: UserRole) {
-    if (!canChangeRole(currentUser?.uid ?? '', u.uid)) {
-      toast.error('No puedes modificar tu propio rol.')
-      return
-    }
-    if (role === u.role) return
-    setActing(u.uid)
-    try {
-      await setUserRole(u.uid, role)
-      setUsers((prev) => prev.map((x) => x.uid === u.uid ? { ...x, role } : x))
-      toast.success(`Rol de ${u.name} actualizado a ${ROLE_LABELS[role]}.`)
-    } catch {
-      toast.error('No se pudo cambiar el rol.')
-    } finally {
-      setActing(null)
-    }
-  }
-
   if (loading) return <div className="flex justify-center py-8"><Spinner /></div>
 
   const pending = users.filter((u) => u.status === 'pending')
@@ -729,11 +713,9 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
                   {u.email ?? u.phone ?? ''}
                 </p>
               </div>
-              <RoleSelector
-                role={u.role}
-                disabled={acting === u.uid || u.uid === currentUser?.uid}
-                onChange={(role) => handleChangeRole(u, role)}
-              />
+              <span className="shrink-0 text-xs font-medium text-gray-500 bg-gray-100 rounded-full px-2.5 py-1">
+                {ROLE_LABELS[u.role]}
+              </span>
             </div>
           ))}
         </div>
@@ -743,38 +725,6 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
 }
 
 // ── Shared ─────────────────────────────────────────────────────────────────────
-
-// Selector de rol (colono/admin/tesorero) de 3 opciones, usado en la
-// pestaña Usuarios. `disabled` cubre tanto el estado "guardando" como el
-// caso de un admin viendo su propia fila (no puede cambiarse su rol).
-function RoleSelector({
-  role,
-  disabled,
-  onChange,
-}: {
-  role: UserRole
-  disabled: boolean
-  onChange: (role: UserRole) => void
-}) {
-  return (
-    <div className="shrink-0 flex bg-gray-100 rounded-full p-0.5">
-      {(Object.keys(ROLE_LABELS) as UserRole[]).map((r) => (
-        <button
-          key={r}
-          onClick={() => onChange(r)}
-          disabled={disabled}
-          className={`text-xs font-medium px-2.5 py-1 rounded-full transition disabled:opacity-40 ${
-            role === r
-              ? 'bg-brand-600 text-white'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          {ROLE_LABELS[r]}
-        </button>
-      ))}
-    </div>
-  )
-}
 
 function Spinner({ sm }: { sm?: boolean }) {
   const size = sm ? 'w-4 h-4 border-2' : 'w-8 h-8 border-4'
