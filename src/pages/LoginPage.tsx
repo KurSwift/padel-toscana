@@ -6,6 +6,7 @@ import { auth } from '@/firebase'
 import { signInWithGoogle, sendPhoneOtp, verifyOtp, signOut } from '@/services/auth'
 import { getResidentsByAddress, checkUserExists } from '@/services/users'
 import { VALID_STREETS, ValidStreet } from '@/types'
+import Logo from '@/components/Logo'
 
 // Excepción hardcodeada: esta es la única cuenta que predata el modelo de
 // alta por admin (entra con Google, no con teléfono asignado) — ver
@@ -164,8 +165,8 @@ export default function LoginPage() {
 
         {/* Header */}
         <div className="text-center pt-8 px-8 pb-6">
-          <div className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-2xl font-bold">P</span>
+          <div className="mx-auto mb-4 w-fit">
+            <Logo size="lg" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Padel Toscana</h1>
         </div>

@@ -7,6 +7,8 @@ import { Court, CourtSettings, UserProfile, UserRole, Reservation, ReservationSt
 import { getAllCourts, updateCourtSettings, toggleCourtActive, createCourt, DEFAULT_COURT_SETTINGS } from '@/services/courts'
 import { getAllUsers, setUserRole, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage } from '@/services/users'
 import { canAssignRole, canChangeRole } from '@/services/userRules'
+import { uploadLogo, getLogoUrl, uploadLogoErrorMessage } from '@/services/branding'
+import { isValidLogoFile } from '@/services/brandingRules'
 import { MAX_RESERVATION_DURATION_HOURS } from '@/services/reservationRules'
 import { subscribeToAllReservationsByDate, setReservationStatus } from '@/services/reservations'
 import { todayString, addDays, formatDateLong, formatTime } from '@/utils/time'
@@ -781,6 +783,7 @@ function AdvancedTab() {
 
   return (
     <div className="space-y-5">
+      <LogoSection />
       <div>
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
           Asignar roles ({users.length})
@@ -807,6 +810,95 @@ function AdvancedTab() {
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Logo del sitio (Epic #43, issue 4/5) — sube a Storage vía uploadLogo()
+// (branding/logo, ruta fija). Solo se monta dentro de AdvancedTab, ya
+// gateado por super-admin; storage.rules refuerza el mismo permiso del
+// lado del servidor.
+function LogoSection() {
+  const [currentUrl, setCurrentUrl] = useState<string | null>(null)
+  const [loadingCurrent, setLoadingCurrent] = useState(true)
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+
+  useEffect(() => {
+    getLogoUrl().then((url) => {
+      setCurrentUrl(url)
+      setLoadingCurrent(false)
+    })
+  }, [])
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f) return
+    if (!isValidLogoFile(f)) {
+      toast.error(uploadLogoErrorMessage('invalid-file'))
+      return
+    }
+    setFile(f)
+    setPreview(URL.createObjectURL(f))
+  }
+
+  async function handleUpload() {
+    if (!file) return
+    setUploading(true)
+    try {
+      const url = await uploadLogo(file)
+      setCurrentUrl(url)
+      setFile(null)
+      setPreview(null)
+      toast.success('Logo actualizado.')
+    } catch (err) {
+      toast.error(uploadLogoErrorMessage((err as Error).message))
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const displayUrl = preview ?? currentUrl
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+        Logo del sitio
+      </p>
+      <div className="bg-white rounded-2xl px-4 py-4 shadow-sm space-y-3">
+        <div className="flex items-center gap-3">
+          {loadingCurrent ? (
+            <Spinner sm />
+          ) : displayUrl ? (
+            <img src={displayUrl} alt="Logo actual" className="w-14 h-14 rounded-xl object-cover bg-gray-100" />
+          ) : (
+            <div className="w-14 h-14 rounded-xl bg-brand-600 flex items-center justify-center">
+              <span className="text-white text-xl font-bold">P</span>
+            </div>
+          )}
+          <p className="text-xs text-gray-400">
+            {!loadingCurrent && !currentUrl && !preview && 'Sin logo — se muestra la "P" por default.'}
+            {preview && 'Vista previa — todavía no se sube hasta que confirmes.'}
+          </p>
+        </div>
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/svg+xml"
+          onChange={handleFileChange}
+          className="block w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100"
+        />
+        {file && (
+          <button
+            onClick={handleUpload}
+            disabled={uploading}
+            className="w-full bg-brand-600 text-white text-sm font-semibold rounded-xl py-2.5 disabled:opacity-40 flex items-center justify-center"
+          >
+            {uploading ? <Spinner sm /> : 'Subir logo'}
+          </button>
+        )}
       </div>
     </div>
   )

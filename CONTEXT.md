@@ -34,19 +34,25 @@ Solo usuarios `active` pueden crear reservaciones. Los usuarios creados antes
 de que existiera este campo se tratan como `active` por default (ver
 `isActiveUser()` en `firestore.rules` y los fallbacks `?? 'active'` en la UI).
 
-**Estado del épico de super-admin** (2026-08-30): el rol base ya está
-implementado — `super-admin` existe en `UserRole`, `firestore.rules` lo
-reconoce (`isAdmin()` lo incluye como superset; `isSuperAdmin()` es la
-única vía para cambiar `role` de otro usuario), `adminCreateColono` lo
-acepta igual que `admin`, y la asignación de roles se quitó por completo
-del tab Usuarios normal (issue [#38](https://github.com/KurSwift/padel-toscana/issues/38),
-cerrado). **Todavía no existe ninguna UI para asignar roles** — el panel
-avanzado de super-admin (asignar roles, logo del sitio, color de acento)
-es el resto del roadmap, ver Epic
-[#43](https://github.com/KurSwift/padel-toscana/issues/43) en GitHub y
-tarea 5 en `TASKS.md`. Hasta que el issue #39 se implemente, promover a
-alguien a `super-admin` requiere editar el doc `users/{uid}` directo en
-Firestore (consola o script), no hay botón en la app.
+**Estado del épico de super-admin** (2026-08-30): rol base, panel avanzado
+y logo ya están implementados (issues [#38](https://github.com/KurSwift/padel-toscana/issues/38),
+[#39](https://github.com/KurSwift/padel-toscana/issues/39) y
+[#41](https://github.com/KurSwift/padel-toscana/issues/41), cerrados) —
+`super-admin` existe en `UserRole`, `firestore.rules` lo reconoce
+(`isAdmin()` lo incluye como superset; `isSuperAdmin()` es la única vía
+para cambiar `role` de otro usuario), `adminCreateColono` lo acepta igual
+que `admin`. La asignación de roles se quitó del tab Usuarios normal y
+vive en `/admin` → pestaña "Avanzado" (solo visible para super-admin,
+`AdvancedTab` en `AdminPage.tsx`), que también tiene la subida del logo
+del sitio (`src/services/branding.ts`, Firebase Storage, ruta fija
+`branding/logo` — ver `storage.rules`). El logo se muestra en el navbar
+(`Header.tsx`) y en `/login` (`Logo.tsx`); sin logo subido, cae al badge
+"P" verde de siempre. Falta el color de acento (issue
+[#42](https://github.com/KurSwift/padel-toscana/issues/42), ver Epic
+[#43](https://github.com/KurSwift/padel-toscana/issues/43) y tarea 5 en
+`TASKS.md`). Promover a alguien a `super-admin` sigue sin tener UI —
+requiere editar el doc `users/{uid}` directo en Firestore (consola o
+script).
 
 ## Flujo de alta y login (actualizado 2026-08-30 — reemplaza el auto-registro)
 

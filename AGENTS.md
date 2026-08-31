@@ -6,7 +6,7 @@ el contexto de negocio/dominio ver [CONTEXT.md](./CONTEXT.md).
 ## Stack
 
 React 19 + TypeScript + Vite 6, Tailwind CSS 3, React Router 7, Firebase v11
-(Auth, Firestore, App Check) vía SDK modular. Sin servidor propio: casi
+(Auth, Firestore, Storage, App Check) vía SDK modular. Sin servidor propio: casi
 toda la lógica de negocio vive en `src/services/*` y se refuerza en
 `firestore.rules`. La excepción es `functions/` (Cloud Functions v2,
 TypeScript) — tres funciones: `createReservation` (existe porque esa
@@ -23,7 +23,7 @@ npm install        # instalar dependencias
 npm run dev        # servidor de desarrollo (Vite, http://localhost:5173)
 npm run build       # tsc -b (type-check) + vite build → sale a public/
 npm run preview     # sirve el build de producción localmente
-npm run emulators   # Auth + Firestore + Functions emulators (requiere Java)
+npm run emulators   # Auth + Firestore + Functions + Storage emulators (requiere Java)
 npm run seed        # prepobla el emulador con datos de ejemplo
 npm run push-to-prod  # migra colecciones seleccionadas emulador → producción (dry-run por default)
 npm run preregister-colonos -- --file=x.json  # alta en bloque de colonos en prod desde JSON (dry-run por default)
@@ -91,17 +91,18 @@ no tiene helper de e2e propio (se quitó `registerWithPhone` — ver nota en
 
 ```
 src/
-  firebase.ts          # init de app/auth/db/app-check — config está hardcodeada aquí
+  firebase.ts          # init de app/auth/db/functions/storage/app-check — config está hardcodeada aquí
   App.tsx              # rutas (react-router)
   context/AuthContext   # user de Firebase Auth + su UserProfile (Firestore), vía onSnapshot
-  components/           # UI reutilizable (BookingSheet, SlotsGrid, DateSelector, StatusBadge, ProtectedRoute...)
+  components/           # UI reutilizable (Header, Logo, BookingSheet, SlotsGrid, DateSelector, StatusBadge, ProtectedRoute...)
   pages/                 # HomePage, AdminPage, TesoreroPage, HelpPage, LoginPage, RegisterPage
-  services/              # única capa que toca Firestore/Auth directamente (auth, courts, reservations, users)
+  services/              # única capa que toca Firestore/Auth/Storage directamente (auth, courts, reservations, users, branding)
   hooks/useCourtData     # combina cancha activa + reservaciones del día + reservaciones del usuario
   types/index.ts         # shapes de Firestore (UserProfile, Court, Reservation...) — fuente de verdad de tipos
   utils/time.ts          # helpers de fecha/hora en formato 'HH:mm' / 'YYYY-MM-DD' (strings, no Date en el modelo)
   services/reservationRules.ts  # lógica pura de reservaciones (sin imports de firebase/*), testeada con Vitest
   services/userRules.ts   # lógica pura de roles/permisos (mismo patrón), testeada con Vitest
+  services/brandingRules.ts  # lógica pura de validación del logo del sitio (mismo patrón), testeada con Vitest
 scripts/
   seed.mjs                    # prepobla el emulador (firebase-admin, nunca toca producción)
   push-to-prod.mjs             # migra colecciones seleccionadas emulador → producción
@@ -171,7 +172,10 @@ reservación). Esto es deliberado: el cliente valida para dar buen UX
 (mensajes de error específicos), pero las rules son la única barrera real
 contra un cliente malicioso. **Si cambias una regla de negocio en
 `src/services/`, revisa si `firestore.rules` necesita el mismo cambio, y
-viceversa.** No asumas que basta con tocar un solo lado.
+viceversa.** No asumas que basta con tocar un solo lado. `storage.rules`
+sigue el mismo patrón para el logo del sitio: `isValidLogoFile()`
+(`src/services/brandingRules.ts`) espeja el `allow write` de
+`branding/logo` (tipo de archivo, tamaño máximo).
 
 **Crear una reservación es la excepción a ese patrón de dos lugares — son
 tres.** El límite de reservaciones activas por usuario
@@ -220,7 +224,7 @@ existe `.env.local` con `VITE_USE_EMULATORS=true` (ver `src/firebase.ts`).
 
 ```bash
 cp .env.local.example .env.local   # una vez
-npm run emulators                  # terminal 1 — Auth :9099, Firestore :8080, Functions :5001, UI :4000
+npm run emulators                  # terminal 1 — Auth :9099, Firestore :8080, Functions :5001, Storage :9199, UI :4000
 npm run seed                       # terminal 2 — prepobla courts/users/addresses/reservations
 npm run dev                        # terminal 2
 ```

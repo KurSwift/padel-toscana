@@ -1,4 +1,5 @@
 import { ReactNode } from 'react'
+import Logo from './Logo'
 
 interface HeaderProps {
   title: string
@@ -9,14 +10,14 @@ interface HeaderProps {
   // Solo HomePage necesita que el header se quede fijo arriba al hacer
   // scroll (la grilla de horarios es larga) — el resto no.
   sticky?: boolean
-  // Slot para el logo del sitio (issue 4/5 del Epic #43, todavía sin
-  // implementar) — hoy ninguna página pasa nada aquí, así que no cambia
-  // el look actual (sin logo, solo título + subtítulo).
+  // Slot para el logo del sitio (Epic #43). Default: <Logo size="sm" />,
+  // que carga el logo subido a Storage o cae al badge "P" si no hay
+  // ninguno — ninguna página necesita pasar esta prop hoy.
   logo?: ReactNode
   children?: ReactNode
 }
 
-export default function Header({ title, titleClassName = 'text-gray-800', subtitle, sticky, logo, children }: HeaderProps) {
+export default function Header({ title, titleClassName = 'text-gray-800', subtitle, sticky, logo = <Logo size="sm" />, children }: HeaderProps) {
   return (
     <header
       className={`${sticky ? 'sticky top-0 z-10 ' : ''}bg-white shadow-sm px-4 py-4 flex items-center justify-between`}
