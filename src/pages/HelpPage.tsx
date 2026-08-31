@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { UserRole } from '@/types'
+import Header from '@/components/Header'
 
 interface HelpSection {
   title: string
@@ -130,18 +131,14 @@ export default function HelpPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm px-4 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-gray-800">Ayuda</h1>
-          <p className="text-xs text-gray-500">{profile?.name}</p>
-        </div>
+      <Header title="Ayuda" subtitle={profile?.name}>
         <button
           onClick={() => navigate('/')}
           className="text-xs font-medium text-brand-600 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition"
         >
           ← Volver
         </button>
-      </header>
+      </Header>
 
       <main className="max-w-lg mx-auto px-4 py-5 space-y-4">
         {sections.map((section) => (
