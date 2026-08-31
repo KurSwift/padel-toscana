@@ -94,9 +94,11 @@ src/
   firebase.ts          # init de app/auth/db/functions/storage/app-check — config está hardcodeada aquí
   App.tsx              # rutas (react-router)
   context/AuthContext   # user de Firebase Auth + su UserProfile (Firestore), vía onSnapshot
+  context/ThemeContext   # paletteId activo (settings/theme en Firestore), vía onSnapshot — mismo molde que AuthContext
   components/           # UI reutilizable (Header, Logo, BookingSheet, SlotsGrid, DateSelector, StatusBadge, ProtectedRoute...)
   pages/                 # HomePage, AdminPage, TesoreroPage, HelpPage, LoginPage, RegisterPage
-  services/              # única capa que toca Firestore/Auth/Storage directamente (auth, courts, reservations, users, branding)
+  services/              # única capa que toca Firestore/Auth/Storage directamente (auth, courts, reservations, users, branding, theme)
+  theme/palettes.ts      # paletas de acento predefinidas (id, name, tones 50–900) — Epic #43, issue 5/5
   hooks/useCourtData     # combina cancha activa + reservaciones del día + reservaciones del usuario
   types/index.ts         # shapes de Firestore (UserProfile, Court, Reservation...) — fuente de verdad de tipos
   utils/time.ts          # helpers de fecha/hora en formato 'HH:mm' / 'YYYY-MM-DD' (strings, no Date en el modelo)
