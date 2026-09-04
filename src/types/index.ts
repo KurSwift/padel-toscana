@@ -19,13 +19,38 @@ export interface CourtSettings {
   // reservación. Default sugerido 300. Editable por admin (issue 6/7 del
   // épico #10) — aquí solo se declara el campo y se usa para mostrarlo.
   reservationFee: number
+  // Máximo de asistentes por reservación. Reemplaza la constante fija
+  // MAX_PLAYER_COUNT de reservationRules.ts (issue 2/8 del épico #60) —
+  // opcional para no requerir migración de canchas ya creadas; los sitios
+  // que lean este campo deben usar `?? MAX_PLAYER_COUNT` como fallback.
+  // Default 10 en cancha, 30 en casa club.
+  maxPlayerCount?: number
+  // ── Campos exclusivos de casa club (issue 1/8 del épico #60) ───────────
+  // No aplican a canchas de padel — quedan undefined/sin usar ahí.
+  // Depósito que se paga al reservar y monto reembolsable de ese depósito
+  // tras el evento (ver issue 4/8: devolución o retención del depósito).
+  depositAmount?: number
+  depositRefundableAmount?: number
+  // Plazo mínimo antes del evento para poder cancelar, en horas (issue
+  // 5/8). Cancha no lo usa — se puede cancelar en cualquier momento.
+  cancellationDeadlineHours?: number
+  // Tope de reservaciones de este recurso por usuario por mes calendario
+  // (issue 2/8). Cancha no lo usa — su tope es maxActiveReservationsPerUser
+  // (global, sin ventana de tiempo).
+  maxReservationsPerUserPerMonth?: number
 }
+
+export type CourtType = 'cancha' | 'casa-club'
 
 export interface Court {
   id: string
   name: string
   isActive: boolean
   settings: CourtSettings
+  // Opcional para no requerir migración de canchas ya creadas antes del
+  // épico #60 — los sitios que lean este campo deben usar `?? 'cancha'`
+  // como fallback (mismo patrón que UserProfile.status ?? 'active').
+  type?: CourtType
 }
 
 export const VALID_STREETS = ['Nogal', 'Olivo', 'Encino'] as const
