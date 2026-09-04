@@ -54,3 +54,14 @@ tocar código:
   `src/services/*` **como** `firestore.rules` — ver AGENTS.md para el porqué.
 - El proyecto es 100% español en textos de usuario (labels, toasts, errores).
   Mantén ese idioma en cualquier UI nueva.
+
+## Git and Commits Style
+
+- **Prefer many small commits** rather than a few large ones.
+- **Micro-commit rule:** If a commit references more than one file, it is
+  likely too large. Break it down.
+- **Commit timing:** Commit changes every single time a standalone feature
+  is added, a micro-task is completed, or a bug is fixed.
+- **Verification:** Always run the project tests before committing code.
+- **Permission:** Never auto-commit or push to remote unless the user
+  explicitly asks in the current chat message.
