@@ -12,6 +12,8 @@ import {
   computePaymentDueAt,
   isPlayerCountValid,
   isResidentInChargeNameValid,
+  isWithinMonthlyLimit,
+  isCancellationAllowed,
 } from './reservationRules'
 
 describe('hasOverlap', () => {
@@ -156,6 +158,71 @@ describe('isPlayerCountValid', () => {
 
   it('rechaza valores no enteros', () => {
     expect(isPlayerCountValid(2.5)).toBe(false)
+  })
+
+  it('acepta un máximo distinto al default (casa club, hasta 30)', () => {
+    expect(isPlayerCountValid(30, 30)).toBe(true)
+    expect(isPlayerCountValid(11, 30)).toBe(true)
+  })
+
+  it('rechaza por encima del máximo pasado explícitamente', () => {
+    expect(isPlayerCountValid(31, 30)).toBe(false)
+  })
+})
+
+describe('isWithinMonthlyLimit', () => {
+  const now = new Date('2026-09-15T12:00:00')
+
+  function reservation(status: string, startAt: Date) {
+    return { status, startAt }
+  }
+
+  it('dentro del tope: menos reservaciones del mes que el máximo', () => {
+    const reservations = [reservation('pagada', new Date('2026-09-01T10:00:00'))]
+    expect(isWithinMonthlyLimit(reservations, 2, now)).toBe(true)
+  })
+
+  it('en el tope: ya tiene exactamente el máximo, bloquea una nueva', () => {
+    const reservations = [
+      reservation('pagada', new Date('2026-09-01T10:00:00')),
+      reservation('solicitada', new Date('2026-09-10T10:00:00')),
+    ]
+    expect(isWithinMonthlyLimit(reservations, 2, now)).toBe(false)
+  })
+
+  it('se reinicia entre meses: reservaciones de meses anteriores no cuentan', () => {
+    const reservations = [
+      reservation('pagada', new Date('2026-08-01T10:00:00')),
+      reservation('pagada', new Date('2026-08-15T10:00:00')),
+    ]
+    expect(isWithinMonthlyLimit(reservations, 2, now)).toBe(true)
+  })
+
+  it('ignora reservaciones canceladas o finalizadas del mismo mes', () => {
+    const reservations = [
+      reservation('cancelada', new Date('2026-09-01T10:00:00')),
+      reservation('finalizada', new Date('2026-09-10T10:00:00')),
+    ]
+    expect(isWithinMonthlyLimit(reservations, 2, now)).toBe(true)
+  })
+})
+
+describe('isCancellationAllowed', () => {
+  const now = new Date('2026-09-15T12:00:00')
+
+  it('permite cancelar justo en el límite del plazo', () => {
+    const startAt = new Date('2026-09-17T12:00:00') // +48h
+    expect(isCancellationAllowed(startAt, now, 48)).toBe(true)
+  })
+
+  it('permite cancelar con más anticipación de la mínima', () => {
+    const startAt = new Date('2026-09-20T12:00:00')
+    expect(isCancellationAllowed(startAt, now, 48)).toBe(true)
+  })
+
+  it('rechaza cancelar con menos anticipación de la mínima', () => {
+    const startAt = new Date('2026-09-17T11:00:00') // +47h
+    expect(isCancellationAllowed(startAt, now, 48)).toBe(false)
   })
 })
 
