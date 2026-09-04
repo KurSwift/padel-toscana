@@ -22,6 +22,14 @@ export const MAX_RESERVATION_DURATION_HOURS = 2
 export const MIN_PLAYER_COUNT = 1
 export const MAX_PLAYER_COUNT = 10
 
+// Reservación de casa club = día completo (issue 2/8 del épico #60):
+// startTime = court.settings.openTime, endTime = court.settings.closeTime,
+// durationHours = court.settings.minDurationHours (== maxDurationHours) para
+// ese tipo de recurso — ver DEFAULT_COURT_SETTINGS_BY_TYPE['casa-club'] en
+// src/services/courts.ts ('00:00'/'23:59'/24). No hace falta lógica de
+// traslape nueva: hasOverlap() ya bloquea el resto del día porque ese rango
+// se traslapa con cualquier otro horario de la misma fecha.
+
 // Determina si el rango [startTime, endTime) se traslapa con alguna
 // reservación existente. Traslapa si empieza antes de que la otra termine
 // y termina después de que la otra empieza (comparación de strings 'HH:mm',
@@ -95,9 +103,46 @@ export function effectiveStatus(
   return reservation.status
 }
 
-// ¿El número total de asistentes está dentro del rango permitido (1–10)?
-export function isPlayerCountValid(playerCount: number): boolean {
-  return Number.isInteger(playerCount) && playerCount >= MIN_PLAYER_COUNT && playerCount <= MAX_PLAYER_COUNT
+// ¿El número total de asistentes está dentro del rango permitido? El máximo
+// ya no es fijo (issue 2/8 del épico #60) — viene de
+// court.settings.maxPlayerCount (10 en cancha, 30 en casa club). Default
+// MAX_PLAYER_COUNT para no romper callers que todavía no leen ese campo.
+export function isPlayerCountValid(
+  playerCount: number,
+  maxPlayerCount: number = MAX_PLAYER_COUNT,
+): boolean {
+  return Number.isInteger(playerCount) && playerCount >= MIN_PLAYER_COUNT && playerCount <= maxPlayerCount
+}
+
+// ¿Las reservaciones de casa club ocupantes del usuario en el mes calendario
+// de `now` (reinicia el día 1) siguen debajo del tope
+// maxReservationsPerUserPerMonth? `reservations` ya debe venir filtrada por
+// el caller a las del usuario para el/los recurso(s) de tipo casa club
+// (mismo contrato que countOccupyingReservations/hasOverlap — esta función
+// no conoce userId ni courtId). Cancha no usa este límite.
+export function isWithinMonthlyLimit(
+  reservations: { status: string; startAt: Date }[],
+  maxPerMonth: number,
+  now: Date,
+): boolean {
+  const count = reservations.filter(
+    (r) =>
+      (OCCUPYING_STATUSES as readonly string[]).includes(r.status) &&
+      r.startAt.getFullYear() === now.getFullYear() &&
+      r.startAt.getMonth() === now.getMonth(),
+  ).length
+  return count < maxPerMonth
+}
+
+// ¿Falta al menos `cancellationDeadlineHours` para el inicio de la
+// reservación? Exclusivo de casa club (issue 5/8) — cancha no tiene plazo,
+// se puede cancelar en cualquier momento.
+export function isCancellationAllowed(
+  startAt: Date,
+  now: Date,
+  cancellationDeadlineHours: number,
+): boolean {
+  return startAt.getTime() - now.getTime() >= cancellationDeadlineHours * 60 * 60 * 1000
 }
 
 // ¿El nombre del residente a cargo no está vacío (ignorando espacios)?
