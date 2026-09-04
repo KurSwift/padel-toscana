@@ -19,6 +19,7 @@
   ],
   "hosting": [
     {
+      "site": "padel-toscana",
       "public": "public",
       "ignore": [
         "firebase.json",
