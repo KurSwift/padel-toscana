@@ -169,6 +169,11 @@ service cloud.firestore {
       //   solicitada → pagada    : tesorero o admin
       //   solicitada|pagada → finalizada : admin, o CUALQUIER autenticado
       //                            si ya pasó endAt (issue 4/7)
+      //   finalizada → deposito-devuelto | deposito-retenido : tesorero o
+      //                            admin, solo casa club (issue 4/8 del
+      //                            épico #60) — 'finalizada' ya implica que
+      //                            pasó endAt, no hace falta re-chequear
+      //                            request.time aquí.
       //   cualquier otra transición : solo admin
       // Las dos ramas "cualquier autenticado" son las que permiten la
       // escritura oportunista de effectiveStatus() en reservations.ts —
@@ -199,6 +204,13 @@ service cloud.firestore {
           && resource.data.status in ['solicitada', 'pagada']
           && request.resource.data.status == 'finalizada'
           && request.time > resource.data.endAt
+          && reservationCoreFieldsUnchanged()
+        )
+        || (
+          isTesorero()
+          && resource.data.status == 'finalizada'
+          && resource.data.get('courtType', 'cancha') == 'casa-club'
+          && request.resource.data.status in ['deposito-devuelto', 'deposito-retenido']
           && reservationCoreFieldsUnchanged()
         )
         || isAdmin();
