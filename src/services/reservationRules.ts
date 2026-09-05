@@ -175,6 +175,11 @@ export function isResidentInChargeNameValid(name: string): boolean {
 //   solicitada → cancelada : dueño o admin/super-admin
 //   pagada     → cancelada : dueño o admin/super-admin
 //   solicitada → pagada    : tesorero o admin/super-admin
+//   finalizada → deposito-devuelto | deposito-retenido : tesorero o
+//                admin/super-admin (issue 4/8 del épico #60, exclusivo de
+//                casa club — 'finalizada' ya implica que pasó endAt, ver
+//                effectiveStatus(), así que no hace falta un chequeo de
+//                tiempo aparte aquí)
 //   cualquier otra transición : solo admin/super-admin
 export function canTransition(
   actor: { role: UserRole; isOwner: boolean },
@@ -187,6 +192,9 @@ export function canTransition(
     return actor.isOwner
   }
   if (from === 'solicitada' && to === 'pagada') {
+    return actor.role === 'tesorero'
+  }
+  if (from === 'finalizada' && (to === 'deposito-devuelto' || to === 'deposito-retenido')) {
     return actor.role === 'tesorero'
   }
   return false
