@@ -118,7 +118,9 @@ export default function TesoreroPage() {
                     <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded text-[10px]">
                       {r.userAddress}
                     </span>
-                    <span className="text-gray-400">· {r.playerCount} jugadores</span>
+                    <span className="text-gray-400">
+                      · {r.playerCount} {(r.courtType ?? 'cancha') === 'casa-club' ? 'personas' : 'jugadores'}
+                    </span>
                   </p>
                 </div>
                 <button
