@@ -140,7 +140,16 @@ export const createReservation = onCall(
     const durationHours = isCasaClub ? court.settings.minDurationHours : request.data.durationHours
     const endTime = addHours(startTime, durationHours)
 
-    if (endTime > court.settings.closeTime) throw new HttpsError('failed-precondition', 'outside-hours')
+    // outside-hours no aplica a casa club: su "endTime" (issue 6/8 del
+    // épico #60) es openTime + minDurationHours (24h) con aritmética de
+    // addHours() ('00:00' + 24h = '24:00'), que siempre es mayor a
+    // closeTime ('23:59', el valor de display de "todo el día") aunque la
+    // reservación sea legítima — el chequeo existe para evitar que una
+    // reservación de cancha se salga del horario de apertura, algo que no
+    // aplica a un recurso de día completo fijo.
+    if (!isCasaClub && endTime > court.settings.closeTime) {
+      throw new HttpsError('failed-precondition', 'outside-hours')
+    }
     // El tope duro de 2h es del reglamento de colonos para cancha — no
     // aplica a casa club, cuya duración (24h) viene fija de settings, no del
     // cliente.
