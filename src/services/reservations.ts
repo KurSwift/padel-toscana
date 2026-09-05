@@ -28,14 +28,25 @@ const ERRORS: Record<string, string> = {
   'max-reservations': 'Ya tienes el máximo de reservaciones activas permitido.',
   'outside-hours': 'El horario está fuera del rango permitido.',
   'duration-too-long': 'La duración máxima de una reservación es de 2 horas.',
-  'lead-time-too-short': 'Debes reservar con al menos 24 horas de anticipación.',
   'too-far-ahead': 'No puedes reservar con tanta anticipación todavía.',
   'invalid-player-count': 'El número de personas está fuera del rango permitido.',
   'resident-in-charge-required': 'Indica el nombre del residente a cargo.',
   'monthly-limit': 'Ya alcanzaste el máximo de reservaciones de este recurso para este mes.',
 }
 
-export function reservationErrorMessage(code: string): string {
+// 'lead-time-too-short' no vive en ERRORS: minLeadHours varía por recurso
+// (24h cancha, 72h casa club, issue 6/8 del épico #60) — un texto fijo
+// ("...al menos 24 horas...") queda mal para casa club aunque la
+// anticipación real ya sea mayor a 24h, que es justo el caso confuso que
+// reportó un colono probando el flujo. `minLeadHours` es opcional para no
+// romper llamadas existentes que no lo tengan a mano (ninguna hoy, pero
+// mantiene la función utilizable sin el dato).
+export function reservationErrorMessage(code: string, minLeadHours?: number): string {
+  if (code === 'lead-time-too-short') {
+    return minLeadHours != null
+      ? `Debes reservar con al menos ${minLeadHours} horas de anticipación.`
+      : 'Debes reservar con más anticipación.'
+  }
   return ERRORS[code] ?? 'No se pudo crear la reservación. Intenta de nuevo.'
 }
 

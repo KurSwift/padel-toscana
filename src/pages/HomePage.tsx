@@ -77,7 +77,7 @@ export default function HomePage() {
         ...params,
       })
     } catch (err) {
-      toast.error(reservationErrorMessage((err as Error).message))
+      toast.error(reservationErrorMessage((err as Error).message, court.settings.minLeadHours))
       setSelectedSlot(null)
       throw err
     }
