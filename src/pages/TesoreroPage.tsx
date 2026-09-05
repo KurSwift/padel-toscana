@@ -4,7 +4,13 @@ import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
 import { Court, Reservation } from '@/types'
 import { getAllCourts } from '@/services/courts'
-import { subscribeToPendingPayments, confirmPayment } from '@/services/reservations'
+import {
+  subscribeToPendingPayments,
+  confirmPayment,
+  subscribeToPendingDepositDecisions,
+  returnDeposit,
+  retainDeposit,
+} from '@/services/reservations'
 import { formatDateShort, formatTime } from '@/utils/time'
 import Header from '@/components/Header'
 
@@ -15,6 +21,8 @@ export default function TesoreroPage() {
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [loading, setLoading] = useState(true)
   const [confirming, setConfirming] = useState<string | null>(null)
+  const [depositReservations, setDepositReservations] = useState<Reservation[]>([])
+  const [decidingDeposit, setDecidingDeposit] = useState<string | null>(null)
 
   useEffect(() => {
     getAllCourts().then(setCourts)
@@ -26,6 +34,12 @@ export default function TesoreroPage() {
         [...r].sort((a, b) => a.paymentDueAt.toMillis() - b.paymentDueAt.toMillis()),
       )
       setLoading(false)
+    })
+  }, [])
+
+  useEffect(() => {
+    return subscribeToPendingDepositDecisions((r) => {
+      setDepositReservations([...r].sort((a, b) => a.date.localeCompare(b.date)))
     })
   }, [])
 
@@ -41,8 +55,29 @@ export default function TesoreroPage() {
     }
   }
 
+  async function handleDeposit(r: Reservation, decision: 'devolver' | 'retener') {
+    setDecidingDeposit(r.id)
+    try {
+      if (decision === 'devolver') {
+        await returnDeposit(r.id)
+        toast.success(`Depósito de ${r.userName.split(' ')[0]} devuelto.`)
+      } else {
+        await retainDeposit(r.id)
+        toast.success(`Depósito de ${r.userName.split(' ')[0]} retenido.`)
+      }
+    } catch {
+      toast.error('No se pudo registrar la decisión del depósito.')
+    } finally {
+      setDecidingDeposit(null)
+    }
+  }
+
   function courtName(courtId: string) {
     return courts.find((c) => c.id === courtId)?.name ?? 'Cancha'
+  }
+
+  function depositRefundableAmount(courtId: string) {
+    return courts.find((c) => c.id === courtId)?.settings.depositRefundableAmount
   }
 
   return (
@@ -96,6 +131,46 @@ export default function TesoreroPage() {
               </div>
             ))}
           </div>
+        )}
+
+        {depositReservations.length > 0 && (
+          <>
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-6 mb-2">
+              Depósitos por resolver
+            </h2>
+            <div className="space-y-2">
+              {depositReservations.map((r) => (
+                <div key={r.id} className="bg-white rounded-2xl px-4 py-3 shadow-sm">
+                  <p className="text-sm font-semibold text-gray-800">{formatDateShort(r.date)}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{courtName(r.courtId)}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
+                    <span>{r.residentInChargeName}</span>
+                    <span className="bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded text-[10px]">
+                      {r.userAddress}
+                    </span>
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => handleDeposit(r, 'devolver')}
+                      disabled={decidingDeposit === r.id}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg px-3 py-2 transition disabled:opacity-40"
+                    >
+                      {decidingDeposit === r.id
+                        ? '...'
+                        : `Devolver depósito ($${depositRefundableAmount(r.courtId) ?? '—'})`}
+                    </button>
+                    <button
+                      onClick={() => handleDeposit(r, 'retener')}
+                      disabled={decidingDeposit === r.id}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg px-3 py-2 transition disabled:opacity-40"
+                    >
+                      {decidingDeposit === r.id ? '...' : 'Retener depósito'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </main>
     </div>
