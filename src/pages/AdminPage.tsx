@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { Timestamp } from 'firebase/firestore'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
-import { Court, CourtSettings, UserProfile, UserRole, Reservation, ReservationStatus, ValidStreet, VALID_STREETS } from '@/types'
-import { getAllCourts, updateCourtSettings, toggleCourtActive, createCourt, DEFAULT_COURT_SETTINGS } from '@/services/courts'
+import { Court, CourtSettings, CourtType, UserProfile, UserRole, Reservation, ReservationStatus, ValidStreet, VALID_STREETS } from '@/types'
+import { getAllCourts, updateCourtSettings, toggleCourtActive, createCourt, DEFAULT_COURT_SETTINGS_BY_TYPE } from '@/services/courts'
 import { getAllUsers, setUserRole, setUserRoleErrorMessage, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage, deleteColono, deleteColonoErrorMessage } from '@/services/users'
 import { canAssignRole, canActOnUser } from '@/services/userRules'
 import { uploadLogo, getLogoUrl, uploadLogoErrorMessage } from '@/services/branding'
@@ -37,6 +37,13 @@ const TAB_LABELS: Record<Tab, string> = {
   courts: 'Canchas',
   users: 'Usuarios',
   avanzado: 'Avanzado',
+}
+
+// Copy por tipo de recurso en CourtsTab (issue 7/8 del épico #60) —
+// generaliza lo que antes era texto fijo pensado solo para canchas.
+const RESOURCE_TYPE_LABELS: Record<CourtType, string> = {
+  cancha: 'Cancha',
+  'casa-club': 'Casa Club',
 }
 
 export default function AdminPage() {
@@ -201,6 +208,7 @@ function CourtsTab() {
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [newCourtName, setNewCourtName] = useState('')
+  const [newCourtType, setNewCourtType] = useState<CourtType>('cancha')
   const [saving, setSaving] = useState<string | null>(null)
 
   useEffect(() => {
@@ -231,13 +239,17 @@ function CourtsTab() {
     if (!name) return
     setSaving('new')
     try {
-      const id = await createCourt(name)
-      setCourts((prev) => [...prev, { id, name, isActive: true, settings: DEFAULT_COURT_SETTINGS }])
+      const id = await createCourt(name, newCourtType)
+      setCourts((prev) => [
+        ...prev,
+        { id, name, isActive: true, type: newCourtType, settings: DEFAULT_COURT_SETTINGS_BY_TYPE[newCourtType] },
+      ])
       setNewCourtName('')
+      setNewCourtType('cancha')
       setAdding(false)
-      toast.success('Cancha creada.')
+      toast.success(newCourtType === 'casa-club' ? 'Casa Club creada.' : 'Cancha creada.')
     } catch {
-      toast.error('No se pudo crear la cancha.')
+      toast.error('No se pudo crear el recurso.')
     } finally {
       setSaving(null)
     }
@@ -259,12 +271,28 @@ function CourtsTab() {
 
       {adding ? (
         <div className="bg-white rounded-2xl px-4 py-4 shadow-sm space-y-3">
-          <p className="text-sm font-semibold text-gray-700">Nueva cancha</p>
+          <p className="text-sm font-semibold text-gray-700">Nuevo recurso</p>
+          <div className="flex gap-2">
+            {(['cancha', 'casa-club'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setNewCourtType(t)}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition border ${
+                  newCourtType === t
+                    ? 'bg-brand-600 text-white border-brand-600'
+                    : 'bg-white text-gray-700 border-gray-300 hover:border-brand-400'
+                }`}
+              >
+                {RESOURCE_TYPE_LABELS[t]}
+              </button>
+            ))}
+          </div>
           <input
             type="text"
             value={newCourtName}
             onChange={(e) => setNewCourtName(e.target.value)}
-            placeholder="Nombre de la cancha"
+            placeholder={newCourtType === 'casa-club' ? 'Ej: Casa Club' : 'Nombre de la cancha'}
             className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
             autoFocus
           />
@@ -277,7 +305,7 @@ function CourtsTab() {
               {saving === 'new' ? <Spinner sm /> : 'Crear'}
             </button>
             <button
-              onClick={() => { setAdding(false); setNewCourtName('') }}
+              onClick={() => { setAdding(false); setNewCourtName(''); setNewCourtType('cancha') }}
               className="flex-1 border border-gray-300 text-sm text-gray-600 rounded-xl py-2.5"
             >
               Cancelar
@@ -289,7 +317,7 @@ function CourtsTab() {
           onClick={() => setAdding(true)}
           className="w-full border-2 border-dashed border-gray-300 rounded-2xl py-4 text-sm text-gray-400 hover:border-brand-400 hover:text-brand-500 transition"
         >
-          + Agregar cancha
+          + Agregar recurso
         </button>
       )}
     </div>
@@ -309,6 +337,7 @@ function CourtCard({
 }) {
   const [settings, setSettings] = useState<CourtSettings>(court.settings)
   const [dirty, setDirty] = useState(false)
+  const isCasaClub = (court.type ?? 'cancha') === 'casa-club'
 
   function update(patch: Partial<CourtSettings>) {
     setSettings((s) => ({ ...s, ...patch }))
@@ -317,14 +346,22 @@ function CourtCard({
 
   // Tope duro de 2h del reglamento de colonos (MAX_RESERVATION_DURATION_HOURS)
   // — la UI ni siquiera ofrece configurar más que eso, independientemente
-  // de lo que ya tenga guardado un court.settings viejo.
+  // de lo que ya tenga guardado un court.settings viejo. Solo aplica a
+  // cancha — casa club es siempre 24h fijo (issue 2/8 del épico #60).
   const durations = Array.from({ length: MAX_RESERVATION_DURATION_HOURS }, (_, i) => i + 1)
 
   return (
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
       {/* Court header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <span className="font-semibold text-gray-800">{court.name}</span>
+        <span className="font-semibold text-gray-800">
+          {court.name}
+          {isCasaClub && (
+            <span className="ml-2 text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full align-middle">
+              Casa Club
+            </span>
+          )}
+        </span>
         <button
           onClick={onToggleActive}
           className={`text-xs font-medium px-3 py-1 rounded-full transition ${
@@ -338,73 +375,108 @@ function CourtCard({
       </div>
 
       <div className="px-4 py-4 space-y-5">
-        {/* Hours */}
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Horario</p>
-          <div className="space-y-3">
-            <label className="block">
-              <span className="text-xs text-gray-500 mb-1 block">Apertura</span>
-              <input
-                type="time"
-                value={settings.openTime}
-                onChange={(e) => update({ openTime: e.target.value })}
-                className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs text-gray-500 mb-1 block">Cierre</span>
-              <input
-                type="time"
-                value={settings.closeTime}
-                onChange={(e) => update({ closeTime: e.target.value })}
-                className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </label>
+        {/* Hours — exclusivo de cancha, casa club es día completo fijo */}
+        {!isCasaClub && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Horario</p>
+            <div className="space-y-3">
+              <label className="block">
+                <span className="text-xs text-gray-500 mb-1 block">Apertura</span>
+                <input
+                  type="time"
+                  value={settings.openTime}
+                  onChange={(e) => update({ openTime: e.target.value })}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs text-gray-500 mb-1 block">Cierre</span>
+                <input
+                  type="time"
+                  value={settings.closeTime}
+                  onChange={(e) => update({ closeTime: e.target.value })}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </label>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Duration */}
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Duración permitida</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <span className="text-xs text-gray-500 mb-1 block">Mínima</span>
-              <div className="flex gap-1">
-                {durations.map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => update({ minDurationHours: d })}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium border transition ${
-                      settings.minDurationHours === d
-                        ? 'bg-brand-600 text-white border-brand-600'
-                        : 'bg-white text-gray-600 border-gray-300 hover:border-brand-400'
-                    }`}
-                  >
-                    {d}h
-                  </button>
-                ))}
+        {/* Duration — exclusivo de cancha */}
+        {!isCasaClub && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Duración permitida</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-xs text-gray-500 mb-1 block">Mínima</span>
+                <div className="flex gap-1">
+                  {durations.map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => update({ minDurationHours: d })}
+                      className={`flex-1 py-2 rounded-lg text-sm font-medium border transition ${
+                        settings.minDurationHours === d
+                          ? 'bg-brand-600 text-white border-brand-600'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-brand-400'
+                      }`}
+                    >
+                      {d}h
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-            <div>
-              <span className="text-xs text-gray-500 mb-1 block">Máxima</span>
-              <div className="flex gap-1">
-                {durations.map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => update({ maxDurationHours: d })}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium border transition ${
-                      settings.maxDurationHours === d
-                        ? 'bg-brand-600 text-white border-brand-600'
-                        : 'bg-white text-gray-600 border-gray-300 hover:border-brand-400'
-                    }`}
-                  >
-                    {d}h
-                  </button>
-                ))}
+              <div>
+                <span className="text-xs text-gray-500 mb-1 block">Máxima</span>
+                <div className="flex gap-1">
+                  {durations.map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => update({ maxDurationHours: d })}
+                      className={`flex-1 py-2 rounded-lg text-sm font-medium border transition ${
+                        settings.maxDurationHours === d
+                          ? 'bg-brand-600 text-white border-brand-600'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-brand-400'
+                      }`}
+                    >
+                      {d}h
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Depósito — exclusivo de casa club (issue 4/8 del épico #60) */}
+        {isCasaClub && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Depósito</p>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="text-xs text-gray-500 mb-1 block">Depósito ($)</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={50000}
+                  value={settings.depositAmount ?? 0}
+                  onChange={(e) => update({ depositAmount: Number(e.target.value) })}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs text-gray-500 mb-1 block">Reembolsable ($)</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={50000}
+                  value={settings.depositRefundableAmount ?? 0}
+                  onChange={(e) => update({ depositRefundableAmount: Number(e.target.value) })}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </label>
+            </div>
+          </div>
+        )}
 
         {/* Rules */}
         <div>
@@ -426,7 +498,7 @@ function CourtCard({
               <input
                 type="number"
                 min={1}
-                max={30}
+                max={90}
                 value={settings.daysAheadAllowed}
                 onChange={(e) => update({ daysAheadAllowed: Number(e.target.value) })}
                 className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
@@ -465,6 +537,43 @@ function CourtCard({
                 className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
               />
             </label>
+            {isCasaClub && (
+              <>
+                <label className="block">
+                  <span className="text-xs text-gray-500 mb-1 block">Plazo de cancelación (horas)</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={168}
+                    value={settings.cancellationDeadlineHours ?? 0}
+                    onChange={(e) => update({ cancellationDeadlineHours: Number(e.target.value) })}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-gray-500 mb-1 block">Tope mensual por usuario</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={settings.maxReservationsPerUserPerMonth ?? 0}
+                    onChange={(e) => update({ maxReservationsPerUserPerMonth: Number(e.target.value) })}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-gray-500 mb-1 block">Aforo (personas)</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={200}
+                    value={settings.maxPlayerCount ?? 0}
+                    onChange={(e) => update({ maxPlayerCount: Number(e.target.value) })}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </label>
+              </>
+            )}
           </div>
         </div>
 
