@@ -20,7 +20,7 @@ const app = initializeApp({ projectId: PROJECT_ID })
 const db = getFirestore(app)
 const auth = getAuth(app)
 
-// Debe reflejar DEFAULT_COURT_SETTINGS en src/services/courts.ts.
+// Debe reflejar DEFAULT_COURT_SETTINGS_BY_TYPE en src/services/courts.ts.
 const DEFAULT_COURT_SETTINGS = {
   openTime: '07:00',
   closeTime: '23:00',
@@ -32,11 +32,31 @@ const DEFAULT_COURT_SETTINGS = {
   minLeadHours: 24,
   paymentDeadlineHours: 12,
   reservationFee: 300,
+  maxPlayerCount: 10,
+}
+
+const DEFAULT_CASA_CLUB_SETTINGS = {
+  openTime: '00:00',
+  closeTime: '23:59',
+  minDurationHours: 24,
+  maxDurationHours: 24,
+  slotIntervalMinutes: 1440,
+  maxActiveReservationsPerUser: 2,
+  daysAheadAllowed: 90,
+  minLeadHours: 72,
+  paymentDeadlineHours: 12,
+  reservationFee: 3000,
+  maxPlayerCount: 30,
+  depositAmount: 3000,
+  depositRefundableAmount: 2000,
+  cancellationDeadlineHours: 48,
+  maxReservationsPerUserPerMonth: 2,
 }
 
 const COURTS = [
-  { id: 'court-1', name: 'Cancha Principal', isActive: true, settings: DEFAULT_COURT_SETTINGS },
-  { id: 'court-2', name: 'Cancha Secundaria', isActive: false, settings: DEFAULT_COURT_SETTINGS },
+  { id: 'court-1', name: 'Cancha Principal', isActive: true, type: 'cancha', settings: DEFAULT_COURT_SETTINGS },
+  { id: 'court-2', name: 'Cancha Secundaria', isActive: false, type: 'cancha', settings: DEFAULT_COURT_SETTINGS },
+  { id: 'casa-club-1', name: 'Casa Club', isActive: true, type: 'casa-club', settings: DEFAULT_CASA_CLUB_SETTINGS },
 ]
 
 // uid fijo por usuario para que sea reproducible entre corridas de seed.
@@ -66,6 +86,7 @@ async function seedCourts() {
     await db.doc(`courts/${c.id}`).set({
       name: c.name,
       isActive: c.isActive,
+      type: c.type,
       settings: c.settings,
       createdAt: Timestamp.now(),
     })
