@@ -18,6 +18,7 @@ import {
   isWithinMaxAdvanceWindow,
   isPlayerCountValid,
   isResidentInChargeNameValid,
+  isCancellationAllowed,
   effectiveStatus,
   OCCUPYING_STATUSES,
 } from '@/services/reservationRules'
@@ -152,7 +153,25 @@ export async function createReservation(params: {
 // El dueño (o un admin) cancela su reservación desde 'solicitada' o
 // 'pagada'. La transición en sí (quién puede cancelar desde qué estado) la
 // valida firestore.rules — ver canTransition() en reservationRules.ts.
-export async function cancelReservation(reservationId: string): Promise<void> {
+// Casa club exige cancellationDeadlineHours de anticipación (issue 5/8 del
+// épico #60) — se valida aquí primero para dar feedback inmediato con el
+// plazo exacto, antes del round-trip a Firestore; firestore.rules repite
+// la misma validación del lado del servidor (isCancellationDeadlineRespected),
+// pero un permission-denied ahí no puede traer un mensaje tan específico.
+// Cancha no tiene plazo — court.settings.cancellationDeadlineHours es
+// undefined para ese tipo, así que el chequeo se salta por completo.
+export async function cancelReservation(
+  reservationId: string,
+  reservation: Reservation,
+  court: Court,
+): Promise<void> {
+  const courtType = court.type ?? 'cancha'
+  const deadlineHours = court.settings.cancellationDeadlineHours
+  if (courtType === 'casa-club' && deadlineHours != null) {
+    if (!isCancellationAllowed(reservation.startAt.toDate(), new Date(), deadlineHours)) {
+      throw new Error(`Ya no se puede cancelar: se requieren al menos ${deadlineHours}h de anticipación.`)
+    }
+  }
   await updateDoc(doc(db, 'reservations', reservationId), {
     status: 'cancelada' satisfies ReservationStatus,
   })

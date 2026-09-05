@@ -1,29 +1,29 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { Reservation } from '@/types'
+import { Court, Reservation } from '@/types'
 import { formatDateShort, formatTime, formatDateTimeShort } from '@/utils/time'
 import { cancelReservation } from '@/services/reservations'
 import StatusBadge from '@/components/StatusBadge'
 
 interface Props {
   reservations: Reservation[]
-  courtName: string
+  court: Court
 }
 
-export default function MyReservations({ reservations, courtName }: Props) {
+export default function MyReservations({ reservations, court }: Props) {
   const [cancelling, setCancelling] = useState<string | null>(null)
 
   const sorted = [...reservations].sort((a, b) =>
     a.date === b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date),
   )
 
-  async function handleCancel(id: string) {
-    setCancelling(id)
+  async function handleCancel(r: Reservation) {
+    setCancelling(r.id)
     try {
-      await cancelReservation(id)
+      await cancelReservation(r.id, r, court)
       toast.success('Reservación cancelada.')
-    } catch {
-      toast.error('No se pudo cancelar. Intenta de nuevo.')
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : 'No se pudo cancelar. Intenta de nuevo.')
     } finally {
       setCancelling(null)
     }
@@ -52,7 +52,7 @@ export default function MyReservations({ reservations, courtName }: Props) {
               <StatusBadge status={r.status} />
             </div>
             <p className="text-xs text-gray-500 mt-0.5">
-              {formatTime(r.startTime)} – {formatTime(r.endTime)} · {courtName}
+              {formatTime(r.startTime)} – {formatTime(r.endTime)} · {court.name}
             </p>
             {r.status === 'solicitada' && (
               <p className="text-xs text-amber-600 mt-1">
@@ -61,7 +61,7 @@ export default function MyReservations({ reservations, courtName }: Props) {
             )}
           </div>
           <button
-            onClick={() => handleCancel(r.id)}
+            onClick={() => handleCancel(r)}
             disabled={cancelling === r.id}
             className="text-xs text-red-500 hover:text-red-600 font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition disabled:opacity-40"
           >

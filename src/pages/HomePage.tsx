@@ -171,7 +171,7 @@ export default function HomePage() {
             </h2>
             <MyReservations
               reservations={userReservations}
-              courtName={court.name}
+              court={court}
             />
           </>
         )}
