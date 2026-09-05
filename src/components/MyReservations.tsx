@@ -12,6 +12,7 @@ interface Props {
 
 export default function MyReservations({ reservations, court }: Props) {
   const [cancelling, setCancelling] = useState<string | null>(null)
+  const isCasaClub = (court.type ?? 'cancha') === 'casa-club'
 
   const sorted = [...reservations].sort((a, b) =>
     a.date === b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date),
@@ -52,7 +53,7 @@ export default function MyReservations({ reservations, court }: Props) {
               <StatusBadge status={r.status} />
             </div>
             <p className="text-xs text-gray-500 mt-0.5">
-              {formatTime(r.startTime)} – {formatTime(r.endTime)} · {court.name}
+              {isCasaClub ? 'Día completo' : `${formatTime(r.startTime)} – ${formatTime(r.endTime)}`} · {court.name}
             </p>
             {r.status === 'solicitada' && (
               <p className="text-xs text-amber-600 mt-1">

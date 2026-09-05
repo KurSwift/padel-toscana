@@ -163,7 +163,9 @@ function ReservationsTab() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-gray-800">
-                    {formatTime(r.startTime)} – {formatTime(r.endTime)}
+                    {(r.courtType ?? 'cancha') === 'casa-club'
+                      ? 'Día completo'
+                      : `${formatTime(r.startTime)} – ${formatTime(r.endTime)}`}
                   </p>
                   <StatusBadge status={r.status} />
                 </div>

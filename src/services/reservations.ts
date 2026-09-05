@@ -28,14 +28,25 @@ const ERRORS: Record<string, string> = {
   'max-reservations': 'Ya tienes el máximo de reservaciones activas permitido.',
   'outside-hours': 'El horario está fuera del rango permitido.',
   'duration-too-long': 'La duración máxima de una reservación es de 2 horas.',
-  'lead-time-too-short': 'Debes reservar con al menos 24 horas de anticipación.',
   'too-far-ahead': 'No puedes reservar con tanta anticipación todavía.',
-  'invalid-player-count': 'El número de jugadores debe ser entre 1 y 10.',
+  'invalid-player-count': 'El número de personas está fuera del rango permitido.',
   'resident-in-charge-required': 'Indica el nombre del residente a cargo.',
   'monthly-limit': 'Ya alcanzaste el máximo de reservaciones de este recurso para este mes.',
 }
 
-export function reservationErrorMessage(code: string): string {
+// 'lead-time-too-short' no vive en ERRORS: minLeadHours varía por recurso
+// (24h cancha, 72h casa club, issue 6/8 del épico #60) — un texto fijo
+// ("...al menos 24 horas...") queda mal para casa club aunque la
+// anticipación real ya sea mayor a 24h, que es justo el caso confuso que
+// reportó un colono probando el flujo. `minLeadHours` es opcional para no
+// romper llamadas existentes que no lo tengan a mano (ninguna hoy, pero
+// mantiene la función utilizable sin el dato).
+export function reservationErrorMessage(code: string, minLeadHours?: number): string {
+  if (code === 'lead-time-too-short') {
+    return minLeadHours != null
+      ? `Debes reservar con al menos ${minLeadHours} horas de anticipación.`
+      : 'Debes reservar con más anticipación.'
+  }
   return ERRORS[code] ?? 'No se pudo crear la reservación. Intenta de nuevo.'
 }
 
@@ -89,9 +100,12 @@ const createReservationCallable = httpsCallable(functions, 'createReservation')
 // de pago hasta paymentDueAt — ver effectiveStatus() para el auto-release).
 // Valida del lado del cliente, en este orden, solo lo que NO requiere leer
 // otras reservaciones (para dar feedback instantáneo sin round-trip de
-// red): horario dentro de rango, tope duro de 2h, rango de jugadores
-// (1-10), que haya residente a cargo, y anticipación mínima/máxima. El
-// límite de reservaciones activas del usuario y los traslapes de horario
+// red): horario dentro de rango, tope duro de 2h (solo cancha — casa club
+// no lo tiene, su duración de 24h viene fija de settings, issue 6/8 del
+// épico #60), rango de jugadores (court.settings.maxPlayerCount — 10
+// cancha / 30 casa club), que haya residente a cargo, y anticipación
+// mínima/máxima. El límite de reservaciones activas del usuario y los
+// traslapes de horario
 // requieren un conteo/query agregada que un cliente podría saltarse
 // escribiendo directo a Firestore — por eso esos dos, y el write en sí,
 // los hace la Cloud Function `createReservation`
@@ -118,10 +132,15 @@ export async function createReservation(params: {
   const { court, date, startTime, durationHours, playerCount } = params
   const residentInChargeName = params.residentInChargeName.trim()
   const endTime = addHours(startTime, durationHours)
+  const isCasaClub = (court.type ?? 'cancha') === 'casa-club'
 
-  if (endTime > court.settings.closeTime) throw new Error('outside-hours')
-  if (!isDurationWithinHardCap(durationHours)) throw new Error('duration-too-long')
-  if (!isPlayerCountValid(playerCount)) throw new Error('invalid-player-count')
+  // outside-hours no aplica a casa club — ver la nota espejo en
+  // functions/src/index.ts (mismo bug encontrado probando el flujo real de
+  // reserva del issue 6/8: addHours('00:00', 24) da '24:00', siempre mayor
+  // a closeTime '23:59' aunque la reservación sea legítima).
+  if (!isCasaClub && endTime > court.settings.closeTime) throw new Error('outside-hours')
+  if (!isCasaClub && !isDurationWithinHardCap(durationHours)) throw new Error('duration-too-long')
+  if (!isPlayerCountValid(playerCount, court.settings.maxPlayerCount)) throw new Error('invalid-player-count')
   if (!isResidentInChargeNameValid(residentInChargeName)) throw new Error('resident-in-charge-required')
 
   const startAt = toDate(date, startTime)
