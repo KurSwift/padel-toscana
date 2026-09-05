@@ -5,9 +5,11 @@ import userEvent from '@testing-library/user-event'
 import BookingSheet from './BookingSheet'
 
 const baseProps = {
+  courtType: 'cancha' as const,
   date: '2026-09-05',
   startTime: '10:00',
   availableDurations: [1, 2, 3],
+  maxPlayerCount: 10,
   defaultResidentName: 'Juan Pérez',
   reservationFee: 300,
   paymentDeadlineHours: 24,
@@ -104,5 +106,55 @@ describe('BookingSheet', () => {
     await user.click(screen.getByRole('button', { name: '✕' }))
 
     expect(onClose).toHaveBeenCalled()
+  })
+})
+
+describe('BookingSheet — casa club (issue 6/8 del épico #60)', () => {
+  const casaClubProps = {
+    ...baseProps,
+    courtType: 'casa-club' as const,
+    availableDurations: [24],
+    maxPlayerCount: 30,
+    reservationFee: 3000,
+    depositAmount: 3000,
+    depositRefundableAmount: 2000,
+  }
+
+  it('no muestra el selector de duración — es día completo, fijo', () => {
+    render(<BookingSheet {...casaClubProps} onConfirm={vi.fn()} />)
+
+    expect(screen.queryByText('¿Cuántas horas?')).not.toBeInTheDocument()
+  })
+
+  it('respeta maxPlayerCount (30), no el máximo fijo de cancha (10)', async () => {
+    const user = userEvent.setup()
+    render(<BookingSheet {...casaClubProps} onConfirm={vi.fn()} />)
+
+    const increment = screen.getByRole('button', { name: '+' })
+    for (let i = 0; i < 30; i++) {
+      await user.click(increment)
+    }
+    expect(screen.getByText('30')).toBeInTheDocument()
+    expect(increment).toBeDisabled()
+  })
+
+  it('muestra el aviso de depósito antes de confirmar', () => {
+    render(<BookingSheet {...casaClubProps} onConfirm={vi.fn()} />)
+
+    expect(screen.getByText(/Depósito de/)).toBeInTheDocument()
+    expect(screen.getByText(/\$3000/)).toBeInTheDocument()
+    expect(screen.getByText(/\$2000 son reembolsables/)).toBeInTheDocument()
+  })
+
+  it('confirma con durationHours fijo (24h) sin selector', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn().mockResolvedValue(undefined)
+    render(<BookingSheet {...casaClubProps} onConfirm={onConfirm} />)
+
+    await user.click(screen.getByRole('button', { name: /Confirmar reservación/ }))
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ durationHours: 24 }),
+    )
   })
 })
