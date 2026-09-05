@@ -31,6 +31,7 @@ const ERRORS: Record<string, string> = {
   'too-far-ahead': 'No puedes reservar con tanta anticipación todavía.',
   'invalid-player-count': 'El número de jugadores debe ser entre 1 y 10.',
   'resident-in-charge-required': 'Indica el nombre del residente a cargo.',
+  'monthly-limit': 'Ya alcanzaste el máximo de reservaciones de este recurso para este mes.',
 }
 
 export function reservationErrorMessage(code: string): string {
