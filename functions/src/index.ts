@@ -29,6 +29,8 @@ import {
   isLeadTimeSufficient,
   isWithinMaxAdvanceWindow,
   isPlayerCountValid,
+  isWithinMonthlyLimit,
+  matchesCourtType,
   isResidentInChargeNameValid,
   computePaymentDueAt,
 } from './reservationRules'
@@ -98,7 +100,7 @@ export const createReservation = onCall(
     if (!isValidInput(request.data)) {
       throw new HttpsError('invalid-argument', 'invalid-argument')
     }
-    const { courtId, date, startTime, durationHours, playerCount } = request.data
+    const { courtId, date, playerCount } = request.data
     const residentInChargeName = request.data.residentInChargeName.trim()
 
     const [userSnap, courtSnap] = await Promise.all([
@@ -112,22 +114,40 @@ export const createReservation = onCall(
 
     if (!courtSnap.exists) throw new HttpsError('failed-precondition', 'court-not-found')
     const court = courtSnap.data() as {
+      type?: 'cancha' | 'casa-club'
       settings: {
+        openTime: string
         closeTime: string
+        minDurationHours: number
         maxActiveReservationsPerUser: number
         minLeadHours: number
         daysAheadAllowed: number
         paymentDeadlineHours: number
+        maxPlayerCount?: number
+        maxReservationsPerUserPerMonth?: number
       }
     }
+    // Fallback ?? 'cancha' — mismo patrón que el resto de campos nuevos del
+    // épico #60 (issue 1/8), para canchas creadas antes de esta migración.
+    const courtType = court.type ?? 'cancha'
+    const isCasaClub = courtType === 'casa-club'
 
+    // Casa club es reservación de día completo (issue 2/8): ignora
+    // startTime/durationHours del cliente y deriva el bloque fijo desde
+    // settings, para que el cliente no pueda mandar un horario parcial para
+    // este tipo de recurso.
+    const startTime = isCasaClub ? court.settings.openTime : request.data.startTime
+    const durationHours = isCasaClub ? court.settings.minDurationHours : request.data.durationHours
     const endTime = addHours(startTime, durationHours)
 
     if (endTime > court.settings.closeTime) throw new HttpsError('failed-precondition', 'outside-hours')
-    if (!isDurationWithinHardCap(durationHours)) {
+    // El tope duro de 2h es del reglamento de colonos para cancha — no
+    // aplica a casa club, cuya duración (24h) viene fija de settings, no del
+    // cliente.
+    if (!isCasaClub && !isDurationWithinHardCap(durationHours)) {
       throw new HttpsError('failed-precondition', 'duration-too-long')
     }
-    if (!isPlayerCountValid(playerCount)) {
+    if (!isPlayerCountValid(playerCount, court.settings.maxPlayerCount)) {
       throw new HttpsError('failed-precondition', 'invalid-player-count')
     }
     if (!isResidentInChargeNameValid(residentInChargeName)) {
@@ -148,15 +168,35 @@ export const createReservation = onCall(
     const newRef = db.collection('reservations').doc()
 
     await db.runTransaction(async (tx) => {
-      // Reservaciones activas del usuario (límite maxActiveReservationsPerUser).
+      // Reservaciones activas del usuario (límite maxActiveReservationsPerUser),
+      // filtradas por courtType EN MEMORIA (no en la query): sin este
+      // filtro, un colono con sus reservaciones de cancha al tope quedaría
+      // bloqueado de reservar la casa club también sin haberla usado nunca,
+      // y viceversa (bug encontrado durante la investigación del épico #60,
+      // issue 3/8). Filtrar con `.where('courtType', ...)` excluiría además
+      // las reservaciones ya existentes en producción sin ese campo — por
+      // eso el filtro va en JS con el mismo fallback `?? 'cancha'` que el
+      // resto de campos nuevos del épico (issue 1/8), no en la query.
       const userQuery = db
         .collection('reservations')
         .where('userId', '==', uid)
         .where('status', 'in', OCCUPYING_STATUSES)
       const userReservationsSnap = await tx.get(userQuery)
-      const userReservations = userReservationsSnap.docs.map((d) => ({ status: d.get('status') as string }))
+      const userReservations = userReservationsSnap.docs
+        .filter((d) => matchesCourtType(d.get('courtType') as string | undefined, courtType))
+        .map((d) => ({
+          status: d.get('status') as string,
+          startAt: (d.get('startAt') as Timestamp).toDate(),
+        }))
       if (countOccupyingReservations(userReservations) >= court.settings.maxActiveReservationsPerUser) {
         throw new HttpsError('failed-precondition', 'max-reservations')
+      }
+      // Tope mensual (issue 2/8), exclusivo de casa club — cancha no tiene
+      // ventana de tiempo, solo el límite de activas de arriba.
+      if (isCasaClub && court.settings.maxReservationsPerUserPerMonth != null) {
+        if (!isWithinMonthlyLimit(userReservations, court.settings.maxReservationsPerUserPerMonth, now)) {
+          throw new HttpsError('failed-precondition', 'monthly-limit')
+        }
       }
 
       // Traslapes en la misma cancha/día.
@@ -176,6 +216,7 @@ export const createReservation = onCall(
 
       tx.set(newRef, {
         courtId,
+        courtType,
         userId: uid,
         userName: user.name,
         userAddress: user.address,
