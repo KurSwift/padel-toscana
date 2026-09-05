@@ -25,6 +25,8 @@ npm run build       # tsc -b (type-check) + vite build → sale a public/
 npm run preview     # sirve el build de producción localmente
 npm run emulators   # Auth + Firestore + Functions + Storage emulators (requiere Java)
 npm run seed        # prepobla el emulador con datos de ejemplo
+npm run seed:casa-club  # + cancha/reservaciones de casa club (requiere seed antes)
+npm run clear-emulator-data  # borra todas las colecciones del emulador
 npm run push-to-prod  # migra colecciones seleccionadas emulador → producción (dry-run por default)
 npm run preregister-colonos -- --file=x.json  # alta en bloque de colonos en prod desde JSON (dry-run por default)
 npm run test        # corre la suite de Vitest una vez (CI-friendly)
@@ -119,6 +121,8 @@ src/
   services/siteSettingsRules.ts  # lógica pura de validación de nombre/link de WhatsApp (mismo patrón), testeada con Vitest
 scripts/
   seed.mjs                    # prepobla el emulador (firebase-admin, nunca toca producción)
+  seed-casa-club.mjs           # prepobla cancha + reservaciones de casa club en el emulador (requiere seed.mjs antes)
+  clear-emulator-data.mjs      # borra todas las colecciones del emulador — sin camino a producción
   push-to-prod.mjs             # migra colecciones seleccionadas emulador → producción
   migrate-users-role.mjs       # one-off: isAdmin (bool) → role (string) en usuarios existentes de prod
   preregister-colonos.mjs      # alta en bloque de colonos en prod desde un JSON (dry-run por default)
@@ -293,11 +297,31 @@ npm run dev                        # terminal 2
   canchas son **idempotentes** (`.set()` con id fijo: correrlo de nuevo
   actualiza los mismos documentos). Las reservaciones de ejemplo **no** —
   se crean con `.add()`, así que cada corrida agrega tres nuevas en vez de
-  reemplazar las anteriores; si necesitas un estado limpio de
-  reservaciones, borra la colección `reservations` a mano desde la
-  Emulator UI antes de volver a sembrar.
+  reemplazar las anteriores; si necesitas un estado limpio, usa `npm run
+  clear-emulator-data` antes de volver a sembrar (ver abajo) en vez de
+  borrar a mano desde la Emulator UI.
   Si cambias `DEFAULT_COURT_SETTINGS` en `src/services/courts.ts`, actualiza
   también la copia duplicada en este script (comentario lo señala).
+- **`npm run seed:casa-club`** (`scripts/seed-casa-club.mjs`) prepobla una
+  cancha de casa club + 4 reservaciones de ejemplo (pendiente de pago,
+  activa a futuro, y dos ya `finalizada` con endAt en el pasado) —
+  necesario porque no hay UI todavía para crear reservaciones de casa club
+  (issue 6/8 del épico #60), así que es la única forma de probar el resto
+  de la épica (issues 3/8 en adelante) contra los emuladores. Requiere
+  haber corrido `npm run seed` antes (reutiliza sus usuarios de prueba por
+  uid fijo). Usa `.set()` con id fijo — idempotente, igual que
+  usuarios/canchas de `seed.mjs`. Si cambias
+  `DEFAULT_COURT_SETTINGS_BY_TYPE['casa-club']` en `src/services/courts.ts`,
+  actualiza también la copia duplicada en este script.
+- **`npm run clear-emulator-data`** (`scripts/clear-emulator-data.mjs`)
+  borra todas las colecciones de la app en el emulador de Firestore —
+  útil para arrancar de cero antes de sembrar, o para limpiar datos de
+  prueba manual (p. ej. algo creado a mano en la Emulator UI durante una
+  verificación). A diferencia de `push-to-prod`/`migrate-users-role`/
+  `preregister-colonos`, no tiene ningún camino hacia producción: fuerza
+  el host del emulador sin importar el entorno, así que no hay bandera
+  `--confirm` que lo desbloquee para producción. No borra cuentas de
+  Auth — `npm run seed` las reutiliza por uid fijo, así que no hace falta.
 - **`npm run migrate-users-role`** (`scripts/migrate-users-role.mjs`)
   one-off contra producción: convierte el campo viejo `isAdmin: boolean` de
   usuarios existentes a `role: 'colono' | 'admin' | 'tesorero'` (`admin` si
