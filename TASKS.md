@@ -388,10 +388,9 @@ si se retoma en una sesión sin ese historial de conversación.
 Nuevo recurso reservable (además de las canchas de padel) en el mismo
 portal — ver **Epic [#60](https://github.com/KurSwift/padel-toscana/issues/60)**
 en GitHub, desglosado en 8 sub-issues en orden de dependencia
-(#61 → #62 → #63 → #64/#65 → #66 → #67 → #68). **#61–#66 mergeados**;
-quedan **#67** (panel de admin: crear/editar casa club + seed + E2E) y
-**#68** (calendario público compartible) — empezar por #67, ya que #68
-no depende de él pero cierra la épica.
+(#61 → #62 → #63 → #64/#65 → #66 → #67 → #68). **#61–#67 mergeados**;
+queda solo **#68** (calendario público compartible) para cerrar la
+épica.
 
 Investigación previa a la épica encontró que el modelo de datos
 (`Court`/`CourtSettings`), `firestore.rules`, y `createReservation` ya
