@@ -144,6 +144,26 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ¿Falta al menos cancellationDeadlineHours para el inicio de la
+    // reservación? Exclusivo de casa club (issue 5/8 del épico #60) —
+    // cancha no tiene plazo, se puede cancelar en cualquier momento. El
+    // get() extra a courts/ solo se paga cuando courtType es 'casa-club'
+    // (&& corto-circuita antes). Fallback 0h si el campo no está
+    // configurado (sin plazo, igual que cancha) — mismo espíritu que
+    // isCancellationAllowed() en src/services/reservationRules.ts, que
+    // recibe cancellationDeadlineHours ya resuelto por el caller.
+    function isCancellationDeadlineRespected(reservation) {
+      // <=, no < — espejo exacto de isCancellationAllowed() en
+      // src/services/reservationRules.ts, que usa >= (permite cancelar
+      // justo en el límite del plazo, no solo antes).
+      return reservation.get('courtType', 'cancha') != 'casa-club'
+        || request.time <= reservation.startAt - duration.value(
+             get(/databases/$(database)/documents/courts/$(reservation.courtId))
+               .data.settings.get('cancellationDeadlineHours', 0),
+             'h'
+           );
+    }
+
     // ── Reservations ───────────────────────────────────────────────────────
     // Máquina de estados: solicitada → pagada → cancelada | finalizada.
     // Ver canTransition() en src/services/reservationRules.ts — si cambia
@@ -164,8 +184,11 @@ service cloud.firestore {
       // Matriz de transición:
       //   solicitada → cancelada : dueño o admin, o CUALQUIER autenticado
       //                            si ya pasó paymentDueAt (auto-release
-      //                            por falta de pago — issue 4/7)
-      //   pagada     → cancelada : dueño o admin
+      //                            por falta de pago — issue 4/7). El
+      //                            dueño solo si respeta el plazo de
+      //                            cancelación de casa club (issue 5/8) —
+      //                            cancha no tiene plazo.
+      //   pagada     → cancelada : dueño (mismo plazo de arriba) o admin
       //   solicitada → pagada    : tesorero o admin
       //   solicitada|pagada → finalizada : admin, o CUALQUIER autenticado
       //                            si ya pasó endAt (issue 4/7)
@@ -184,6 +207,7 @@ service cloud.firestore {
           isOwner(resource.data.userId)
           && resource.data.status in ['solicitada', 'pagada']
           && request.resource.data.status == 'cancelada'
+          && isCancellationDeadlineRespected(resource.data)
           && reservationCoreFieldsUnchanged()
         )
         || (
