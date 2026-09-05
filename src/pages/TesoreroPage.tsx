@@ -110,7 +110,10 @@ export default function TesoreroPage() {
               <div key={r.id} className="bg-white rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800">
-                    {formatDateShort(r.date)} · {formatTime(r.startTime)} – {formatTime(r.endTime)}
+                    {formatDateShort(r.date)} ·{' '}
+                    {(r.courtType ?? 'cancha') === 'casa-club'
+                      ? 'Día completo'
+                      : `${formatTime(r.startTime)} – ${formatTime(r.endTime)}`}
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">{courtName(r.courtId)}</p>
                   <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
