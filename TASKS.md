@@ -383,13 +383,15 @@ Plan completo (contexto de la exploración, decisiones tomadas) en
 `/Users/ernestosanchezkuri/.claude/plans/snug-percolating-feigenbaum.md`
 si se retoma en una sesión sin ese historial de conversación.
 
-## 6. Reservación de la casa club (2026-08-31) — tracked en GitHub, no aquí
+## 6. Reservación de la casa club (2026-08-31, actualizado 2026-09-05) — tracked en GitHub, no aquí
 
 Nuevo recurso reservable (además de las canchas de padel) en el mismo
 portal — ver **Epic [#60](https://github.com/KurSwift/padel-toscana/issues/60)**
 en GitHub, desglosado en 8 sub-issues en orden de dependencia
-(#61 → #62 → #63 → #64/#65 → #66 → #67 → #68), ninguno implementado
-todavía.
+(#61 → #62 → #63 → #64/#65 → #66 → #67 → #68). **#61–#66 mergeados**;
+quedan **#67** (panel de admin: crear/editar casa club + seed + E2E) y
+**#68** (calendario público compartible) — empezar por #67, ya que #68
+no depende de él pero cierra la épica.
 
 Investigación previa a la épica encontró que el modelo de datos
 (`Court`/`CourtSettings`), `firestore.rules`, y `createReservation` ya
