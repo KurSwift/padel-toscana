@@ -167,6 +167,23 @@ export async function confirmPayment(reservationId: string): Promise<void> {
   })
 }
 
+// El tesorero (o un admin) decide, tras el evento, devolver o retener el
+// depósito de una reservación de casa club (court.settings.
+// depositRefundableAmount) — issue 4/8 del épico #60, exclusivo de ese tipo
+// de recurso. Reforzado en firestore.rules — solo tesorero/admin, solo
+// desde 'finalizada' y solo courtType 'casa-club'.
+export async function returnDeposit(reservationId: string): Promise<void> {
+  await updateDoc(doc(db, 'reservations', reservationId), {
+    status: 'deposito-devuelto' satisfies ReservationStatus,
+  })
+}
+
+export async function retainDeposit(reservationId: string): Promise<void> {
+  await updateDoc(doc(db, 'reservations', reservationId), {
+    status: 'deposito-retenido' satisfies ReservationStatus,
+  })
+}
+
 // Override manual de admin: cambia el status a cualquier valor, sin pasar
 // por la matriz de transición normal (issue 6/7 del épico #10 — panel
 // admin de reservaciones). Reforzado en firestore.rules: solo admin.
@@ -232,5 +249,27 @@ export function subscribeToPendingPayments(
   return onSnapshot(
     query(collection(db, 'reservations'), where('status', '==', 'solicitada')),
     (snap) => onUpdate(toEffectiveReservations(snap.docs).filter((r) => r.status === 'solicitada')),
+  )
+}
+
+// El tesorero ve las reservaciones de casa club ya 'finalizada' (el evento
+// ya pasó) sin decisión de depósito todavía — issue 4/8 del épico #60. La
+// query trae 'pagada' además de 'finalizada' por la misma razón que
+// subscribeToPendingPayments: el status guardado puede no haberse corregido
+// todavía a 'finalizada' (expiración lazy, ver effectiveStatus()).
+// courtType se filtra en JS, no en la query — mismo motivo que en
+// createReservation (functions/src/index.ts): un `.where('courtType', ...)`
+// excluiría reservaciones sin ese campo denormalizado.
+export function subscribeToPendingDepositDecisions(
+  onUpdate: (reservations: Reservation[]) => void,
+): () => void {
+  return onSnapshot(
+    query(collection(db, 'reservations'), where('status', 'in', ['pagada', 'finalizada'])),
+    (snap) =>
+      onUpdate(
+        toEffectiveReservations(snap.docs).filter(
+          (r) => r.status === 'finalizada' && (r.courtType ?? 'cancha') === 'casa-club',
+        ),
+      ),
   )
 }

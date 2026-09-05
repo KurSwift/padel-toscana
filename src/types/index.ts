@@ -90,6 +90,11 @@ export interface UserProfile {
 //   Ya no ocupa el horario.
 // finalizada: ya pasó su horario (endAt) estando pagada. Ya no ocupa el
 //   horario.
+// deposito-devuelto / deposito-retenido: exclusivos de casa club (issue 4/8
+//   del épico #60) — el tesorero/admin decide, después de 'finalizada', si
+//   devuelve o retiene el depósito (court.settings.depositRefundableAmount).
+//   Cancha nunca llega a estos dos — su máquina de estados se queda en los
+//   4 valores de siempre. Ver canTransition() en reservationRules.ts.
 // "Ocupar el horario" = cuenta para traslapes y para el límite de
 // reservaciones activas por usuario — ver OCCUPYING_STATUSES en
 // src/services/reservationRules.ts.
@@ -101,11 +106,21 @@ export interface UserProfile {
 // disponibilidad/conteos. src/services/reservations.ts ya hace esto en
 // las funciones de lectura y además escribe el status corregido de forma
 // oportunista cuando lo detecta.
-export type ReservationStatus = 'solicitada' | 'pagada' | 'cancelada' | 'finalizada'
+export type ReservationStatus =
+  | 'solicitada'
+  | 'pagada'
+  | 'cancelada'
+  | 'finalizada'
+  | 'deposito-devuelto'
+  | 'deposito-retenido'
 
 export interface Reservation {
   id: string
   courtId: string
+  // Denormalizado al crear (issue 3/8 del épico #60), mismo patrón que
+  // userName/userAddress. Opcional: reservaciones creadas antes de ese
+  // cambio no lo tienen — fallback `?? 'cancha'` en quien lo lea.
+  courtType?: CourtType
   userId: string
   userName: string
   userAddress: string

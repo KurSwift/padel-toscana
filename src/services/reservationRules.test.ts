@@ -224,6 +224,20 @@ describe('canTransition', () => {
   it('no permite "transicionar" a un usuario no-admin al mismo estado', () => {
     expect(canTransition({ role: 'tesorero', isOwner: false }, 'pagada', 'pagada')).toBe(false)
   })
+
+  it('el tesorero puede devolver o retener el depósito desde finalizada (casa club, issue 4/8)', () => {
+    expect(canTransition({ role: 'tesorero', isOwner: false }, 'finalizada', 'deposito-devuelto')).toBe(true)
+    expect(canTransition({ role: 'tesorero', isOwner: false }, 'finalizada', 'deposito-retenido')).toBe(true)
+  })
+
+  it('un colono, aunque sea el dueño, no puede decidir el depósito', () => {
+    expect(canTransition({ role: 'colono', isOwner: true }, 'finalizada', 'deposito-devuelto')).toBe(false)
+  })
+
+  it('no se puede decidir el depósito antes de finalizada', () => {
+    expect(canTransition({ role: 'tesorero', isOwner: false }, 'pagada', 'deposito-devuelto')).toBe(false)
+    expect(canTransition({ role: 'tesorero', isOwner: false }, 'solicitada', 'deposito-retenido')).toBe(false)
+  })
 })
 
 describe('computePaymentDueAt', () => {
