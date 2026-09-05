@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   hasOverlap,
+  matchesCourtType,
   countOccupyingReservations,
   isDurationWithinHardCap,
   isLeadTimeSufficient,
@@ -52,6 +53,56 @@ describe('hasOverlap', () => {
     ]
     expect(hasOverlap(existing, '10:00', '11:00')).toBe(false)
     expect(hasOverlap(existing, '08:30', '09:30')).toBe(true)
+  })
+})
+
+describe('matchesCourtType', () => {
+  it('hace match directo cuando el doc ya tiene courtType', () => {
+    expect(matchesCourtType('casa-club', 'casa-club')).toBe(true)
+    expect(matchesCourtType('cancha', 'cancha')).toBe(true)
+  })
+
+  it('no hace match entre tipos distintos', () => {
+    expect(matchesCourtType('cancha', 'casa-club')).toBe(false)
+    expect(matchesCourtType('casa-club', 'cancha')).toBe(false)
+  })
+
+  it('fallback ?? "cancha" para docs sin courtType (reservaciones pre-migración)', () => {
+    expect(matchesCourtType(undefined, 'cancha')).toBe(true)
+    expect(matchesCourtType(undefined, 'casa-club')).toBe(false)
+  })
+})
+
+describe('conteo de activas por tipo (fix issue 3/8 del épico #60)', () => {
+  it('una cancha al tope no cuenta contra el límite de casa club, y viceversa', () => {
+    const reservations = [
+      { status: 'pagada', courtType: 'cancha' },
+      { status: 'solicitada', courtType: 'cancha' },
+      { status: 'pagada', courtType: 'casa-club' },
+    ]
+    const canchaCount = countOccupyingReservations(
+      reservations.filter((r) => matchesCourtType(r.courtType, 'cancha')),
+    )
+    const casaClubCount = countOccupyingReservations(
+      reservations.filter((r) => matchesCourtType(r.courtType, 'casa-club')),
+    )
+    expect(canchaCount).toBe(2)
+    expect(casaClubCount).toBe(1)
+  })
+
+  it('reservaciones pre-migración (sin courtType) cuentan como cancha, no como casa club', () => {
+    const reservations = [
+      { status: 'pagada', courtType: undefined },
+      { status: 'pagada', courtType: undefined },
+    ]
+    const canchaCount = countOccupyingReservations(
+      reservations.filter((r) => matchesCourtType(r.courtType, 'cancha')),
+    )
+    const casaClubCount = countOccupyingReservations(
+      reservations.filter((r) => matchesCourtType(r.courtType, 'casa-club')),
+    )
+    expect(canchaCount).toBe(2)
+    expect(casaClubCount).toBe(0)
   })
 })
 

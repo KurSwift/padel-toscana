@@ -42,8 +42,14 @@ service cloud.firestore {
     // transición de status no cambie nada más (ver canTransition() y
     // effectiveStatus() en src/services/reservationRules.ts).
     function reservationCoreFieldsUnchanged() {
+      // courtType usa get(..., null) en vez de acceso directo: es un campo
+      // nuevo (issue 3/8 del épico #60) que las reservaciones creadas antes
+      // de este cambio no tienen, y un acceso directo a un campo ausente
+      // hace que la regla de Firestore lo evalúe como error (deniega la
+      // transición) en vez de comparar como "sin cambios".
       return request.resource.data.userId        == resource.data.userId
           && request.resource.data.courtId       == resource.data.courtId
+          && request.resource.data.get('courtType', null) == resource.data.get('courtType', null)
           && request.resource.data.date          == resource.data.date
           && request.resource.data.startTime     == resource.data.startTime
           && request.resource.data.endTime       == resource.data.endTime
