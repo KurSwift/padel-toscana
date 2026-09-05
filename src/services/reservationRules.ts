@@ -42,6 +42,20 @@ export function hasOverlap(
   return existing.some((r) => startTime < r.endTime && endTime > r.startTime)
 }
 
+// ¿La reservación es del tipo de recurso `courtType`? Fallback `?? 'cancha'`
+// para docs sin courtType denormalizado (issue 1/8 del épico #60). Extraída
+// como función pura testeable del fix del bug de conteo por tipo (issue 3/8
+// — createReservation en functions/src/index.ts): antes de este fix, el
+// límite de reservaciones activas por usuario contaba TODAS sus
+// reservaciones sin importar el recurso, así que un colono con sus
+// reservaciones de cancha al tope quedaba bloqueado de reservar la casa
+// club también, sin haberla usado nunca (y viceversa). El filtro va en JS,
+// no en la query de Firestore (`.where('courtType', ...)` excluiría además
+// reservaciones ya existentes en producción sin ese campo).
+export function matchesCourtType(docCourtType: string | undefined, courtType: string): boolean {
+  return (docCourtType ?? 'cancha') === courtType
+}
+
 // Cuenta cuántas reservaciones de la lista están "ocupando" un cupo activo
 // del usuario (ver OCCUPYING_STATUSES). Se usa para aplicar el límite de
 // reservaciones activas por usuario (`maxActiveReservationsPerUser`).
