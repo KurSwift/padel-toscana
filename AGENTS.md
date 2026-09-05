@@ -85,6 +85,11 @@ no tiene helper de e2e propio (se quitó `registerWithPhone` — ver nota en
   `main`. Al terminar y verificar el cambio (`npm run build` limpio, feature
   probada), se abre un **Pull Request** para revisión, en vez de mergear
   directo.
+- **Nombre de branch: `tipo/issue-slug-corto`.** `tipo` es uno de `feat`,
+  `fix`, `docs`, `chore`, `refactor`, `test`; `issue` es el número de issue
+  de GitHub cuando la tarea viene de uno (omítelo si no aplica); `slug` es
+  2-4 palabras en español, kebab-case, sin acentos. Ejemplos:
+  `feat/67-admin-panel`, `fix/82-otp-bug`, `docs/epic-progress`.
 - **Toda lógica de negocio nueva o modificada lleva tests de Vitest** antes
   de dar la tarea por terminada — no es opcional. Si la lógica no es pura
   (hace `await` a Firestore), extrae la parte de decisión/validación a una
