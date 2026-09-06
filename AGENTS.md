@@ -9,12 +9,15 @@ React 19 + TypeScript + Vite 6, Tailwind CSS 3, React Router 7, Firebase v11
 (Auth, Firestore, Storage, App Check) vía SDK modular. Sin servidor propio: casi
 toda la lógica de negocio vive en `src/services/*` y se refuerza en
 `firestore.rules`. La excepción es `functions/` (Cloud Functions v2,
-TypeScript) — tres funciones: `createReservation` (existe porque esa
+TypeScript) — seis funciones: `createReservation` (existe porque esa
 validación requiere una query agregada que `firestore.rules` no puede
-hacer — ver "La regla más importante del repo" más abajo), y
-`adminCreateColono`/`getResidentsByAddress` (alta de colonos por admin —
-crean cuentas de Auth ajenas y consultan `users` pre-auth, ambas cosas
-requieren Admin SDK). El proyecto está en plan Blaze (de pago) por esto.
+hacer — ver "La regla más importante del repo" más abajo),
+`adminCreateColono`/`adminDeleteColono`/`adminSetUserRole` (alta/baja de
+colonos y asignación de roles por admin — crean/eliminan cuentas de Auth
+ajenas y setean custom claims, Admin SDK), y
+`getResidentsByAddress`/`getCasaClubCalendar` (lecturas pre-auth con
+Admin SDK — saludo de login y calendario público de casa club,
+respectivamente). El proyecto está en plan Blaze (de pago) por esto.
 
 ## Comandos
 
@@ -64,13 +67,17 @@ falta instalar nada global). El proyecto está enlazado vía `.firebaserc`
 `npm run test:e2e` (Playwright, `e2e/`) no es parte de los gates automáticos
 de arriba — necesita los emuladores corriendo (`npm run emulators` +
 `npm run seed`) y un `npm run dev` en paralelo (Playwright reusa uno ya
-levantado en `:5173`, o levanta el suyo). Corre el único flujo crítico que
-cubre hoy: alta de colono por admin → login (domicilio → saludo → teléfono
-→ OTP) → reserva → confirmación de pago → cancelación, generando un
-usuario/teléfono/domicilio nuevo en cada corrida para no depender de
-cuántas reservaciones de ejemplo acumule ya el emulador (`npm run seed` no
-es idempotente para `reservations`, ver "Emuladores, seeds y
-push-to-prod" más abajo). `e2e/helpers.ts` automatiza `loginWithPhone`
+levantado en `:5173`, o levanta el suyo). Corre dos flujos críticos:
+`critical-flow.spec.ts` (alta de colono por admin → login (domicilio →
+saludo → teléfono → OTP) → reserva de cancha → confirmación de pago →
+cancelación) y `casa-club-flow.spec.ts` (mismo alta/login, pero
+reservación de casa club con depósito → pago → admin fuerza `finalizada`
+→ tesorero devuelve el depósito → segunda reservación cancelada dentro
+del plazo de 48h). Ambos generan un usuario/teléfono/domicilio nuevo en
+cada corrida para no depender de cuántas reservaciones de ejemplo
+acumule ya el emulador (`npm run seed` no es idempotente para
+`reservations`, ver "Emuladores, seeds y push-to-prod" más abajo).
+`e2e/helpers.ts` automatiza `loginWithPhone`
 (domicilio + teléfono, la única forma de entrar hoy — ver "Flujo de alta y
 login" en CONTEXT.md) leyendo la OTP directo del endpoint de testing del
 emulador de Auth (`/emulator/v1/projects/{id}/verificationCodes`) — no hay
@@ -114,7 +121,7 @@ src/
   context/ThemeContext   # paletteId activo (settings/theme en Firestore), vía onSnapshot — mismo molde que AuthContext
   context/SiteSettingsContext  # siteName/whatsappUrl (settings/general), mismo molde — también fija document.title
   components/           # UI reutilizable (Header, Logo, BookingSheet, SlotsGrid, DateSelector, StatusBadge, ProtectedRoute...)
-  pages/                 # HomePage, AdminPage, TesoreroPage, HelpPage, LoginPage, RegisterPage
+  pages/                 # HomePage, AdminPage, TesoreroPage, HelpPage, LoginPage, RegisterPage, CasaClubCalendarPage (única pública, sin auth)
   services/              # única capa que toca Firestore/Auth/Storage directamente (auth, courts, reservations, users, branding, theme, siteSettings)
   theme/palettes.ts      # paletas de acento predefinidas (id, name, tones 50–900) — Epic #43, issue 5/5
   hooks/useCourtData     # combina cancha activa + reservaciones del día + reservaciones del usuario
@@ -133,13 +140,15 @@ scripts/
   preregister-colonos.mjs      # alta en bloque de colonos en prod desde un JSON (dry-run por default)
 e2e/                      # Playwright — npm run test:e2e, ver más abajo
   helpers.ts              # loginWithPhone (domicilio + teléfono + OTP vía emulador), logout
-  critical-flow.spec.ts   # alta por admin → login → reserva → pago → cancelación
+  critical-flow.spec.ts   # alta por admin → login → reserva de cancha → pago → cancelación
+  casa-club-flow.spec.ts  # reserva de casa club con depósito → pago → devolución de depósito → cancelación
 functions/                # Cloud Functions v2 + TypeScript — build/deploy propios, ver "Comandos"
-  src/index.ts             # createReservation, adminCreateColono, getResidentsByAddress (onCall)
+  src/index.ts             # createReservation, adminCreateColono/adminDeleteColono/adminSetUserRole,
+                            # getResidentsByAddress, getCasaClubCalendar (todas onCall)
   src/reservationRules.ts  # copia de la lógica pura que necesita (ver comentario de cabecera)
   src/colonoRules.ts        # lógica pura de alta de colonos (calle válida, cupo, teléfono) — sin mirror en src/
   src/rateLimit.ts           # rate limiting genérico (ventana fija), usado por createReservation
-  src/time.ts               # copia de src/utils/time.ts (toDate/addHours) — mismo motivo
+  src/time.ts               # copia de src/utils/time.ts (toDate/addHours) + monthDateRange (solo acá)
 ```
 
 Alias de import: `@/` → `src/` (configurado en `vite.config.ts` y
