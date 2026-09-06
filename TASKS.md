@@ -383,25 +383,29 @@ Plan completo (contexto de la exploración, decisiones tomadas) en
 `/Users/ernestosanchezkuri/.claude/plans/snug-percolating-feigenbaum.md`
 si se retoma en una sesión sin ese historial de conversación.
 
-## 6. Reservación de la casa club (2026-08-31, actualizado 2026-09-05) — tracked en GitHub, no aquí
+## 6. Reservación de la casa club (2026-08-31, cerrada 2026-09-05) — tracked en GitHub, no aquí
 
-Nuevo recurso reservable (además de las canchas de padel) en el mismo
-portal — ver **Epic [#60](https://github.com/KurSwift/padel-toscana/issues/60)**
-en GitHub, desglosado en 8 sub-issues en orden de dependencia
-(#61 → #62 → #63 → #64/#65 → #66 → #67 → #68). **#61–#67 mergeados**;
-queda solo **#68** (calendario público compartible) para cerrar la
-épica.
+**Épica completa.** Nuevo recurso reservable (además de las canchas de
+padel) en el mismo portal — ver **Epic
+[#60](https://github.com/KurSwift/padel-toscana/issues/60)** en GitHub,
+8 sub-issues (#61-#68), todos mergeados. El último, #68 (calendario
+público en `/casa-club/calendario`, sin login, para compartir con el
+guardia/grupo de WhatsApp), es la primera excepción deliberada al
+modelo "100% privado por invitación" del sitio — ver PRD.md § 9.
 
 Investigación previa a la épica encontró que el modelo de datos
 (`Court`/`CourtSettings`), `firestore.rules`, y `createReservation` ya
-son genéricos por `courtId` — el trabajo real es reglas de negocio
+eran genéricos por `courtId` — el trabajo real fue reglas de negocio
 nuevas (depósito con devolución parcial, tope mensual, cancelación con
 plazo, día completo en vez de horario) más un bug real ya identificado
-(el conteo de reservaciones activas por usuario es global entre
-recursos, no por tipo — issue #63 lo arregla). El issue #68
-(calendario público, sin login, para compartir con el guardia/grupo de
-WhatsApp) es la primera excepción deliberada al modelo "100% privado
-por invitación" del sitio — ver PRD.md § 9.
+(el conteo de reservaciones activas por usuario era global entre
+recursos, no por tipo — issue #63 lo arregló).
+
+**Pendiente identificado durante #68, no bloqueante:** `CONTEXT.md` →
+"Flujo de reservación" nunca se actualizó para el modelo de casa club
+(depósito, 6 estados, tope mensual, plazo de cancelación) — sigue
+describiendo solo el modelo original de cancha. Documentado como gap
+conocido en `CONTEXT.md`; reescribir esa sección es tarea aparte.
 
 Contexto completo de las decisiones (depósito, tope mensual, formato
 del calendario) en `PRD.md` § 14 y en el historial de esta conversación
