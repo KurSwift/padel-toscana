@@ -268,6 +268,30 @@ CMS ni colección de Firestore para esto. Termina con un bloque fijo
 apuntando al grupo de WhatsApp "Reservaciones - La Toscana" para dudas o
 problemas que la ayuda no cubra.
 
+## Calendario público de casa club (`/casa-club/calendario`)
+
+Única ruta pública del sitio — sin `ProtectedRoute`, sin sesión iniciada
+(issue 8/8 del épico #60, ver PRD.md § 9 y § 11). Pensada para
+compartirse como link directo en el grupo de WhatsApp o con el guardia.
+`CasaClubCalendarPage.tsx`: grilla de mes (navegación anterior/siguiente)
+con los días que tienen una reservación de casa club resaltados, más una
+lista debajo con fecha + nombre del residente a cargo + domicilio por
+reservación. Agrega `<meta name="robots" content="noindex">` al `<head>`
+en un `useEffect` (se quita al desmontar) — pública no implica indexable.
+
+Los datos vienen de `getCasaClubCalendar` (Cloud Function `onCall`,
+`functions/src/index.ts`), protegida solo por App Check — no requiere
+`request.auth`, mismo patrón que `getResidentsByAddress`. Recibe
+`{ year, month }`, ubica el recurso `type == 'casa-club'`, y regresa
+únicamente `{ date, name, address }` por reservación con status distinto
+de `cancelada` (`isVisibleOnPublicCalendar()` en
+`functions/src/reservationRules.ts` — a diferencia de
+`OCCUPYING_STATUSES`, también incluye `finalizada`/`deposito-devuelto`/
+`deposito-retenido`, porque el evento sí ocupó la fecha aunque ya se haya
+resuelto). **Nunca** se abre `firestore.rules` de `reservations` a
+lectura pública para esto — expondría status de pago/depósito de
+cualquier reservación a quien tenga el link.
+
 ## Modelo de datos (Firestore)
 
 | Colección | Documento | Notas |
@@ -293,9 +317,10 @@ shape de estos documentos en el cliente.
 - **App Check** (`src/firebase.ts`) con reCAPTCHA v3 está siempre activo,
   incluso en dev — en local se apoya en el modo debug-token (ver README y
   AGENTS.md; para `npm run test:e2e` específicamente hace falta un debug
-  token fijo vía `VITE_APPCHECK_DEBUG_TOKEN`, ver AGENTS.md). Las tres
+  token fijo vía `VITE_APPCHECK_DEBUG_TOKEN`, ver AGENTS.md). Las seis
   Cloud Functions (`createReservation`, `adminCreateColono`,
-  `getResidentsByAddress`) tienen `enforceAppCheck: true`.
+  `adminDeleteColono`, `adminSetUserRole`, `getResidentsByAddress`,
+  `getCasaClubCalendar`) tienen `enforceAppCheck: true`.
 - La autorización real vive en `firestore.rules`; el cliente nunca debe ser la
   única línea de defensa para nada sensible (roles, límites, integridad de
   reservaciones).
@@ -303,18 +328,28 @@ shape de estos documentos en el cliente.
 ## Gaps / deuda conocida (útil antes de asumir que "ya existe")
 
 - Casi toda la lógica vive en el cliente + reglas de Firestore. Las
-  excepciones son las tres funciones en `functions/` (Cloud Functions v2):
-  `createReservation` (existe porque crear una reservación necesita
+  excepciones son las seis funciones en `functions/` (Cloud Functions
+  v2): `createReservation` (existe porque crear una reservación necesita
   validar el límite de activas por usuario y traslapes de horario, algo
   que requiere queries agregadas que `firestore.rules` no puede hacer —
   solo `get()` de documentos puntuales; corre esa validación + el write
   dentro de una transacción atómica; `firestore.rules` deniega `create` en
   `reservations` por completo, `if false` — la función es la única vía),
-  `adminCreateColono` y `getResidentsByAddress` (alta de colonos por
-  admin — necesitan Admin SDK para crear cuentas de Auth ajenas y para
-  consultar `users` antes de que la persona esté autenticada). El proyecto
-  está en plan Blaze por esto. Ver "La regla más importante del repo" en
-  AGENTS.md.
+  `adminCreateColono`/`adminDeleteColono`/`adminSetUserRole` (necesitan
+  Admin SDK para crear/eliminar cuentas de Auth ajenas y setear custom
+  claims), y `getResidentsByAddress`/`getCasaClubCalendar` (ambas leen
+  Firestore pre-auth con Admin SDK — la primera para el saludo de login,
+  la segunda para el calendario público de casa club, ver sección
+  dedicada arriba). El proyecto está en plan Blaze por esto. Ver "La
+  regla más importante del repo" en AGENTS.md.
+- `CONTEXT.md` → "Flujo de reservación" no se actualizó para reflejar el
+  modelo de casa club (depósito, 6 estados incluyendo
+  `deposito-devuelto`/`deposito-retenido`, tope mensual, plazo de
+  cancelación de 48h) introducido por el Epic #60 (issues #61-67) —
+  sigue describiendo el modelo original de solo cancha (4 estados, "una
+  sola cancha activa"). Pendiente de reescribir esa sección completa;
+  mientras tanto, `src/services/reservationRules.ts` y
+  `functions/src/reservationRules.ts` son la fuente de verdad real.
 - Hay tests unitarios (Vitest — `npm run test` para el cliente,
   `npm run test:functions` para `functions/`) para toda la lógica de
   negocio pura, tests de componentes (Testing Library, ej. `BookingSheet`,

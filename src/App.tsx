@@ -11,6 +11,7 @@ import HomePage from '@/pages/HomePage'
 import AdminPage from '@/pages/AdminPage'
 import TesoreroPage from '@/pages/TesoreroPage'
 import HelpPage from '@/pages/HelpPage'
+import CasaClubCalendarPage from '@/pages/CasaClubCalendarPage'
 
 export default function App() {
   return (
@@ -31,6 +32,13 @@ export default function App() {
               <Route
                 path="/registro"
                 element={<RegisterPage />}
+              />
+              {/* Pública, sin sesión — primera excepción deliberada al
+                  modelo "100% privado por invitación" (issue 8/8 del
+                  épico #60, ver PRD.md § 9). */}
+              <Route
+                path="/casa-club/calendario"
+                element={<CasaClubCalendarPage />}
               />
               <Route
                 path="/"

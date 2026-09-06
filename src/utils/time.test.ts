@@ -12,6 +12,7 @@ import {
   toDate,
   toTimeString,
   formatDateTimeShort,
+  formatMonthYear,
 } from './time'
 
 describe('addHours', () => {
@@ -50,6 +51,17 @@ describe('formatDateLong / formatDateShort', () => {
 
   it('formatDateShort usa versiones abreviadas', () => {
     expect(formatDateShort('2026-08-29')).toBe('Sáb 29 ago')
+  })
+})
+
+describe('formatMonthYear', () => {
+  it('capitaliza el nombre del mes en español', () => {
+    expect(formatMonthYear(2026, 9)).toBe('Septiembre 2026')
+  })
+
+  it('funciona para el primer y último mes del año', () => {
+    expect(formatMonthYear(2026, 1)).toBe('Enero 2026')
+    expect(formatMonthYear(2026, 12)).toBe('Diciembre 2026')
   })
 })
 

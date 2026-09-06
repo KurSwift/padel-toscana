@@ -33,8 +33,9 @@ import {
   matchesCourtType,
   isResidentInChargeNameValid,
   computePaymentDueAt,
+  isVisibleOnPublicCalendar,
 } from './reservationRules'
-import { toDate, addHours } from './time'
+import { toDate, addHours, monthDateRange } from './time'
 import { checkRateLimit, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_CALLS } from './rateLimit'
 import { isValidStreet, isAddressAvailable, normalizeAddress, isValidColonoName, isValidMxPhone } from './colonoRules'
 
@@ -518,5 +519,71 @@ export const adminSetUserRole = onCall(
     await getAuth().setCustomUserClaims(uid, { role })
 
     return { success: true }
+  },
+)
+
+// ── Calendario público de casa club (issue 8/8 del épico #60) ──────────────
+// Primera excepción deliberada al modelo "100% privado por invitación" del
+// sitio — ver PRD.md § 9 (Seguridad y privacidad). Pensada para
+// compartirse como link directo en el grupo de WhatsApp/con el guardia,
+// sin sesión iniciada.
+
+interface GetCasaClubCalendarInput {
+  year: number
+  month: number
+}
+
+function isValidCalendarInput(data: unknown): data is GetCasaClubCalendarInput {
+  if (typeof data !== 'object' || data === null) return false
+  const d = data as Record<string, unknown>
+  return (
+    typeof d.year === 'number' &&
+    Number.isInteger(d.year) &&
+    typeof d.month === 'number' &&
+    Number.isInteger(d.month) &&
+    d.month >= 1 &&
+    d.month <= 12
+  )
+}
+
+// No requiere request.auth (mismo patrón que getResidentsByAddress) — es la
+// ruta pública. NUNCA expone `firestore.rules` de `reservations` a lectura
+// pública para lograr esto: eso filtraría status de pago/depósito de
+// cualquier reservación (de cualquier recurso, no solo casa club) a quien
+// tenga el link. En vez de eso, esta función corre con Admin SDK y solo
+// regresa los tres campos que el calendario necesita mostrar.
+export const getCasaClubCalendar = onCall(
+  { region: 'us-central1', enforceAppCheck: true },
+  async (request) => {
+    if (!isValidCalendarInput(request.data)) {
+      throw new HttpsError('invalid-argument', 'invalid-argument')
+    }
+    const { year, month } = request.data
+
+    const courtsSnap = await db.collection('courts').where('type', '==', 'casa-club').limit(1).get()
+    if (courtsSnap.empty) {
+      return { reservations: [] }
+    }
+    const courtId = courtsSnap.docs[0].id
+
+    const { firstDay, lastDay } = monthDateRange(year, month)
+    const reservationsSnap = await db
+      .collection('reservations')
+      .where('courtId', '==', courtId)
+      .where('date', '>=', firstDay)
+      .where('date', '<=', lastDay)
+      .get()
+
+    const reservations = reservationsSnap.docs
+      .map((d) => ({
+        date: d.get('date') as string,
+        status: d.get('status') as string,
+        name: d.get('residentInChargeName') as string,
+        address: d.get('userAddress') as string,
+      }))
+      .filter((r) => isVisibleOnPublicCalendar(r.status))
+      .map(({ date, name, address }) => ({ date, name, address }))
+
+    return { reservations }
   },
 )
