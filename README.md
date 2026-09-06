@@ -2,22 +2,24 @@
 
 [![CI](https://github.com/KurSwift/padel-toscana/actions/workflows/ci.yml/badge.svg)](https://github.com/KurSwift/padel-toscana/actions/workflows/ci.yml)
 
-App privada de reservación de canchas de pádel para los residentes del
-fraccionamiento Toscana (calles Nogal, Olivo y Encino). Los registros
-requieren aprobación de un administrador antes de poder reservar.
+App privada de reservación de canchas de pádel y casa club para los
+residentes del fraccionamiento Toscana (calles Nogal, Olivo y Encino).
+El alta de colonos la hace un administrador — no hay auto-registro.
 
-Para el detalle del dominio (roles, flujo de registro/aprobación, modelo de
+Para el detalle del dominio (roles, flujo de alta y login, modelo de
 datos, reglas de negocio) ver [CONTEXT.md](./CONTEXT.md). Para convenciones
 de código y comandos, ver [AGENTS.md](./AGENTS.md).
 
 ## Stack
 
 React 19 · TypeScript · Vite 6 · Tailwind CSS 3 · React Router 7 · Firebase
-(Auth, Firestore, App Check).
+(Auth, Firestore, Storage, Cloud Functions v2, App Check).
 
 ## Requisitos
 
-- Node.js 20+
+- Node.js 22 (misma versión que `functions/package.json` → `engines.node`
+  y el runtime real de Cloud Functions — usa esa si vas a tocar
+  `functions/`)
 - **Java (JRE 11+)** — lo requiere el emulador de Firestore. Instálalo con
   `brew install openjdk` si no lo tienes (`java -version` para verificar).
 - Solo si vas a desarrollar contra producción en vez de emuladores: una
@@ -64,48 +66,73 @@ App Check, así que este paso solo aplica al modo producción.)
 | `npm run dev` | Servidor de desarrollo (Vite) |
 | `npm run build` | Type-check (`tsc -b`) + build de producción → `public/` |
 | `npm run preview` | Sirve el build de producción localmente |
-| `npm run emulators` | Levanta Auth + Firestore emulators (con persistencia en `.emulator-data/`) |
-| `npm run seed` | Prepobla el emulador con canchas, usuarios y una reservación de ejemplo |
+| `npm run emulators` | Levanta Auth + Firestore + Functions + Storage emulators (con persistencia en `.emulator-data/`) |
+| `npm run seed` | Prepobla el emulador con canchas, casa club, usuarios y reservaciones de ejemplo |
+| `npm run seed:casa-club` | Agrega reservaciones de ejemplo de casa club en varios estados (requiere `npm run seed` antes) |
+| `npm run clear-emulator-data` | Borra todas las colecciones del emulador |
 | `npm run push-to-prod` | Migra colecciones seleccionadas del emulador a producción (dry-run por default) |
 | `npm run migrate-users-role` | One-off: migra `isAdmin` (bool) a `role` en usuarios existentes de producción (dry-run por default) |
-| `npm run test` | Corre la suite de tests (Vitest) una vez |
+| `npm run preregister-colonos -- --file=x.json` | Alta en bloque de colonos en producción desde un JSON (dry-run por default) |
+| `npm run test` | Vitest — lógica de negocio pura del cliente, una corrida |
 | `npm run test:watch` | Vitest en modo watch |
+| `npm run test:e2e` | Playwright — flujos críticos E2E contra los emuladores (ver `e2e/`) |
+| `npm run functions:build` | Type-check de `functions/` (build separado, ver sección Firebase) |
+| `npm run test:functions` | Vitest de `functions/` |
+| `npm run functions:deploy` | Deploy solo de Cloud Functions (requiere plan Blaze) |
 
-No hay lint configurado; `npm run build` (type-check + build) y `npm run
-test` (Vitest, lógica de negocio pura) son los gates automatizados de
-calidad.
+No hay lint configurado. Los gates automatizados de calidad son
+`npm run build` + `npm run test` para `src/`, y `npm run functions:build`
++ `npm run test:functions` para `functions/` — ver AGENTS.md para el
+detalle completo de cada script (incluye los de un solo uso como
+`push-to-prod`/`migrate-users-role`/`preregister-colonos`, que escriben
+en producción real con `--confirm`).
 
 ## Firebase
 
-- Proyecto: `padel-toscana` (Firestore + Hosting + Auth con Google Sign-In),
-  enlazado vía `.firebaserc`.
+- Proyecto: `padel-toscana` (Firestore + Hosting + Auth con Google Sign-In
+  + Storage + App Check + Cloud Functions v2), enlazado vía `.firebaserc`.
+  Plan Blaze (de pago) — lo requiere `functions/`.
+- `functions/` es un proyecto TypeScript aparte (su propio
+  `package.json`/`tsconfig.json`, no forma parte de `tsc -b` de la raíz) —
+  seis Cloud Functions para las operaciones que necesitan Admin SDK
+  (crear reservaciones, alta/baja de colonos, asignar roles, lecturas
+  pre-auth). Ver AGENTS.md para el detalle de cada una.
 - Deploy de hosting + reglas de Firestore:
   ```bash
   npm run build
   firebase deploy
   ```
+  Para desplegar solo Cloud Functions: `npm run functions:deploy`.
 - Las reglas de seguridad (`firestore.rules`) duplican intencionalmente
   varias validaciones que también existen en `src/services/*` — ver
   AGENTS.md antes de cambiar reglas de negocio en cualquiera de los dos
   lados.
 - **Nunca ejecutes `npm run push-to-prod --confirm` sin revisar antes el
   dry-run** (el comando sin `--confirm`) — escribe directo en producción y
-  sobreescribe documentos existentes con el mismo id.
+  sobreescribe documentos existentes con el mismo id. Lo mismo aplica a
+  `migrate-users-role`/`preregister-colonos` con `--confirm`.
 
 ## Estructura
 
 ```
 src/
-  firebase.ts        # init de Firebase (auth, db, app check, conexión a emuladores)
-  App.tsx            # rutas
-  context/           # AuthContext (usuario + perfil)
+  firebase.ts        # init de Firebase (auth, db, functions, app check, conexión a emuladores)
+  App.tsx            # rutas (incluye /casa-club/calendario, la única pública sin login)
+  context/           # AuthContext (usuario + perfil), ThemeContext, SiteSettingsContext
   components/        # UI reutilizable
-  pages/             # LoginPage, RegisterPage, HomePage, AdminPage, TesoreroPage, HelpPage
-  services/          # única capa que habla con Firestore/Auth
+  pages/             # LoginPage, RegisterPage, HomePage, AdminPage, TesoreroPage, HelpPage,
+                      # CasaClubCalendarPage (pública)
+  services/          # única capa que habla con Firestore/Auth/Storage/Functions
   hooks/             # useCourtData
   types/             # tipos de los documentos de Firestore
   utils/             # helpers de fecha/hora
 scripts/
-  seed.mjs           # prepobla el emulador con datos de ejemplo
-  push-to-prod.mjs   # migra colecciones seleccionadas del emulador a producción
+  seed.mjs                  # prepobla el emulador con datos de ejemplo (canchas, casa club, usuarios)
+  seed-casa-club.mjs        # agrega reservaciones de ejemplo de casa club (requiere seed.mjs antes)
+  clear-emulator-data.mjs   # borra todas las colecciones del emulador
+  push-to-prod.mjs          # migra colecciones seleccionadas del emulador a producción
+  migrate-users-role.mjs    # one-off, ver tabla de Scripts
+  preregister-colonos.mjs   # alta en bloque de colonos en producción desde un JSON
+functions/           # Cloud Functions v2 + TypeScript — build/deploy propios, ver sección Firebase
+e2e/                 # Playwright — flujos críticos contra los emuladores, ver AGENTS.md
 ```
