@@ -157,10 +157,11 @@ Reglas transversales:
 - **Soporte multi-fraccionamiento.** El sistema está construido para
   esta comunidad específica, no como producto genérico para múltiples
   HOAs/fraccionamientos con configuración por cliente.
-- **Múltiples deportes o instalaciones (por ahora).** Solo canchas de
-  padel hoy. La reservación de la casa club ya está planeada — Epic
+- **Múltiples deportes o instalaciones más allá de canchas y casa
+  club.** La reservación de la casa club (Epic
   [#60](https://github.com/KurSwift/padel-toscana/issues/60) en
-  GitHub — pero no implementada todavía (ver sección 14).
+  GitHub) ya está implementada — ver sección 14. Cualquier tercer tipo
+  de recurso seguiría sin planearse.
 - **App nativa (iOS/Android).** Solo web responsive; no hay planes de
   apps nativas.
 - **Soporte offline.** La app requiere conexión a internet — no hay
@@ -226,6 +227,17 @@ Reglas transversales:
   visible **antes** de autenticarse (para el saludo de bienvenida en
   login) — expone menos que el resto del perfil, y solo a quien ya
   conoce una dirección real dentro de la comunidad.
+- Segunda excepción deliberada (issue
+  [#68](https://github.com/KurSwift/padel-toscana/issues/68), Epic
+  #60): el calendario de disponibilidad de la casa club
+  (`/casa-club/calendario`) es una ruta **pública, sin autenticación**,
+  pensada para compartirse como link directo en el grupo de WhatsApp o
+  con el guardia. Expone únicamente fecha + nombre del residente a
+  cargo + domicilio por reservación — nunca status de pago/depósito —
+  vía una Cloud Function de solo lectura con Admin SDK
+  (`getCasaClubCalendar`); `firestore.rules` de `reservations` sigue
+  cerrado a lectura pública. Marcada `noindex` — pública no implica
+  indexable por buscadores.
 
 ## 10. Analítica
 
@@ -253,8 +265,11 @@ pueden medir manual.
 ## 11. Arquitectura de navegación
 
 Todo el mundo entra por login (domicilio → saludo por nombre → OTP por
-teléfono) — no hay ninguna otra puerta de entrada activa. De ahí, el
-recorrido depende del rol:
+teléfono) — única puerta de entrada a las secciones privadas del sitio.
+La excepción es `/casa-club/calendario` (issue #68 del Epic #60):
+pública, sin login, pensada para compartirse como link directo — ver
+sección 9. De ahí, el recorrido dentro de las secciones privadas
+depende del rol:
 
 - **Colono:** aterriza en Home — reservar en la grilla de horarios, ver
   "Mis reservaciones", y acceso a Ayuda. Nada más le aparece en la
@@ -334,20 +349,16 @@ _(Entidades conceptuales — el schema exacto de campos/tipos vive en
 
 ## 14. Preguntas abiertas
 
-- ~~**Reservación de la casa club.**~~ — **resuelta** (2026-08-31): ya
-  no es una pregunta abierta, quedó planeada como Epic
-  [#60](https://github.com/KurSwift/padel-toscana/issues/60) en
-  GitHub, desglosada en 8 issues en orden de dependencia (#61-#68).
-  Mismo proyecto, no uno aparte — reutiliza Auth/Firestore/Storage/App
-  Check ya provisionados. Reglas de negocio reales quedaron definidas
-  (reservación por día completo, depósito de $3,000 con $2,000
-  reembolsables, cancelación con 48h de anticipación, tope de 2 al mes
-  por usuario, aforo de 30) — ver el Epic para el detalle completo. La
-  sección 7 (Fuera de alcance) y la 9 (Seguridad y privacidad) de este
-  documento seguirán describiendo el estado *actual* hasta que la
-  épica se implemente — en particular, el calendario público (issue
-  #68) va a ser la primera excepción deliberada al modelo "100%
-  privado por invitación".
+- ~~**Reservación de la casa club.**~~ — **implementada** (2026-09-05):
+  Epic [#60](https://github.com/KurSwift/padel-toscana/issues/60) en
+  GitHub, 8 issues (#61-#68), todos mergeados. Mismo proyecto, no uno
+  aparte — reutiliza Auth/Firestore/Storage/App Check ya provisionados.
+  Reglas de negocio: reservación por día completo, depósito de $3,000
+  con $2,000 reembolsables, cancelación con 48h de anticipación, tope
+  de 2 al mes por usuario, aforo de 30. El calendario público (issue
+  #68) es la primera excepción deliberada al modelo "100% privado por
+  invitación" — ver sección 9. Las secciones 7, 9 y 11 ya reflejan el
+  estado implementado.
 - El Compromiso SLC de arriba ("sin excepciones documentadas") está en
   tensión directa con trabajo ya desplegado: las features de
   nombre-del-sitio/logo/color-de-acento (extensiones del Epic #43)
