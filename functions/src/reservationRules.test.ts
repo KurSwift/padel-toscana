@@ -15,6 +15,7 @@ import {
   isResidentInChargeNameValid,
   isWithinMonthlyLimit,
   isCancellationAllowed,
+  isVisibleOnPublicCalendar,
 } from './reservationRules'
 
 describe('hasOverlap', () => {
@@ -289,4 +290,17 @@ describe('isResidentInChargeNameValid', () => {
   it('rechaza una cadena de solo espacios', () => {
     expect(isResidentInChargeNameValid('   ')).toBe(false)
   })
+})
+
+describe('isVisibleOnPublicCalendar', () => {
+  it('excluye cancelada', () => {
+    expect(isVisibleOnPublicCalendar('cancelada')).toBe(false)
+  })
+
+  it.each(['solicitada', 'pagada', 'finalizada', 'deposito-devuelto', 'deposito-retenido'])(
+    'incluye %s',
+    (status) => {
+      expect(isVisibleOnPublicCalendar(status)).toBe(true)
+    },
+  )
 })

@@ -128,3 +128,16 @@ export function isCancellationAllowed(
 export function isResidentInChargeNameValid(name: string): boolean {
   return name.trim().length > 0
 }
+
+// ¿Esta reservación debe aparecer en el calendario público de casa club
+// (issue 8/8 del épico #60, getCasaClubCalendar en ./index.ts)? Solo
+// excluye 'cancelada' — a diferencia de OCCUPYING_STATUSES (que solo cuenta
+// 'solicitada'/'pagada' para traslapes/topes), el calendario también debe
+// mostrar días ya 'finalizada'/'deposito-devuelto'/'deposito-retenido': el
+// evento sí ocupó/va a ocupar la fecha, solo que ya se resolvió. Exclusivo
+// de esta función — no forma parte del set de 3 archivos a sincronizar que
+// describe el comentario de arriba del archivo (no es una regla de
+// validación de creación/transición, solo de qué mostrar públicamente).
+export function isVisibleOnPublicCalendar(status: string): boolean {
+  return status !== 'cancelada'
+}
