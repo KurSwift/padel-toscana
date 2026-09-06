@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-// Prepobla el emulador con una cancha de casa club + reservaciones de
-// ejemplo en distintos estados — no hay UI todavía para crear
-// reservaciones de casa club (issue 6/8 del épico #60), así que este
-// script es la única forma de probar el resto de la épica (issues 3/8,
-// 4/8, 5/8, 7/8, 8/8) contra los emuladores sin escribir los documentos a
-// mano en la Emulator UI cada vez.
+// Prepobla el emulador con reservaciones de casa club de ejemplo en
+// distintos estados y meses — reservar una por una a mano desde la UI para
+// tener suficientes datos con los que ver el calendario público (issue
+// 8/8 del épico #60) o "Depósitos por resolver" en TesoreroPage es lento;
+// este script las escribe directo.
 //
 // Requiere haber corrido `npm run seed` antes (reutiliza sus usuarios de
-// prueba por uid fijo — Ana Activa, Beto Activo, Tere Tesorera). No toca
-// producción — apunta explícitamente a los puertos del emulador.
+// prueba por uid fijo — Ana Activa, Beto Activo, Tere Tesorera — y el
+// recurso `casa-club-1` que ya siembra). No toca producción — apunta
+// explícitamente a los puertos del emulador.
 //
 //   npm run emulators        (terminal 1)
 //   npm run seed             (terminal 2 — usuarios/canchas/reservaciones base)
@@ -20,7 +20,11 @@ import { initializeApp } from 'firebase-admin/app'
 import { getFirestore, Timestamp } from 'firebase-admin/firestore'
 
 const PROJECT_ID = 'padel-toscana'
-const COURT_ID = 'court-casa-club-1'
+// Debe ser el mismo id que crea `scripts/seed.mjs` para el recurso
+// casa-club — de lo contrario este script crea un SEGUNDO recurso de tipo
+// casa-club, y `useCourtData` (que asume uno solo por tipo) toma el primero
+// que encuentra, dejando el otro huérfano.
+const COURT_ID = 'casa-club-1'
 
 const db = getFirestore(initializeApp({ projectId: PROJECT_ID }))
 
