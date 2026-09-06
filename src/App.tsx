@@ -11,7 +11,7 @@ import HomePage from '@/pages/HomePage'
 import AdminPage from '@/pages/AdminPage'
 import TesoreroPage from '@/pages/TesoreroPage'
 import HelpPage from '@/pages/HelpPage'
-import CasaClubCalendarPage from '@/pages/CasaClubCalendarPage'
+import PublicCalendarPage from '@/pages/PublicCalendarPage'
 
 export default function App() {
   return (
@@ -35,10 +35,11 @@ export default function App() {
               />
               {/* Pública, sin sesión — primera excepción deliberada al
                   modelo "100% privado por invitación" (issue 8/8 del
-                  épico #60, ver PRD.md § 9). */}
+                  épico #60, generalizada a cancha después — ver
+                  PRD.md § 9). */}
               <Route
-                path="/casa-club/calendario"
-                element={<CasaClubCalendarPage />}
+                path="/calendario"
+                element={<PublicCalendarPage />}
               />
               <Route
                 path="/"
