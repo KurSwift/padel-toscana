@@ -311,3 +311,22 @@ export function subscribeToPendingDepositDecisions(
       ),
   )
 }
+
+export interface CasaClubCalendarEntry {
+  date: string
+  name: string
+  address: string
+}
+
+// Calendario público de casa club (issue 8/8 del épico #60,
+// CasaClubCalendarPage.tsx) — sin sesión iniciada, protegido solo por App
+// Check (mismo patrón que getResidentsByAddress). `month` es 1-12.
+const getCasaClubCalendarCallable = httpsCallable(functions, 'getCasaClubCalendar')
+
+export async function getCasaClubCalendar(
+  year: number,
+  month: number,
+): Promise<CasaClubCalendarEntry[]> {
+  const result = await getCasaClubCalendarCallable({ year, month })
+  return (result.data as { reservations: CasaClubCalendarEntry[] }).reservations
+}
