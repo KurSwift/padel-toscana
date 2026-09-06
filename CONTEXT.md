@@ -6,17 +6,19 @@ app, para que cualquier persona (o agente) que llegue al repo entienda el
 
 ## Qué es esto
 
-Padel Toscana es una **app privada de reservación de canchas de pádel** para
-los residentes de un fraccionamiento llamado "Toscana", compuesto por
-exactamente tres calles:
+Padel Toscana es una **app privada de reservación de canchas de pádel y
+casa club** para los residentes de un fraccionamiento llamado "Toscana",
+compuesto por exactamente tres calles:
 
 ```
 Nogal · Olivo · Encino
 ```
 
-(ver `VALID_STREETS` en `src/types/index.ts`). No es una app pública — solo
-personas que viven en una de esas calles pueden solicitar acceso, y cada
-solicitud debe ser aprobada manualmente por un administrador.
+(ver `VALID_STREETS` en `src/types/index.ts`). No es una app pública — un
+administrador da de alta a cada colono directamente (ver "Flujo de alta y
+login" abajo; no hay auto-registro). La única excepción es
+`/casa-club/calendario`, pública y sin login — ver sección dedicada más
+abajo.
 
 ## Roles
 
@@ -198,15 +200,25 @@ las notificaciones, ese es el primer lugar a revisar.
 Cuatro pestañas — la cuarta solo la ve `super-admin` (`AdminPage.tsx`,
 `isSuperAdmin`/`tabs`; ver "Roles" arriba y Epic #43):
 - **Reservaciones**: navega por fecha, ve **todas** las reservaciones del
-  día (los 4 estados, con `StatusBadge` — a diferencia de las vistas de
-  colono, aquí no se filtra por status, ver
-  `subscribeToAllReservationsByDate` en `src/services/reservations.ts`),
-  puede cambiar el status de cualquiera a cualquier estado con un `<select>`
-  (`setReservationStatus`, sin pasar por la matriz de transición normal —
-  reforzado en rules: solo admin/super-admin).
-- **Canchas**: activar/desactivar canchas, editar `CourtSettings` (horario,
-  duración mín/máx, reservaciones máximas por usuario, días de anticipación,
-  anticipación mínima, plazo de pago, monto a pagar), crear canchas nuevas.
+  día de cualquier recurso (los 6 estados, con `StatusBadge` — incluye
+  `deposito-devuelto`/`deposito-retenido`, exclusivos de casa club, ver
+  Epic #60 — a diferencia de las vistas de colono, aquí no se filtra por
+  status, ver `subscribeToAllReservationsByDate` en
+  `src/services/reservations.ts`), puede cambiar el status de cualquiera a
+  cualquier estado con un `<select>` (`setReservationStatus`, sin pasar
+  por la matriz de transición normal — reforzado en rules: solo
+  admin/super-admin).
+- **Canchas** (issue 7/8 del Epic #60 generalizó esta pestaña, antes solo
+  manejaba canchas de padel): activar/desactivar recursos, crear uno
+  nuevo eligiendo tipo (Cancha/Casa Club — `createCourt(name, type)` en
+  `src/services/courts.ts`), editar `CourtSettings` de cada uno. Los
+  campos editables dependen del tipo (`AdminPage.tsx`, `CourtCard`):
+  cancha muestra Horario y Duración permitida; casa club los oculta (es
+  siempre día completo) y en su lugar muestra Depósito/Reembolsable,
+  Plazo de cancelación y Aforo. Ambos tipos comparten la sección Reglas
+  (reservaciones máximas por usuario, días de anticipación, anticipación
+  mínima, plazo de pago, monto a pagar) — casa club agrega ahí Tope
+  mensual por usuario.
 - **Usuarios**: aprobar/rechazar pendientes, agregar colonos nuevos
   directamente (`adminCreateColono`). El rol de cada usuario se muestra
   aquí de **solo lectura** — asignarlo se movió a Avanzado (#38/#39).
@@ -300,10 +312,10 @@ cualquier reservación a quien tenga el link.
 | `addresses/{addressKey}` | `{ uids: string[] }` | Máximo 2 `uids`. Lectura pública (se usa antes de autenticar, para validar disponibilidad de domicilio en el registro). |
 | `mail/{autoId}` | `{ to, message: { subject, html } }` | Solo creación por la app; lectura/actualización/borrado bloqueados — los procesa la extensión de correo. |
 | `rateLimits/{uid}` | `{ windowStart: Timestamp, count: number }` | Rate limiting de `createReservation` (ventana fija, ver `functions/src/rateLimit.ts`). Solo la Cloud Function (Admin SDK) la toca — bloqueada por completo para el cliente en `firestore.rules`. |
-| `courts/{courtId}` | `Court` (incluye `CourtSettings`) | Lectura para cualquier usuario autenticado, escritura solo admin. |
+| `courts/{courtId}` | `Court` (incluye `CourtSettings`) | Lectura para cualquier usuario autenticado, escritura solo admin. `type?: 'cancha' \| 'casa-club'` (Epic #60, issue 1/8) discrimina el recurso — opcional para no requerir migración, `?? 'cancha'` como fallback en quien lo lea. `CourtSettings` tiene campos exclusivos de casa club (`depositAmount`, `depositRefundableAmount`, `cancellationDeadlineHours`, `maxReservationsPerUserPerMonth`) que quedan `undefined`/sin usar en cancha. |
 | `settings/theme` | `{ paletteId: string }` | Paleta de acento activa (Epic #43, issue 5/5 — ver `src/theme/palettes.ts`). Lectura pública (se necesita antes de autenticar, en `/login`), escritura solo super-admin. Si no existe, se asume la paleta default (`'green'`). |
 | `settings/general` | `{ siteName: string, whatsappUrl?: string }` | Nombre del sitio (Home/Login/RegisterPage y `document.title`) y link de contacto de WhatsApp (tarjeta al final de `HelpPage`). Mismas reglas que `settings/theme`: lectura pública, escritura solo super-admin. Si no existe o `whatsappUrl` está vacío, cae a los defaults/texto plano de siempre — ver `src/context/SiteSettingsContext.tsx`. |
-| `reservations/{id}` | `Reservation` | Ver reglas de creación/actualización arriba. `startAt`/`endAt`/`paymentDueAt` son `Timestamp`; el resto de fecha/hora sigue siendo strings (`date`, `startTime`, `endTime`). El campo `status` puede estar desactualizado — ver "Expiración lazy" arriba. `playerCount`/`residentInChargeName` capturados en `BookingSheet`. Índices compuestos en `firestore.indexes.json` para `courtId+date+status` y `userId+status+date` — siguen sirviendo con `where('status','in',[...])` porque Firestore indexa `in` igual que una igualdad. El índice `date+status` que existía se quitó (issue 6/7): la única query que lo usaba (panel admin) ya no filtra por status. |
+| `reservations/{id}` | `Reservation` | Ver reglas de creación/actualización arriba. `startAt`/`endAt`/`paymentDueAt` son `Timestamp`; el resto de fecha/hora sigue siendo strings (`date`, `startTime`, `endTime`). `status` tiene 6 valores — además de los 4 originales, `deposito-devuelto`/`deposito-retenido` (exclusivos de casa club, issue 4/8) — y puede estar desactualizado, ver "Expiración lazy" arriba. `courtType?: CourtType` (issue 3/8) denormaliza el tipo de recurso al crear, mismo patrón/fallback que `Court.type`. `playerCount`/`residentInChargeName` capturados en `BookingSheet`. Índices compuestos en `firestore.indexes.json` para `courtId+date+status` y `userId+status+date` — siguen sirviendo con `where('status','in',[...])` porque Firestore indexa `in` igual que una igualdad; el prefijo `courtId+date` también sirve la query por rango de fechas de `getCasaClubCalendar` (issue 8/8) sin índice aparte. El índice `date+status` que existía se quitó (issue 6/7): la única query que lo usaba (panel admin) ya no filtra por status. |
 
 Los tipos TypeScript en `src/types/index.ts` son la fuente de verdad del
 shape de estos documentos en el cliente.
