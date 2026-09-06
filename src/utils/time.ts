@@ -37,8 +37,9 @@ export function formatDateShort(dateStr: string): string {
   return `${DAYS[d.getDay()].slice(0, 3)} ${day} ${MONTHS[month - 1].slice(0, 3)}`
 }
 
-// Encabezado del calendario público de casa club (CasaClubCalendarPage,
-// issue 8/8 del épico #60), p. ej. "Septiembre 2026". `month` es 1-12.
+// Encabezado del calendario público de cancha/casa club
+// (PublicCalendarPage, issue 8/8 del épico #60), p. ej. "Septiembre
+// 2026". `month` es 1-12.
 export function formatMonthYear(year: number, month: number): string {
   const name = MONTHS[month - 1]
   return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${year}`
