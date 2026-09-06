@@ -307,17 +307,18 @@ npm run dev                        # terminal 2
   borrar a mano desde la Emulator UI.
   Si cambias `DEFAULT_COURT_SETTINGS` en `src/services/courts.ts`, actualiza
   también la copia duplicada en este script (comentario lo señala).
-- **`npm run seed:casa-club`** (`scripts/seed-casa-club.mjs`) prepobla una
-  cancha de casa club + 4 reservaciones de ejemplo (pendiente de pago,
-  activa a futuro, y dos ya `finalizada` con endAt en el pasado) —
-  necesario porque no hay UI todavía para crear reservaciones de casa club
-  (issue 6/8 del épico #60), así que es la única forma de probar el resto
-  de la épica (issues 3/8 en adelante) contra los emuladores. Requiere
-  haber corrido `npm run seed` antes (reutiliza sus usuarios de prueba por
-  uid fijo). Usa `.set()` con id fijo — idempotente, igual que
-  usuarios/canchas de `seed.mjs`. Si cambias
-  `DEFAULT_COURT_SETTINGS_BY_TYPE['casa-club']` en `src/services/courts.ts`,
-  actualiza también la copia duplicada en este script.
+- **`npm run seed:casa-club`** (`scripts/seed-casa-club.mjs`) agrega 4
+  reservaciones de ejemplo de casa club (pendiente de pago, activa a
+  futuro, y dos ya `finalizada` con endAt en el pasado) sobre el recurso
+  `casa-club-1` que ya crea `seed.mjs` — atajo para no tener que reservar
+  varias veces a mano desde la UI cuando hace falta ver el calendario
+  público (issue 8/8) o "Depósitos por resolver" en TesoreroPage con datos.
+  Requiere haber corrido `npm run seed` antes (reutiliza sus usuarios de
+  prueba por uid fijo, y el propio recurso `casa-club-1`). Usa `.set()` con
+  id fijo — idempotente, igual que usuarios/canchas de `seed.mjs`. Si
+  cambias `DEFAULT_COURT_SETTINGS_BY_TYPE['casa-club']` en
+  `src/services/courts.ts`, actualiza también la copia duplicada en este
+  script.
 - **`npm run clear-emulator-data`** (`scripts/clear-emulator-data.mjs`)
   borra todas las colecciones de la app en el emulador de Firestore —
   útil para arrancar de cero antes de sembrar, o para limpiar datos de
