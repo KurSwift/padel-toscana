@@ -42,6 +42,14 @@ tocar código:
   registrar un debug token en Firebase Console. Espera un `403` en
   Auth/Firestore a menos que ese token ya esté registrado — no es una
   regresión tuya.
+- **Despliegue completo a producción:** solo cuando el usuario lo pida de
+  forma explícita, ejecuta `npm run build` desde `main` actualizado y después
+  `npx firebase deploy`. Esto publica los dos sitios de Hosting, Functions,
+  reglas/índices de Firestore, reglas de Storage y la configuración de Auth
+  declarados en `firebase.json`. El build modifica archivos versionados en
+  `public/`; después de desplegar, restaura únicamente esos artefactos para
+  dejar el árbol limpio (`git restore public` y elimina solo los hashes nuevos
+  generados por ese build, tras confirmar sus nombres con `git status`).
 - **Cualquier script en `scripts/` que acepte `--confirm` escribe en
   producción real** (`push-to-prod.mjs`, `migrate-users-role.mjs`,
   `preregister-colonos.mjs`, y cualquiera que se agregue después con ese
