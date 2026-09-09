@@ -180,9 +180,11 @@ function ReservationsTab() {
   return (
     <div className="space-y-4">
       {/* Date nav */}
-      <div className="flex items-center justify-between bg-white rounded-2xl px-4 py-3 shadow-sm">
+      <div role="group" aria-label={`Fecha seleccionada: ${formatDateLong(date)}`} className="flex items-center justify-between bg-white rounded-2xl px-4 py-3 shadow-sm">
         <button
+          type="button"
           onClick={() => setDate(addDays(date, -1))}
+          aria-label="Ver día anterior"
           className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 transition"
         >
           ‹
@@ -191,7 +193,9 @@ function ReservationsTab() {
           {date === today ? 'Hoy' : formatDateLong(date)}
         </span>
         <button
+          type="button"
           onClick={() => setDate(addDays(date, 1))}
+          aria-label="Ver día siguiente"
           className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 transition"
         >
           ›

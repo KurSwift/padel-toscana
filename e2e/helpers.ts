@@ -61,24 +61,12 @@ export async function loginWithPhone(
 // pena mantenerla cubierta por e2e por ahora. Si se reactiva el
 // auto-registro como entrada real, vale la pena reconstruir este helper.
 
-// Cierra sesión desde cualquier página protegida (home, admin, tesorero,
-// pantalla de "solicitud en revisión") para dejar el navegador listo para
-// loguear a otro usuario de seed dentro del mismo test. Espera a llegar a
-// /login antes de devolver el control — signOut() es async y un
-// page.goto('/login') inmediato después de clickear "Salir" puede abortar
-// esa llamada a medio camino (la sesión de Firebase Auth persistida en
-// IndexedDB no llega a limpiarse, y el siguiente loginWithPhone() se
-// encuentra con la sesión anterior todavía activa).
+// Cierra sesión desde cualquier pantalla autenticada usando el menú de
+// cuenta del AppShell. Espera a llegar a /login antes de devolver el
+// control — signOut() es async y un page.goto('/login') inmediato puede
+// abortar la llamada a medio camino y dejar la sesión en IndexedDB.
 export async function logout(page: Page) {
-  const homeSignOut = page.getByRole('button', { name: 'Salir' })
-  if (await homeSignOut.isVisible().catch(() => false)) {
-    await homeSignOut.click()
-  } else if (await page.getByRole('button', { name: 'Cerrar sesión' }).isVisible().catch(() => false)) {
-    await page.getByRole('button', { name: 'Cerrar sesión' }).click()
-  } else {
-    // Admin/Tesorero no tienen botón de "Salir" propio — hay que volver a home primero.
-    await page.getByRole('button', { name: '← Volver' }).click()
-    await page.getByRole('button', { name: 'Salir' }).click()
-  }
+  await page.getByRole('button', { name: 'Abrir opciones de cuenta' }).click()
+  await page.getByRole('button', { name: 'Cerrar sesión' }).click()
   await page.waitForURL(/\/login/)
 }

@@ -27,7 +27,7 @@ export default function HomePage() {
   const [selectedDate, setSelectedDate] = useState(todayString())
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null)
 
-  const { court, reservations, loading } = useCourtData(
+  const { court, reservations, loading, reservationsLoading } = useCourtData(
     user?.uid ?? '',
     resourceType,
     selectedDate,
@@ -125,7 +125,11 @@ export default function HomePage() {
 
               {/* Disponibilidad: grilla de horarios (cancha) o bloque de
                   día completo (casa club, issue 2/8 del épico #60) */}
-              {isCasaClub ? (
+              {reservationsLoading ? (
+                <div className="flex min-h-[88px] items-center justify-center rounded-2xl bg-gray-50 text-sm text-gray-500" role="status">
+                  Cargando disponibilidad…
+                </div>
+              ) : isCasaClub ? (
                 <CasaClubAvailability
                   reservations={reservations}
                   userId={user?.uid ?? ''}
