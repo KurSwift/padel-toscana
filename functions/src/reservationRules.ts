@@ -130,7 +130,7 @@ export function isResidentInChargeNameValid(name: string): boolean {
 }
 
 // ¿Esta reservación debe aparecer en el calendario público de casa club
-// (issue 8/8 del épico #60, getCasaClubCalendar en ./index.ts)? Solo
+// (issue 8/8 del épico #60, getPublicCalendar en ./index.ts)? Solo
 // excluye 'cancelada' — a diferencia de OCCUPYING_STATUSES (que solo cuenta
 // 'solicitada'/'pagada' para traslapes/topes), el calendario también debe
 // mostrar días ya 'finalizada'/'deposito-devuelto'/'deposito-retenido': el

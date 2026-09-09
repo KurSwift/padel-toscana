@@ -228,14 +228,15 @@ Reglas transversales:
   login) — expone menos que el resto del perfil, y solo a quien ya
   conoce una dirección real dentro de la comunidad.
 - Segunda excepción deliberada (issue
-  [#68](https://github.com/KurSwift/padel-toscana/issues/68), Epic
-  #60): el calendario de disponibilidad de la casa club
-  (`/casa-club/calendario`) es una ruta **pública, sin autenticación**,
-  pensada para compartirse como link directo en el grupo de WhatsApp o
-  con el guardia. Expone únicamente fecha + nombre del residente a
-  cargo + domicilio por reservación — nunca status de pago/depósito —
-  vía una Cloud Function de solo lectura con Admin SDK
-  (`getCasaClubCalendar`); `firestore.rules` de `reservations` sigue
+  [#68](https://github.com/KurSwift/padel-toscana/issues/68), Epic #60
+  — nació exclusiva de casa club, generalizada a cancha después):
+  el calendario de disponibilidad (`/calendario`, selector Cancha/Casa
+  Club) es una ruta **pública, sin autenticación**, pensada para
+  compartirse como link directo en el grupo de WhatsApp o con el
+  guardia. Expone únicamente fecha + horario (cancha) + nombre del
+  residente a cargo + domicilio por reservación — nunca status de
+  pago/depósito — vía una Cloud Function de solo lectura con Admin SDK
+  (`getPublicCalendar`); `firestore.rules` de `reservations` sigue
   cerrado a lectura pública. Marcada `noindex` — pública no implica
   indexable por buscadores.
 
@@ -266,9 +267,9 @@ pueden medir manual.
 
 Todo el mundo entra por login (domicilio → saludo por nombre → OTP por
 teléfono) — única puerta de entrada a las secciones privadas del sitio.
-La excepción es `/casa-club/calendario` (issue #68 del Epic #60):
-pública, sin login, pensada para compartirse como link directo — ver
-sección 9. De ahí, el recorrido dentro de las secciones privadas
+La excepción es `/calendario` (issue #68 del Epic #60, cancha y casa
+club): pública, sin login, pensada para compartirse como link directo —
+ver sección 9. De ahí, el recorrido dentro de las secciones privadas
 depende del rol:
 
 - **Colono:** aterriza en Home — reservar en la grilla de horarios, ver

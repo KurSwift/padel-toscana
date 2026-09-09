@@ -15,8 +15,8 @@ hacer — ver "La regla más importante del repo" más abajo),
 `adminCreateColono`/`adminDeleteColono`/`adminSetUserRole` (alta/baja de
 colonos y asignación de roles por admin — crean/eliminan cuentas de Auth
 ajenas y setean custom claims, Admin SDK), y
-`getResidentsByAddress`/`getCasaClubCalendar` (lecturas pre-auth con
-Admin SDK — saludo de login y calendario público de casa club,
+`getResidentsByAddress`/`getPublicCalendar` (lecturas pre-auth con
+Admin SDK — saludo de login y calendario público de cancha/casa club,
 respectivamente). El proyecto está en plan Blaze (de pago) por esto.
 
 ## Comandos
@@ -121,7 +121,7 @@ src/
   context/ThemeContext   # paletteId activo (settings/theme en Firestore), vía onSnapshot — mismo molde que AuthContext
   context/SiteSettingsContext  # siteName/whatsappUrl (settings/general), mismo molde — también fija document.title
   components/           # UI reutilizable (Header, Logo, BookingSheet, SlotsGrid, DateSelector, StatusBadge, ProtectedRoute...)
-  pages/                 # HomePage, AdminPage, TesoreroPage, HelpPage, LoginPage, RegisterPage, CasaClubCalendarPage (única pública, sin auth)
+  pages/                 # HomePage, AdminPage, TesoreroPage, HelpPage, LoginPage, RegisterPage, PublicCalendarPage (única pública, sin auth)
   services/              # única capa que toca Firestore/Auth/Storage directamente (auth, courts, reservations, users, branding, theme, siteSettings)
   theme/palettes.ts      # paletas de acento predefinidas (id, name, tones 50–900) — Epic #43, issue 5/5
   hooks/useCourtData     # combina cancha activa + reservaciones del día + reservaciones del usuario
@@ -144,7 +144,7 @@ e2e/                      # Playwright — npm run test:e2e, ver más abajo
   casa-club-flow.spec.ts  # reserva de casa club con depósito → pago → devolución de depósito → cancelación
 functions/                # Cloud Functions v2 + TypeScript — build/deploy propios, ver "Comandos"
   src/index.ts             # createReservation, adminCreateColono/adminDeleteColono/adminSetUserRole,
-                            # getResidentsByAddress, getCasaClubCalendar (todas onCall)
+                            # getResidentsByAddress, getPublicCalendar (todas onCall)
   src/reservationRules.ts  # copia de la lógica pura que necesita (ver comentario de cabecera)
   src/colonoRules.ts        # lógica pura de alta de colonos (calle válida, cupo, teléfono) — sin mirror en src/
   src/rateLimit.ts           # rate limiting genérico (ventana fija), usado por createReservation

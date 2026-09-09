@@ -117,11 +117,11 @@ en producción real con `--confirm`).
 ```
 src/
   firebase.ts        # init de Firebase (auth, db, functions, app check, conexión a emuladores)
-  App.tsx            # rutas (incluye /casa-club/calendario, la única pública sin login)
+  App.tsx            # rutas (incluye /calendario, la única pública sin login)
   context/           # AuthContext (usuario + perfil), ThemeContext, SiteSettingsContext
   components/        # UI reutilizable
   pages/             # LoginPage, RegisterPage, HomePage, AdminPage, TesoreroPage, HelpPage,
-                      # CasaClubCalendarPage (pública)
+                      # PublicCalendarPage (pública)
   services/          # única capa que habla con Firestore/Auth/Storage/Functions
   hooks/             # useCourtData
   types/             # tipos de los documentos de Firestore

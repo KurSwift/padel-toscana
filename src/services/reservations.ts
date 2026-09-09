@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/firebase'
-import { Court, Reservation, ReservationStatus } from '@/types'
+import { Court, CourtType, Reservation, ReservationStatus } from '@/types'
 import { addHours, toDate } from '@/utils/time'
 import {
   isDurationWithinHardCap,
@@ -312,21 +312,27 @@ export function subscribeToPendingDepositDecisions(
   )
 }
 
-export interface CasaClubCalendarEntry {
+export interface PublicCalendarEntry {
   date: string
+  startTime: string
+  endTime: string
   name: string
   address: string
 }
 
-// Calendario público de casa club (issue 8/8 del épico #60,
-// CasaClubCalendarPage.tsx) — sin sesión iniciada, protegido solo por App
-// Check (mismo patrón que getResidentsByAddress). `month` es 1-12.
-const getCasaClubCalendarCallable = httpsCallable(functions, 'getCasaClubCalendar')
+// Calendario público (issue 8/8 del épico #60, PublicCalendarPage.tsx) —
+// sin sesión iniciada, protegido solo por App Check (mismo patrón que
+// getResidentsByAddress). `month` es 1-12. Nació exclusivo de casa club,
+// se generalizó a cancha después — `courtType` decide cuál recurso
+// consultar. Siempre trae startTime/endTime aunque casa club no los use
+// para mostrar horario (siempre día completo) — el caller decide.
+const getPublicCalendarCallable = httpsCallable(functions, 'getPublicCalendar')
 
-export async function getCasaClubCalendar(
+export async function getPublicCalendar(
   year: number,
   month: number,
-): Promise<CasaClubCalendarEntry[]> {
-  const result = await getCasaClubCalendarCallable({ year, month })
-  return (result.data as { reservations: CasaClubCalendarEntry[] }).reservations
+  courtType: CourtType,
+): Promise<PublicCalendarEntry[]> {
+  const result = await getPublicCalendarCallable({ year, month, courtType })
+  return (result.data as { reservations: PublicCalendarEntry[] }).reservations
 }

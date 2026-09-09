@@ -17,7 +17,7 @@ Nogal · Olivo · Encino
 (ver `VALID_STREETS` en `src/types/index.ts`). No es una app pública — un
 administrador da de alta a cada colono directamente (ver "Flujo de alta y
 login" abajo; no hay auto-registro). La única excepción es
-`/casa-club/calendario`, pública y sin login — ver sección dedicada más
+`/calendario`, pública y sin login — ver sección dedicada más
 abajo.
 
 ## Roles
@@ -280,28 +280,38 @@ CMS ni colección de Firestore para esto. Termina con un bloque fijo
 apuntando al grupo de WhatsApp "Reservaciones - La Toscana" para dudas o
 problemas que la ayuda no cubra.
 
-## Calendario público de casa club (`/casa-club/calendario`)
+## Calendario público (`/calendario`)
 
 Única ruta pública del sitio — sin `ProtectedRoute`, sin sesión iniciada
-(issue 8/8 del épico #60, ver PRD.md § 9 y § 11). Pensada para
-compartirse como link directo en el grupo de WhatsApp o con el guardia.
-`CasaClubCalendarPage.tsx`: grilla de mes (navegación anterior/siguiente)
-con los días que tienen una reservación de casa club resaltados, más una
-lista debajo con fecha + nombre del residente a cargo + domicilio por
-reservación. Agrega `<meta name="robots" content="noindex">` al `<head>`
-en un `useEffect` (se quita al desmontar) — pública no implica indexable.
+(issue 8/8 del épico #60, ver PRD.md § 9 y § 11; nació exclusiva de casa
+club y se generalizó a cancha después, mismo criterio de privacidad).
+Pensada para compartirse como link directo en el grupo de WhatsApp o con
+el guardia. `PublicCalendarPage.tsx`: selector Cancha/Casa Club (mismo
+patrón que `HomePage`, siempre resuelve al único recurso activo de ese
+tipo — hoy no hay más de una cancha, así que no hace falta elegir cuál),
+grilla de mes (navegación anterior/siguiente) con los días que tienen
+alguna reservación resaltados, más una lista debajo por reservación:
+fecha + horario (cancha) o "Día completo" (casa club) + nombre del
+residente a cargo + domicilio. A diferencia de casa club (máximo una
+reservación por día), cancha puede tener varias el mismo día — la lista
+se ordena por fecha y, dentro del día, por horario. Agrega `<meta
+name="robots" content="noindex">` al `<head>` en un `useEffect` (se
+quita al desmontar) — pública no implica indexable.
 
-Los datos vienen de `getCasaClubCalendar` (Cloud Function `onCall`,
+Los datos vienen de `getPublicCalendar` (Cloud Function `onCall`,
 `functions/src/index.ts`), protegida solo por App Check — no requiere
 `request.auth`, mismo patrón que `getResidentsByAddress`. Recibe
-`{ year, month }`, ubica el recurso `type == 'casa-club'`, y regresa
-únicamente `{ date, name, address }` por reservación con status distinto
-de `cancelada` (`isVisibleOnPublicCalendar()` en
-`functions/src/reservationRules.ts` — a diferencia de
-`OCCUPYING_STATUSES`, también incluye `finalizada`/`deposito-devuelto`/
-`deposito-retenido`, porque el evento sí ocupó la fecha aunque ya se haya
-resuelto). **Nunca** se abre `firestore.rules` de `reservations` a
-lectura pública para esto — expondría status de pago/depósito de
+`{ year, month, courtType }`, ubica el recurso `type == courtType`, y
+regresa únicamente `{ date, startTime, endTime, name, address }` por
+reservación con status distinto de `cancelada`
+(`isVisibleOnPublicCalendar()` en `functions/src/reservationRules.ts` —
+a diferencia de `OCCUPYING_STATUSES`, también incluye
+`finalizada`/`deposito-devuelto`/`deposito-retenido`, porque el evento sí
+ocupó la fecha aunque ya se haya resuelto). Siempre incluye
+`startTime`/`endTime` aunque casa club no los use para mostrar (son
+siempre el mismo bloque de día completo) — el cliente decide qué mostrar
+según `courtType`. **Nunca** se abre `firestore.rules` de `reservations`
+a lectura pública para esto — expondría status de pago/depósito de
 cualquier reservación a quien tenga el link.
 
 ## Modelo de datos (Firestore)
@@ -315,7 +325,7 @@ cualquier reservación a quien tenga el link.
 | `courts/{courtId}` | `Court` (incluye `CourtSettings`) | Lectura para cualquier usuario autenticado, escritura solo admin. `type?: 'cancha' \| 'casa-club'` (Epic #60, issue 1/8) discrimina el recurso — opcional para no requerir migración, `?? 'cancha'` como fallback en quien lo lea. `CourtSettings` tiene campos exclusivos de casa club (`depositAmount`, `depositRefundableAmount`, `cancellationDeadlineHours`, `maxReservationsPerUserPerMonth`) que quedan `undefined`/sin usar en cancha. |
 | `settings/theme` | `{ paletteId: string }` | Paleta de acento activa (Epic #43, issue 5/5 — ver `src/theme/palettes.ts`). Lectura pública (se necesita antes de autenticar, en `/login`), escritura solo super-admin. Si no existe, se asume la paleta default (`'green'`). |
 | `settings/general` | `{ siteName: string, whatsappUrl?: string }` | Nombre del sitio (Home/Login/RegisterPage y `document.title`) y link de contacto de WhatsApp (tarjeta al final de `HelpPage`). Mismas reglas que `settings/theme`: lectura pública, escritura solo super-admin. Si no existe o `whatsappUrl` está vacío, cae a los defaults/texto plano de siempre — ver `src/context/SiteSettingsContext.tsx`. |
-| `reservations/{id}` | `Reservation` | Ver reglas de creación/actualización arriba. `startAt`/`endAt`/`paymentDueAt` son `Timestamp`; el resto de fecha/hora sigue siendo strings (`date`, `startTime`, `endTime`). `status` tiene 6 valores — además de los 4 originales, `deposito-devuelto`/`deposito-retenido` (exclusivos de casa club, issue 4/8) — y puede estar desactualizado, ver "Expiración lazy" arriba. `courtType?: CourtType` (issue 3/8) denormaliza el tipo de recurso al crear, mismo patrón/fallback que `Court.type`. `playerCount`/`residentInChargeName` capturados en `BookingSheet`. Índices compuestos en `firestore.indexes.json` para `courtId+date+status` y `userId+status+date` — siguen sirviendo con `where('status','in',[...])` porque Firestore indexa `in` igual que una igualdad; el prefijo `courtId+date` también sirve la query por rango de fechas de `getCasaClubCalendar` (issue 8/8) sin índice aparte. El índice `date+status` que existía se quitó (issue 6/7): la única query que lo usaba (panel admin) ya no filtra por status. |
+| `reservations/{id}` | `Reservation` | Ver reglas de creación/actualización arriba. `startAt`/`endAt`/`paymentDueAt` son `Timestamp`; el resto de fecha/hora sigue siendo strings (`date`, `startTime`, `endTime`). `status` tiene 6 valores — además de los 4 originales, `deposito-devuelto`/`deposito-retenido` (exclusivos de casa club, issue 4/8) — y puede estar desactualizado, ver "Expiración lazy" arriba. `courtType?: CourtType` (issue 3/8) denormaliza el tipo de recurso al crear, mismo patrón/fallback que `Court.type`. `playerCount`/`residentInChargeName` capturados en `BookingSheet`. Índices compuestos en `firestore.indexes.json` para `courtId+date+status` y `userId+status+date` — siguen sirviendo con `where('status','in',[...])` porque Firestore indexa `in` igual que una igualdad; el prefijo `courtId+date` también sirve la query por rango de fechas de `getPublicCalendar` (issue 8/8) sin índice aparte. El índice `date+status` que existía se quitó (issue 6/7): la única query que lo usaba (panel admin) ya no filtra por status. |
 
 Los tipos TypeScript en `src/types/index.ts` son la fuente de verdad del
 shape de estos documentos en el cliente.
@@ -332,7 +342,7 @@ shape de estos documentos en el cliente.
   token fijo vía `VITE_APPCHECK_DEBUG_TOKEN`, ver AGENTS.md). Las seis
   Cloud Functions (`createReservation`, `adminCreateColono`,
   `adminDeleteColono`, `adminSetUserRole`, `getResidentsByAddress`,
-  `getCasaClubCalendar`) tienen `enforceAppCheck: true`.
+  `getPublicCalendar`) tienen `enforceAppCheck: true`.
 - La autorización real vive en `firestore.rules`; el cliente nunca debe ser la
   única línea de defensa para nada sensible (roles, límites, integridad de
   reservaciones).
@@ -349,9 +359,9 @@ shape de estos documentos en el cliente.
   `reservations` por completo, `if false` — la función es la única vía),
   `adminCreateColono`/`adminDeleteColono`/`adminSetUserRole` (necesitan
   Admin SDK para crear/eliminar cuentas de Auth ajenas y setear custom
-  claims), y `getResidentsByAddress`/`getCasaClubCalendar` (ambas leen
+  claims), y `getResidentsByAddress`/`getPublicCalendar` (ambas leen
   Firestore pre-auth con Admin SDK — la primera para el saludo de login,
-  la segunda para el calendario público de casa club, ver sección
+  la segunda para el calendario público de cancha/casa club, ver sección
   dedicada arriba). El proyecto está en plan Blaze por esto. Ver "La
   regla más importante del repo" en AGENTS.md.
 - `CONTEXT.md` → "Flujo de reservación" no se actualizó para reflejar el

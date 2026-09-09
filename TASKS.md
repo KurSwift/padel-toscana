@@ -389,9 +389,13 @@ si se retoma en una sesión sin ese historial de conversación.
 padel) en el mismo portal — ver **Epic
 [#60](https://github.com/KurSwift/padel-toscana/issues/60)** en GitHub,
 8 sub-issues (#61-#68), todos mergeados. El último, #68 (calendario
-público en `/casa-club/calendario`, sin login, para compartir con el
-guardia/grupo de WhatsApp), es la primera excepción deliberada al
-modelo "100% privado por invitación" del sitio — ver PRD.md § 9.
+público, sin login, para compartir con el guardia/grupo de WhatsApp),
+es la primera excepción deliberada al modelo "100% privado por
+invitación" del sitio — ver PRD.md § 9. Nació exclusivo de casa club en
+`/casa-club/calendario`; se generalizó a cancha poco después (fuera de
+la épica, a pedido directo del usuario) y la ruta pasó a `/calendario`
+con un selector Cancha/Casa Club — ver `getPublicCalendar` en
+`functions/src/index.ts`.
 
 Investigación previa a la épica encontró que el modelo de datos
 (`Court`/`CourtSettings`), `firestore.rules`, y `createReservation` ya

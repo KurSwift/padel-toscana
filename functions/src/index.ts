@@ -522,18 +522,23 @@ export const adminSetUserRole = onCall(
   },
 )
 
-// ── Calendario público de casa club (issue 8/8 del épico #60) ──────────────
+// ── Calendario público (issue 8/8 del épico #60, generalizado a cancha) ────
 // Primera excepción deliberada al modelo "100% privado por invitación" del
 // sitio — ver PRD.md § 9 (Seguridad y privacidad). Pensada para
 // compartirse como link directo en el grupo de WhatsApp/con el guardia,
-// sin sesión iniciada.
+// sin sesión iniciada. Nació exclusiva de casa club (issue 8/8); se
+// generalizó a cancha después, mismo criterio de privacidad — ver PRD.md.
 
-interface GetCasaClubCalendarInput {
+const PUBLIC_CALENDAR_COURT_TYPES = ['cancha', 'casa-club'] as const
+type PublicCalendarCourtType = (typeof PUBLIC_CALENDAR_COURT_TYPES)[number]
+
+interface GetPublicCalendarInput {
   year: number
   month: number
+  courtType: PublicCalendarCourtType
 }
 
-function isValidCalendarInput(data: unknown): data is GetCasaClubCalendarInput {
+function isValidCalendarInput(data: unknown): data is GetPublicCalendarInput {
   if (typeof data !== 'object' || data === null) return false
   const d = data as Record<string, unknown>
   return (
@@ -542,25 +547,30 @@ function isValidCalendarInput(data: unknown): data is GetCasaClubCalendarInput {
     typeof d.month === 'number' &&
     Number.isInteger(d.month) &&
     d.month >= 1 &&
-    d.month <= 12
+    d.month <= 12 &&
+    typeof d.courtType === 'string' &&
+    (PUBLIC_CALENDAR_COURT_TYPES as readonly string[]).includes(d.courtType)
   )
 }
 
 // No requiere request.auth (mismo patrón que getResidentsByAddress) — es la
 // ruta pública. NUNCA expone `firestore.rules` de `reservations` a lectura
 // pública para lograr esto: eso filtraría status de pago/depósito de
-// cualquier reservación (de cualquier recurso, no solo casa club) a quien
-// tenga el link. En vez de eso, esta función corre con Admin SDK y solo
-// regresa los tres campos que el calendario necesita mostrar.
-export const getCasaClubCalendar = onCall(
+// cualquier reservación (de cualquier recurso) a quien tenga el link. En
+// vez de eso, esta función corre con Admin SDK y solo regresa los campos
+// que el calendario necesita mostrar — incluye startTime/endTime porque
+// cancha (a diferencia de casa club) puede tener varias reservaciones el
+// mismo día; el cliente decide si los muestra ("Día completo" para casa
+// club, rango de horario para cancha).
+export const getPublicCalendar = onCall(
   { region: 'us-central1', enforceAppCheck: true },
   async (request) => {
     if (!isValidCalendarInput(request.data)) {
       throw new HttpsError('invalid-argument', 'invalid-argument')
     }
-    const { year, month } = request.data
+    const { year, month, courtType } = request.data
 
-    const courtsSnap = await db.collection('courts').where('type', '==', 'casa-club').limit(1).get()
+    const courtsSnap = await db.collection('courts').where('type', '==', courtType).limit(1).get()
     if (courtsSnap.empty) {
       return { reservations: [] }
     }
@@ -578,11 +588,13 @@ export const getCasaClubCalendar = onCall(
       .map((d) => ({
         date: d.get('date') as string,
         status: d.get('status') as string,
+        startTime: d.get('startTime') as string,
+        endTime: d.get('endTime') as string,
         name: d.get('residentInChargeName') as string,
         address: d.get('userAddress') as string,
       }))
       .filter((r) => isVisibleOnPublicCalendar(r.status))
-      .map(({ date, name, address }) => ({ date, name, address }))
+      .map(({ date, startTime, endTime, name, address }) => ({ date, startTime, endTime, name, address }))
 
     return { reservations }
   },
