@@ -12,26 +12,35 @@ export default function DateSelector({ date, maxDaysAhead, onChange }: Props) {
   const canGoPrev = date > today
   const canGoNext = date < maxDate
 
+  const fullDate = formatDateLong(date)
+  const weekday = fullDate.split(',')[0]
   const label = date === today
     ? 'Hoy'
     : date === addDays(today, 1)
     ? 'Mañana'
-    : formatDateLong(date)
+    : weekday
 
   return (
-    <div className="flex items-center justify-between bg-white rounded-2xl px-4 py-3 shadow-sm">
+    <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm">
       <button
+        type="button"
         onClick={() => onChange(addDays(date, -1))}
         disabled={!canGoPrev}
-        className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition"
+        aria-label="Ver día anterior"
+        className="grid h-11 w-11 place-items-center rounded-xl text-2xl leading-none text-gray-500 transition hover:bg-gray-100 disabled:opacity-30"
       >
         ‹
       </button>
-      <span className="font-semibold text-gray-800 text-sm">{label}</span>
+      <div className="min-w-0 px-2 text-center">
+        <p className="text-sm font-semibold text-gray-900">{label}</p>
+        <p className="mt-0.5 truncate text-xs text-gray-500">{fullDate}</p>
+      </div>
       <button
+        type="button"
         onClick={() => onChange(addDays(date, 1))}
         disabled={!canGoNext}
-        className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 disabled:opacity-30 transition"
+        aria-label="Ver día siguiente"
+        className="grid h-11 w-11 place-items-center rounded-xl text-2xl leading-none text-gray-500 transition hover:bg-gray-100 disabled:opacity-30"
       >
         ›
       </button>

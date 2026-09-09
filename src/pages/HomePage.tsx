@@ -16,8 +16,8 @@ interface SelectedSlot {
 }
 
 const RESOURCE_LABELS: Record<CourtType, string> = {
-  cancha: '🏓 Cancha',
-  'casa-club': '🏠 Casa Club',
+  cancha: 'Cancha',
+  'casa-club': 'Casa Club',
 }
 
 export default function HomePage() {
@@ -72,43 +72,31 @@ export default function HomePage() {
 
   return (
     <div className="min-h-full pb-20 md:pb-0">
-      {/* Resource selector — Cancha / Casa Club (issue 6/8 del épico #60) */}
-      <div className="sticky top-[61px] z-10 border-b border-gray-200 bg-white/95 px-4 py-2 backdrop-blur md:top-[61px] md:px-8">
-        <div className="mx-auto flex max-w-5xl gap-2">
-          {(['cancha', 'casa-club'] as const).map((type) => (
-            <button
-              key={type}
-              onClick={() => handleSelectResource(type)}
-              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition ${
-                resourceType === type
-                  ? 'bg-brand-600 text-white'
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-              }`}
-            >
-              {RESOURCE_LABELS[type]}
-            </button>
-          ))}
-        </div>
-      </div>
+      <main className="mx-auto max-w-5xl px-4 py-6 md:px-8">
+        <div className="max-w-lg space-y-6">
+          <section aria-labelledby="calendar-title">
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">Reservar</p>
+            <h2 id="calendar-title" className="mt-1 text-2xl font-bold tracking-tight text-gray-900">Calendario</h2>
+            <p className="mt-1 text-sm text-gray-500">Elige el recurso y consulta su disponibilidad.</p>
+            <ResourceSegmentedControl value={resourceType} onChange={handleSelectResource} />
+          </section>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : !court ? (
-        <div className="flex items-center justify-center py-20 px-4">
-          <p className="text-gray-500 text-center">
-            {isCasaClub ? 'La Casa Club no está disponible todavía.' : 'No hay canchas disponibles por el momento.'}
-          </p>
-        </div>
-      ) : (
-        <>
-          <main className="mx-auto max-w-5xl px-4 py-5 md:px-8">
-            <div className="max-w-lg space-y-5">
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : !court ? (
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-12 text-center">
+              <p className="text-sm text-gray-500">
+                {isCasaClub ? 'La Casa Club no está disponible todavía.' : 'No hay canchas disponibles por el momento.'}
+              </p>
+            </div>
+          ) : (
+            <>
               {/* Court name */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 px-1">
                 <span className="text-base font-semibold text-gray-800">{court.name}</span>
-                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
                   {isCasaClub ? 'Día completo' : `${court.settings.openTime} – ${court.settings.closeTime}`}
                 </span>
               </div>
@@ -144,28 +132,58 @@ export default function HomePage() {
                   }
                 />
               )}
-            </div>
-          </main>
-
-          {/* Booking bottom sheet */}
-          {selectedSlot && profile && (
-            <BookingSheet
-              courtType={court.type ?? 'cancha'}
-              date={selectedDate}
-              startTime={selectedSlot.startTime}
-              availableDurations={selectedSlot.availableDurations}
-              maxPlayerCount={court.settings.maxPlayerCount ?? 10}
-              defaultResidentName={profile.name}
-              reservationFee={court.settings.reservationFee}
-              paymentDeadlineHours={court.settings.paymentDeadlineHours}
-              depositAmount={court.settings.depositAmount}
-              depositRefundableAmount={court.settings.depositRefundableAmount}
-              onConfirm={handleConfirmBooking}
-              onClose={() => setSelectedSlot(null)}
-            />
+            </>
           )}
-        </>
+        </div>
+      </main>
+
+      {/* Booking bottom sheet */}
+      {selectedSlot && profile && court && (
+        <BookingSheet
+          courtType={court.type ?? 'cancha'}
+          date={selectedDate}
+          startTime={selectedSlot.startTime}
+          availableDurations={selectedSlot.availableDurations}
+          maxPlayerCount={court.settings.maxPlayerCount ?? 10}
+          defaultResidentName={profile.name}
+          reservationFee={court.settings.reservationFee}
+          paymentDeadlineHours={court.settings.paymentDeadlineHours}
+          depositAmount={court.settings.depositAmount}
+          depositRefundableAmount={court.settings.depositRefundableAmount}
+          onConfirm={handleConfirmBooking}
+          onClose={() => setSelectedSlot(null)}
+        />
       )}
+    </div>
+  )
+}
+
+/** Selector segmentado accesible para alternar el recurso del calendario. */
+function ResourceSegmentedControl({ value, onChange }: {
+  value: CourtType
+  onChange: (type: CourtType) => void
+}) {
+  return (
+    <div role="tablist" aria-label="Recurso a reservar" className="mt-5 grid grid-cols-2 rounded-xl bg-gray-100 p-1">
+      {(['cancha', 'casa-club'] as const).map((type) => {
+        const selected = value === type
+        return (
+          <button
+            key={type}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            onClick={() => onChange(type)}
+            className={`min-h-11 rounded-lg px-3 text-sm font-semibold transition ${
+              selected
+                ? 'bg-white text-brand-700 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {RESOURCE_LABELS[type]}
+          </button>
+        )
+      })}
     </div>
   )
 }
