@@ -74,101 +74,64 @@ export default function BookingSheet({
   if (confirmed) {
     const paymentDueAt = computePaymentDueAt(toDate(date, startTime), paymentDeadlineHours)
     return (
-      <>
-        <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl px-6 pt-5 pb-8 max-w-lg mx-auto">
-          <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
-          <div className="text-center mb-5">
-            <div className="w-14 h-14 bg-brand-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-              <span className="text-2xl">✓</span>
-            </div>
-            <h2 className="text-lg font-bold text-gray-900">¡Reservación creada!</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              {isCasaClub ? formatDateLong(date) : `${formatDateLong(date)} · ${formatTime(startTime)} – ${formatTime(endTime)}`}
-            </p>
-          </div>
-
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 text-center">
-            <p className="text-sm text-amber-800">
-              Paga <span className="font-bold">${reservationFee}</span> al tesorero antes de
-            </p>
-            <p className="text-base font-bold text-amber-900 mt-0.5">
-              {formatDateTimeShort(paymentDueAt)}
-            </p>
+      <SheetFrame labelledBy="booking-success-title" onClose={onClose}>
+        <div className="px-5 pb-5 pt-2 text-center">
+          <div aria-hidden="true" className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-brand-100 text-2xl font-semibold text-brand-700">✓</div>
+          <h2 id="booking-success-title" className="text-xl font-bold tracking-tight text-gray-900">¡Reservación creada!</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            {isCasaClub ? formatDateLong(date) : `${formatDateLong(date)} · ${formatTime(startTime)} – ${formatTime(endTime)}`}
+          </p>
+          <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Siguiente paso</p>
+            <p className="mt-1 text-sm text-amber-900">Paga <span className="font-bold">${reservationFee}</span> al tesorero antes de</p>
+            <p className="mt-1 text-base font-bold text-amber-950">{formatDateTimeShort(paymentDueAt)}</p>
             {isCasaClub && depositRefundableAmount != null && (
-              <p className="text-xs text-amber-700 mt-2">
-                ${depositRefundableAmount} de ese depósito se te devuelve después del evento, salvo
-                que se retenga por daños o incumplimiento.
+              <p className="mt-3 text-xs leading-5 text-amber-800">
+                ${depositRefundableAmount} de ese depósito se te devuelve después del evento, salvo que se retenga por daños o incumplimiento.
               </p>
             )}
-            <p className="text-xs text-amber-700 mt-2">
+            <p className="mt-3 text-xs leading-5 text-amber-800">
               Si no se confirma el pago antes de esa fecha, {isCasaClub ? 'la fecha se libera' : 'el horario se libera'} automáticamente.
             </p>
           </div>
-
-          <button
-            onClick={onClose}
-            className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-2xl py-4 transition"
-          >
-            Entendido
-          </button>
+          <button type="button" onClick={onClose} className="mt-6 min-h-12 w-full rounded-xl bg-brand-600 text-sm font-semibold text-white transition hover:bg-brand-700">Entendido</button>
         </div>
-      </>
+      </SheetFrame>
     )
   }
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/40 z-40"
-        onClick={onClose}
-      />
-
-      {/* Bottom sheet */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl px-6 pt-5 pb-8 max-w-lg mx-auto max-h-[90vh] overflow-y-auto">
-        {/* Handle */}
-        <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
-
-        <div className="flex items-start justify-between mb-5">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">{isCasaClub ? 'Reservar Casa Club' : 'Reservar cancha'}</h2>
-            <p className="text-sm text-gray-500 mt-0.5">{formatDateLong(date)}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
-          >
-            ✕
-          </button>
+    <SheetFrame labelledBy="booking-title" onClose={onClose}>
+      <header className="flex items-start justify-between border-b border-gray-100 px-5 pb-4 pt-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">Nueva reservación</p>
+          <h2 id="booking-title" className="mt-1 text-xl font-bold tracking-tight text-gray-900">{isCasaClub ? 'Casa Club' : 'Cancha'}</h2>
         </div>
+        <button type="button" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full bg-gray-100 text-gray-500 transition hover:bg-gray-200">✕</button>
+      </header>
 
-        {/* Time display */}
-        <div className="bg-brand-50 rounded-2xl p-4 mb-5 text-center">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+        <section aria-label="Resumen de reservación" className="rounded-2xl bg-brand-50 p-4">
+          <p className="text-sm font-semibold text-brand-900">{formatDateLong(date)}</p>
           {isCasaClub ? (
-            <p className="text-2xl font-bold text-brand-700">Día completo</p>
+            <p className="mt-1 text-xl font-bold text-brand-700">Día completo</p>
           ) : (
-            <>
-              <p className="text-3xl font-bold text-brand-700">
-                {formatTime(startTime)}
-              </p>
-              <p className="text-sm text-brand-500 mt-1">
-                hasta {formatTime(endTime)}
-              </p>
-            </>
+            <p className="mt-1 text-xl font-bold text-brand-700">{formatTime(startTime)} – {formatTime(endTime)}</p>
           )}
-        </div>
+        </section>
 
         {/* Duration selector — exclusivo de cancha, casa club es 24h fijo */}
         {!isCasaClub && (
-          <>
-            <p className="text-sm font-medium text-gray-700 mb-3">¿Cuántas horas?</p>
-            <div className="flex gap-3 mb-6">
+          <section className="mt-6">
+            <h3 className="text-sm font-semibold text-gray-900">¿Cuántas horas?</h3>
+            <div className="mt-3 grid grid-cols-2 gap-2">
               {availableDurations.map((d) => (
                 <button
                   key={d}
+                  type="button"
                   onClick={() => setDuration(d)}
-                  className={`flex-1 py-3 rounded-xl font-semibold text-sm transition border ${
+                  aria-pressed={duration === d}
+                  className={`min-h-12 rounded-xl border text-sm font-semibold transition ${
                     duration === d
                       ? 'bg-brand-600 text-white border-brand-600'
                       : 'bg-white text-gray-600 border-gray-300 hover:border-brand-400'
@@ -178,51 +141,55 @@ export default function BookingSheet({
                 </button>
               ))}
             </div>
-          </>
+          </section>
         )}
 
         {/* Player count */}
-        <p className="text-sm font-medium text-gray-700 mb-1">
+        <section className="mt-6">
+        <h3 className="text-sm font-semibold text-gray-900">
           {isCasaClub ? '¿Cuántos invitados en total?' : '¿Cuántos jugadores en total?'}
-        </p>
-        <p className="text-xs text-gray-400 mb-3">
+        </h3>
+        <p className="mt-1 text-xs text-gray-500">
           {isCasaClub
             ? `Hasta ${maxPlayerCount} personas.`
             : 'En cancha caben 4 a la vez — el resto son suplentes/acompañantes.'}
         </p>
-        <div className="flex items-center gap-4 mb-6">
+        <div className="mt-3 flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-2">
           <button
+            type="button"
             onClick={() => setPlayerCount((n) => Math.max(MIN_PLAYER_COUNT, n - 1))}
             disabled={playerCount <= MIN_PLAYER_COUNT}
-            className="w-11 h-11 rounded-xl border border-gray-300 text-gray-600 text-lg font-semibold disabled:opacity-30 hover:border-brand-400 transition"
+            className="grid h-11 w-11 place-items-center rounded-xl bg-gray-100 text-lg font-semibold text-gray-700 transition hover:bg-gray-200 disabled:opacity-30"
           >
             −
           </button>
-          <span className="text-2xl font-bold text-gray-900 w-10 text-center">{playerCount}</span>
+          <span className="text-2xl font-bold text-gray-900">{playerCount}</span>
           <button
+            type="button"
             onClick={() => setPlayerCount((n) => Math.min(maxPlayerCount, n + 1))}
             disabled={playerCount >= maxPlayerCount}
-            className="w-11 h-11 rounded-xl border border-gray-300 text-gray-600 text-lg font-semibold disabled:opacity-30 hover:border-brand-400 transition"
+            className="grid h-11 w-11 place-items-center rounded-xl bg-brand-50 text-lg font-semibold text-brand-700 transition hover:bg-brand-100 disabled:opacity-30"
           >
             +
           </button>
         </div>
+        </section>
 
         {/* Resident in charge */}
-        <label className="block mb-6">
-          <span className="text-sm font-medium text-gray-700 mb-2 block">Residente a cargo</span>
+        <label className="mt-6 block">
+          <span className="mb-2 block text-sm font-semibold text-gray-900">Residente a cargo</span>
           <input
             type="text"
             value={residentInChargeName}
             onChange={(e) => setResidentInChargeName(e.target.value)}
             placeholder="Nombre del residente a cargo"
-            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+            className="min-h-12 w-full rounded-xl border border-gray-300 px-4 text-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500"
           />
         </label>
 
         {/* Aviso de depósito — exclusivo de casa club, antes de confirmar */}
         {isCasaClub && depositAmount != null && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6">
+          <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
             <p className="text-sm text-amber-800">
               Depósito de <span className="font-bold">${depositAmount}</span> al confirmar.
               {depositRefundableAmount != null && (
@@ -231,11 +198,13 @@ export default function BookingSheet({
             </p>
           </div>
         )}
-
+      </div>
+      <footer className="border-t border-gray-100 bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4">
         <button
+          type="button"
           onClick={handleConfirm}
           disabled={loading || !residentNameValid}
-          className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-2xl py-4 transition disabled:opacity-50 flex items-center justify-center gap-2"
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-600 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
         >
           {loading ? (
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -245,7 +214,24 @@ export default function BookingSheet({
             `Confirmar · ${formatTime(startTime)} - ${formatTime(endTime)}`
           )}
         </button>
+      </footer>
+    </SheetFrame>
+  )
+}
+
+/** Marco compartido para las hojas móviles de reservación y confirmación. */
+function SheetFrame({ children, labelledBy, onClose }: {
+  children: React.ReactNode
+  labelledBy: string
+  onClose: () => void
+}) {
+  return (
+    <div role="dialog" aria-modal="true" aria-labelledby={labelledBy} className="fixed inset-0 z-40 flex items-end bg-black/40 sm:items-center sm:justify-center sm:p-4">
+      <button type="button" aria-label="Cerrar hoja de reservación" onClick={onClose} className="absolute inset-0 cursor-default" />
+      <div className="relative flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
+        <div aria-hidden="true" className="mx-auto my-3 h-1 w-10 shrink-0 rounded-full bg-gray-200" />
+        {children}
       </div>
-    </>
+    </div>
   )
 }
