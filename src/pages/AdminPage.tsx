@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Timestamp } from 'firebase/firestore'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
@@ -18,7 +18,6 @@ import { MAX_RESERVATION_DURATION_HOURS } from '@/services/reservationRules'
 import { subscribeToAllReservationsByDate, setReservationStatus } from '@/services/reservations'
 import { todayString, addDays, formatDateLong, formatTime } from '@/utils/time'
 import StatusBadge, { RESERVATION_STATUS_LABELS } from '@/components/StatusBadge'
-import Header from '@/components/Header'
 
 type Tab = 'reservations' | 'courts' | 'users' | 'avanzado'
 
@@ -49,12 +48,15 @@ const RESOURCE_TYPE_LABELS: Record<CourtType, string> = {
 export default function AdminPage() {
   const { profile } = useAuth()
   const navigate = useNavigate()
-  const [tab, setTab] = useState<Tab>('reservations')
+  const [searchParams] = useSearchParams()
   const [pendingCount, setPendingCount] = useState(0)
   const isSuperAdmin = profile?.role === 'super-admin'
   const tabs: Tab[] = isSuperAdmin
     ? ['reservations', 'courts', 'users', 'avanzado']
     : ['reservations', 'courts', 'users']
+
+  const requestedTab = searchParams.get('seccion')
+  const tab = tabs.includes(requestedTab as Tab) ? requestedTab as Tab : null
 
   useEffect(() => {
     getAllUsers().then((users) =>
@@ -62,52 +64,87 @@ export default function AdminPage() {
     )
   }, [tab])
 
+  function openSection(section: Tab) {
+    navigate(`/configuracion?seccion=${section}`)
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header title="Panel Admin" subtitle={profile?.name}>
-        <button
-          onClick={() => navigate('/ayuda')}
-          className="text-xs font-medium text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition"
-        >
-          Ayuda
-        </button>
-        <button
-          onClick={() => navigate('/')}
-          className="text-xs font-medium text-brand-600 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition"
-        >
-          ← Volver
-        </button>
-      </Header>
-
-      {/* Tab bar */}
-      <div className="bg-white border-b border-gray-200 flex">
-        {tabs.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 py-3 text-sm font-medium transition border-b-2 relative ${
-              tab === t
-                ? 'border-brand-600 text-brand-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {TAB_LABELS[t]}
-            {t === 'users' && pendingCount > 0 && (
-              <span className="absolute top-2 right-1/4 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
-                {pendingCount}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      <main className="max-w-lg mx-auto px-4 py-5">
-        {tab === 'reservations' && <ReservationsTab />}
-        {tab === 'courts' && <CourtsTab />}
-        {tab === 'users' && <UsersTab onPendingChange={setPendingCount} />}
-        {tab === 'avanzado' && isSuperAdmin && <AdvancedTab />}
-      </main>
+    <div className="min-h-full pb-20 md:pb-0">
+      {tab ? (
+        <main className="mx-auto max-w-5xl px-4 py-6 md:px-8">
+          <div className="max-w-3xl">
+            <button
+              type="button"
+              onClick={() => navigate('/configuracion')}
+              className="mb-5 inline-flex min-h-11 items-center gap-1 rounded-xl px-2 text-sm font-medium text-brand-700 transition hover:bg-brand-50"
+            >
+              <span aria-hidden="true" className="text-xl leading-none">‹</span>
+              Configuración
+            </button>
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900">{TAB_LABELS[tab]}</h2>
+            <p className="mt-1 mb-6 text-sm text-gray-500">{SECTION_DESCRIPTIONS[tab]}</p>
+            {tab === 'reservations' && <ReservationsTab />}
+            {tab === 'courts' && <CourtsTab />}
+            {tab === 'users' && <UsersTab onPendingChange={setPendingCount} />}
+            {tab === 'avanzado' && isSuperAdmin && <AdvancedTab />}
+          </div>
+        </main>
+      ) : (
+        <SettingsOverview tabs={tabs} pendingCount={pendingCount} onSelect={openSection} />
+      )}
     </div>
+  )
+}
+
+const SECTION_DESCRIPTIONS: Record<Tab, string> = {
+  reservations: 'Consulta y actualiza las reservaciones de la comunidad.',
+  courts: 'Gestiona los recursos, horarios y reglas de reservación.',
+  users: 'Da de alta colonos y administra las solicitudes pendientes.',
+  avanzado: 'Administra roles, identidad y opciones avanzadas del sitio.',
+}
+
+const SECTION_ICONS: Record<Tab, string> = {
+  reservations: '▦',
+  courts: '⌘',
+  users: '♙',
+  avanzado: '⚙',
+}
+
+/** Índice móvil de configuración; cada fila abre una pantalla de detalle. */
+function SettingsOverview({ tabs, pendingCount, onSelect }: {
+  tabs: Tab[]
+  pendingCount: number
+  onSelect: (section: Tab) => void
+}) {
+  return (
+    <main className="mx-auto max-w-5xl px-4 py-6 pb-24 md:px-8 md:pb-8">
+      <div className="max-w-2xl">
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900">Configuración</h2>
+        <p className="mt-1 text-sm text-gray-500">Administra la comunidad y los recursos.</p>
+        <div className="mt-6 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200/70">
+          {tabs.map((section, index) => (
+            <button
+              key={section}
+              type="button"
+              onClick={() => onSelect(section)}
+              className={`flex min-h-[72px] w-full items-center gap-3 px-4 text-left transition hover:bg-gray-50 ${index > 0 ? 'border-t border-gray-100' : ''}`}
+            >
+              <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-lg font-semibold text-brand-700">
+                {SECTION_ICONS[section]}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-gray-800">{TAB_LABELS[section]}</span>
+                <span className="mt-0.5 block truncate text-xs text-gray-500">{SECTION_DESCRIPTIONS[section]}</span>
+              </span>
+              {section === 'users' && pendingCount > 0 && (
+                <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">{pendingCount}</span>
+              )}
+              <span aria-hidden="true" className="text-xl text-gray-300">›</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </main>
   )
 }
 
@@ -768,9 +805,10 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
         ) : (
           <button
             onClick={() => setAdding(true)}
-            className="w-full border-2 border-dashed border-gray-300 rounded-2xl py-4 text-sm text-gray-400 hover:border-brand-400 hover:text-brand-500 transition"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
           >
-            + Agregar colono
+            <span aria-hidden="true" className="mr-1.5 text-lg leading-none">+</span>
+            Agregar colono
           </button>
         )}
       </div>
@@ -853,7 +891,8 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
 
 // ── Advanced Tab (super-admin) ────────────────────────────────────────────────
 // Asignar roles y eliminar usuarios son exclusivos de super-admin (Epic #43,
-// issues #38 y siguiente) — el RoleSelector se movió aquí desde UsersTab.
+// issues #38 y siguiente). El rol se elige en una hoja modal para no
+// comprimir cuatro controles dentro de cada fila de usuario.
 // Solo se monta si profile.role === 'super-admin' (ver AdminPage), pero
 // handleChangeRole/handleDelete igual re-chequean canAssignRole/
 // canActOnUser por si este componente se llega a renderizar desde otro
@@ -865,6 +904,7 @@ function AdvancedTab() {
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState<string | null>(null)
   const [confirmingDeleteUid, setConfirmingDeleteUid] = useState<string | null>(null)
+  const [rolePickerUser, setRolePickerUser] = useState<UserProfile | null>(null)
 
   useEffect(() => {
     getAllUsers().then((u) => {
@@ -916,6 +956,14 @@ function AdvancedTab() {
     }
   }
 
+  /** Guarda el rol elegido y cierra la hoja antes de completar el write. */
+  async function handleChooseRole(role: UserRole) {
+    if (!rolePickerUser) return
+    const target = rolePickerUser
+    setRolePickerUser(null)
+    await handleChangeRole(target, role)
+  }
+
   if (loading) return <div className="flex justify-center py-8"><Spinner /></div>
 
   return (
@@ -963,10 +1011,10 @@ function AdvancedTab() {
                       {u.street} {u.streetNumber}
                     </p>
                   </div>
-                  <RoleSelector
+                  <RolePickerButton
                     role={u.role}
                     disabled={acting === u.uid || u.uid === currentUser?.uid}
-                    onChange={(role) => handleChangeRole(u, role)}
+                    onClick={() => setRolePickerUser(u)}
                   />
                   <button
                     onClick={() => setConfirmingDeleteUid(u.uid)}
@@ -982,6 +1030,13 @@ function AdvancedTab() {
           ))}
         </div>
       </div>
+      {rolePickerUser && (
+        <RolePickerSheet
+          user={rolePickerUser}
+          onClose={() => setRolePickerUser(null)}
+          onChange={handleChooseRole}
+        />
+      )}
     </div>
   )
 }
@@ -1206,34 +1261,72 @@ function PaletteSection() {
 
 // ── Shared ─────────────────────────────────────────────────────────────────────
 
-// Selector de rol (colono/admin/tesorero/super-admin), usado en AdvancedTab.
-// `disabled` cubre tanto el estado "guardando" como el caso de un super-admin
-// viendo su propia fila (no puede cambiarse su rol, ver canActOnUser).
-function RoleSelector({
+/** Abre la hoja de elección de rol desde una fila compacta de usuario. */
+function RolePickerButton({
   role,
   disabled,
-  onChange,
+  onClick,
 }: {
   role: UserRole
   disabled: boolean
-  onChange: (role: UserRole) => void
+  onClick: () => void
 }) {
   return (
-    <div className="shrink-0 flex flex-wrap justify-end gap-1 bg-gray-100 rounded-full p-0.5">
-      {(Object.keys(ROLE_LABELS) as UserRole[]).map((r) => (
-        <button
-          key={r}
-          onClick={() => onChange(r)}
-          disabled={disabled}
-          className={`text-xs font-medium px-2.5 py-1 rounded-full transition disabled:opacity-40 ${
-            role === r
-              ? 'bg-brand-600 text-white'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          {ROLE_LABELS[r]}
-        </button>
-      ))}
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={`Cambiar rol: ${ROLE_LABELS[role]}`}
+      className="shrink-0 inline-flex min-h-9 items-center gap-1 rounded-full bg-brand-50 px-3 text-xs font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-default"
+    >
+      {ROLE_LABELS[role]}
+      <span aria-hidden="true" className="text-base leading-none">›</span>
+    </button>
+  )
+}
+
+/**
+ * Hoja modal de selección de rol. En móvil aparece desde abajo, como una
+ * action sheet de iOS, y mantiene objetivos táctiles amplios por opción.
+ */
+function RolePickerSheet({ user, onClose, onChange }: {
+  user: UserProfile
+  onClose: () => void
+  onChange: (role: UserRole) => void
+}) {
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  return (
+    <div role="dialog" aria-modal="true" aria-labelledby="role-picker-title" className="fixed inset-0 z-40 flex items-end bg-black/30 p-3 sm:items-center sm:justify-center">
+      <button type="button" aria-label="Cerrar selector de rol" onClick={onClose} className="absolute inset-0 cursor-default" />
+      <div className="relative w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="border-b border-gray-100 px-5 py-4">
+          <p className="text-xs font-medium text-gray-500">Cambiar rol</p>
+          <h3 id="role-picker-title" className="mt-0.5 text-base font-semibold text-gray-900">{user.name}</h3>
+        </div>
+        <div className="p-2">
+          {(Object.keys(ROLE_LABELS) as UserRole[]).map((role) => (
+            <button
+              key={role}
+              type="button"
+              onClick={() => onChange(role)}
+              className="flex min-h-12 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-medium text-gray-700 transition hover:bg-brand-50"
+            >
+              {ROLE_LABELS[role]}
+              {role === user.role && <span aria-label="Rol actual" className="text-lg font-semibold text-brand-600">✓</span>}
+            </button>
+          ))}
+        </div>
+        <div className="border-t border-gray-100 p-2">
+          <button type="button" onClick={onClose} className="min-h-11 w-full rounded-xl text-sm font-semibold text-gray-600 transition hover:bg-gray-100">Cancelar</button>
+        </div>
+      </div>
     </div>
   )
 }

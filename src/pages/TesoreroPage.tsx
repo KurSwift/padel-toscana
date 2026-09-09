@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { useAuth } from '@/context/AuthContext'
 import { Court, Reservation } from '@/types'
 import { getAllCourts } from '@/services/courts'
 import {
@@ -12,11 +10,8 @@ import {
   retainDeposit,
 } from '@/services/reservations'
 import { formatDateShort, formatTime } from '@/utils/time'
-import Header from '@/components/Header'
 
 export default function TesoreroPage() {
-  const { profile } = useAuth()
-  const navigate = useNavigate()
   const [courts, setCourts] = useState<Court[]>([])
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [loading, setLoading] = useState(true)
@@ -81,23 +76,11 @@ export default function TesoreroPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header title="Pagos pendientes" subtitle={profile?.name}>
-        <button
-          onClick={() => navigate('/ayuda')}
-          className="text-xs font-medium text-gray-500 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition"
-        >
-          Ayuda
-        </button>
-        <button
-          onClick={() => navigate('/')}
-          className="text-xs font-medium text-brand-600 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition"
-        >
-          ← Volver
-        </button>
-      </Header>
-
-      <main className="max-w-lg mx-auto px-4 py-5">
+    <main className="mx-auto min-h-full max-w-5xl px-4 py-6 pb-24 md:px-8 md:pb-8">
+      <div className="max-w-2xl">
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900">Pagos</h2>
+        <p className="mt-1 text-sm text-gray-500">Confirma pagos y resuelve depósitos pendientes.</p>
+        <div className="mt-6">
         {loading ? (
           <div className="flex justify-center py-8">
             <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
@@ -177,7 +160,8 @@ export default function TesoreroPage() {
             </div>
           </>
         )}
-      </main>
-    </div>
+        </div>
+      </div>
+    </main>
   )
 }

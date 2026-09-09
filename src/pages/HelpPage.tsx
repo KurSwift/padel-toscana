@@ -1,8 +1,6 @@
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { useSiteSettings } from '@/context/SiteSettingsContext'
 import { UserRole } from '@/types'
-import Header from '@/components/Header'
 
 interface HelpSection {
   title: string
@@ -58,7 +56,7 @@ const SECTIONS: HelpSection[] = [
     title: 'Confirmar pagos (tesorero)',
     visibleTo: ['tesorero', 'admin', 'super-admin'],
     steps: [
-      'Entra a "Pagos" en la barra de arriba.',
+      'Abre la pestaña "Pagos" en la navegación principal.',
       'Verás la lista de reservaciones pendientes de pago, ordenadas de la más urgente a la menos urgente.',
       'Cuando alguien te pague (fuera de la app), busca su reservación en la lista y presiona "Confirmar pago".',
       'La reservación desaparece de tu lista y el colono ve su estado cambiar a "Confirmada".',
@@ -82,7 +80,7 @@ const SECTIONS: HelpSection[] = [
     title: 'Panel de administración',
     visibleTo: ['admin', 'super-admin'],
     steps: [
-      'Entra a "Admin" en la barra de arriba.',
+      'Abre "Configuración" en la navegación principal.',
       'Pestaña "Reservaciones": ve todas las reservaciones de un día (los 4 estados) y cambia el estado de cualquiera si hace falta.',
       'Pestaña "Canchas": activa/desactiva canchas, y ajusta horarios, duración, límites de anticipación, plazo de pago y el monto a cobrar.',
       'Pestaña "Usuarios": aprueba o rechaza solicitudes de registro nuevas, y agrega colonos nuevos directamente.',
@@ -110,7 +108,7 @@ const SECTIONS: HelpSection[] = [
     title: 'Panel avanzado (super-admin)',
     visibleTo: ['super-admin'],
     steps: [
-      'Entra a "Admin" → pestaña "Avanzado" (solo visible para super-admin, no para admin normal).',
+      'Abre "Configuración" → sección "Avanzado" (solo visible para super-admin, no para admin normal).',
       'Asignar roles: usa el selector de rol junto al nombre de cada usuario activo (Colono/Admin/Tesorero/Super Admin).',
     ],
     faq: [
@@ -125,24 +123,16 @@ const SECTIONS: HelpSection[] = [
 export default function HelpPage() {
   const { profile } = useAuth()
   const { whatsappUrl } = useSiteSettings()
-  const navigate = useNavigate()
 
   const sections = SECTIONS.filter(
     (s) => s.visibleTo.includes('all') || (profile && s.visibleTo.includes(profile.role)),
   )
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header title="Ayuda" subtitle={profile?.name}>
-        <button
-          onClick={() => navigate('/')}
-          className="text-xs font-medium text-brand-600 hover:text-brand-700 px-3 py-1.5 rounded-lg hover:bg-brand-50 transition"
-        >
-          ← Volver
-        </button>
-      </Header>
-
-      <main className="max-w-lg mx-auto px-4 py-5 space-y-4">
+    <main className="mx-auto min-h-full max-w-5xl space-y-4 px-4 py-6 pb-24 md:px-8 md:pb-8">
+      <div className="max-w-2xl">
+        <h2 className="mb-1 text-2xl font-bold tracking-tight text-gray-900">Ayuda</h2>
+        <p className="mb-6 text-sm text-gray-500">Guías y respuestas para usar la app.</p>
         {sections.map((section) => (
           <div key={section.title} className="bg-white rounded-2xl shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100">
@@ -199,7 +189,7 @@ export default function HelpPage() {
             </p>
           )}
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   )
 }
