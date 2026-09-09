@@ -5,6 +5,7 @@ import {
   countOccupyingReservations,
   isDurationWithinHardCap,
   isLeadTimeSufficient,
+  firstReservableDate,
   isWithinMaxAdvanceWindow,
   canTransition,
   computePaymentDueAt,
@@ -159,6 +160,18 @@ describe('isLeadTimeSufficient', () => {
   it('rechaza un inicio en el pasado', () => {
     const startAt = new Date('2026-08-29T10:00:00')
     expect(isLeadTimeSufficient(startAt, now, 24)).toBe(false)
+  })
+})
+
+describe('firstReservableDate', () => {
+  it('salta los días cuyo inicio todavía no cumple la anticipación mínima', () => {
+    const now = new Date(2026, 8, 8, 12) // 8 sep, 12:00 local
+    expect(firstReservableDate(now, '00:00', 72)).toBe('2026-09-12')
+  })
+
+  it('acepta el día cuyo inicio está exactamente en el límite', () => {
+    const now = new Date(2026, 8, 8, 0) // 8 sep, 00:00 local
+    expect(firstReservableDate(now, '00:00', 72)).toBe('2026-09-11')
   })
 })
 

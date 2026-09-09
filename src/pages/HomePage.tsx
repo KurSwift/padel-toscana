@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { CourtType } from '@/types'
 import { useAuth } from '@/context/AuthContext'
 import { useCourtData } from '@/hooks/useCourtData'
 import { createReservation, reservationErrorMessage } from '@/services/reservations'
+import { firstReservableDate } from '@/services/reservationRules'
 import DateSelector from '@/components/DateSelector'
 import SlotsGrid from '@/components/SlotsGrid'
 import CasaClubAvailability from '@/components/CasaClubAvailability'
@@ -33,13 +34,26 @@ export default function HomePage() {
   )
 
   const isCasaClub = resourceType === 'casa-club'
+  const firstBookableDate = court
+    ? firstReservableDate(new Date(), court.settings.openTime, court.settings.minLeadHours)
+    : todayString()
+
+  useEffect(() => {
+    // Al cambiar de recurso, una fecha que era válida para cancha puede no
+    // cumplir la anticipación de Casa Club. La UI siempre aterriza en la
+    // primera fecha que el servidor aceptaría.
+    if (selectedDate < firstBookableDate) {
+      setSelectedDate(firstBookableDate)
+      setSelectedSlot(null)
+    }
+  }, [firstBookableDate, selectedDate])
 
   function handleSelectResource(type: CourtType) {
     setResourceType(type)
     // Una fecha válida para el recurso anterior podría no serlo para el
-    // nuevo (daysAheadAllowed distinto — 7 en cancha, 90 en casa club) —
-    // vuelve a "hoy" para no arrancar en un estado raro. También cierra
-    // cualquier sheet de reserva abierto del recurso anterior.
+    // nuevo (días y anticipación mínima distintos) — el efecto de arriba la
+    // ajusta a la primera fecha reservable. También cierra cualquier sheet
+    // de reserva abierto del recurso anterior.
     setSelectedDate(todayString())
     setSelectedSlot(null)
   }
@@ -102,9 +116,10 @@ export default function HomePage() {
               </div>
 
               {/* Date selector */}
-              <DateSelector
-                date={selectedDate}
-                maxDaysAhead={court.settings.daysAheadAllowed}
+                <DateSelector
+                  date={selectedDate}
+                  minDate={firstBookableDate}
+                  maxDaysAhead={court.settings.daysAheadAllowed}
                 onChange={setSelectedDate}
               />
 

@@ -2,14 +2,18 @@ import { addDays, formatDateLong, todayString } from '@/utils/time'
 
 interface Props {
   date: string
+  // Primera fecha que cumple la anticipación mínima del recurso. Si se
+  // omite, conserva el comportamiento histórico: no permitir días pasados.
+  minDate?: string
   maxDaysAhead: number
   onChange: (date: string) => void
 }
 
-export default function DateSelector({ date, maxDaysAhead, onChange }: Props) {
+export default function DateSelector({ date, minDate, maxDaysAhead, onChange }: Props) {
   const today = todayString()
   const maxDate = addDays(today, maxDaysAhead)
-  const canGoPrev = date > today
+  const firstDate = minDate ?? today
+  const canGoPrev = date > firstDate
   const canGoNext = date < maxDate
 
   const fullDate = formatDateLong(date)
