@@ -415,3 +415,40 @@ Contexto completo de las decisiones (depósito, tope mensual, formato
 del calendario) en `PRD.md` § 14 y en el historial de esta conversación
 si se retoma sin ese contexto.
 
+## 7. Reservación manual por administración
+
+Agregar a `/configuracion` la capacidad para que `admin` y `super-admin`
+creen una reservación en nombre de un colono. Debe reutilizar las mismas
+reglas de disponibilidad, anticipación, límites, pago y depósito que una
+reservación creada por el propio usuario; no debe existir una vía de cliente
+que pueda saltarlas. Definir en el issue la UX para seleccionar al colono y
+el recurso/fecha, y si el residente a cargo se precarga o se puede editar.
+
+## 8. Épica: notificaciones dentro de la app (sin push por ahora)
+
+Crear una épica de GitHub antes de implementar. El objetivo es que cada
+usuario pueda consultar sus notificaciones dentro del portal, con estas
+notificaciones iniciales:
+
+- Nueva reservación requerida → avisar a `admin`, `super-admin` y
+  `tesorero`.
+- Próxima reservación → avisar al usuario cuando falten 24, 12 y 6 horas.
+- Reservación cancelada → avisar a `admin` y `super-admin`.
+
+**Restricción de producto/costo:** por ahora no usar notificaciones push,
+SMS ni correo para este alcance. Investigar primero el costo de alternativas
+que se mantengan lo más cerca posible de $0; la primera versión debe ser una
+bandeja/centro de notificaciones dentro de la app. La épica debe decidir cómo
+generar los avisos temporizados sin introducir un costo recurrente inesperado
+y qué lecturas/escrituras de Firestore implica.
+
+## 9. Alta masiva de colonos desde JSON en Configuración
+
+Agregar a `admin` y `super-admin` una interfaz en `/configuracion` para
+subir un JSON de colonos y darlos de alta en lote. Ya existe
+`scripts/preregister-colonos.mjs` como herramienta administrativa fuera de
+la UI (tarea 2); esta tarea es llevar esa capacidad al portal de forma segura,
+con validación previa, reporte por fila y sin exponer credenciales de Admin
+SDK al cliente. Definir si el flujo permite revisar y confirmar el lote antes
+de crear cuentas, y reutilizar las mismas reglas de domicilio, teléfono y
+cupo que `adminCreateColono`.
