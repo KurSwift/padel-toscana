@@ -28,8 +28,8 @@ Cuatro roles, en `UserProfile.role` (`src/types/index.ts`):
 |---|---|
 | **`colono`** | Puede reservar/cancelar sus propias reservaciones una vez aprobado. Rol por default al registrarse. |
 | **`admin`** | Aprueba/rechaza registros, gestiona canchas (horarios, reglas), ve y cancela cualquier reservación. Ya no cambia el rol de otros usuarios — eso quedó exclusivo de `super-admin` (ver abajo). |
-| **`tesorero`** | Confirma que una reservación `solicitada` ya fue pagada, desde `/tesorero` (`TesoreroPage.tsx`) — lista todas las `solicitada` pendientes (cualquier fecha/cancha) con un botón "Confirmar pago" (`confirmPayment()`). Un admin/super-admin también puede entrar a esa ruta. |
-| **`super-admin`** | Superset de `admin` — entra a `/admin` con las mismas capacidades, más asignar el rol de cualquier otro usuario y eliminar cuentas (exclusivo suyo, ver `canAssignRole()`/`canActOnUser()` en `src/services/userRules.ts`, `adminSetUserRole`/`adminDeleteColono` en `functions/src/index.ts`, e `isSuperAdmin()` en `firestore.rules`). Se asigna a mano en Firestore (bootstrap) o vía `adminSetUserRole` si ya hay otro super-admin — no hay UI de auto-promoción para el primero. |
+| **`tesorero`** | Confirma que una reservación `solicitada` ya fue pagada desde `/pagos` (`TesoreroPage.tsx`) y resuelve depósitos de Casa Club finalizada. Un admin/super-admin también puede entrar a esa ruta. |
+| **`super-admin`** | Superset de `admin` — entra a `/configuracion` con las mismas capacidades, más asignar el rol de cualquier otro usuario y eliminar cuentas (exclusivo suyo, ver `canAssignRole()`/`canActOnUser()` en `src/services/userRules.ts`, `adminSetUserRole`/`adminDeleteColono` en `functions/src/index.ts`, e `isSuperAdmin()` en `firestore.rules`). Se asigna a mano en Firestore (bootstrap) o vía `adminSetUserRole` si ya hay otro super-admin — no hay UI de auto-promoción para el primero. |
 
 Un usuario tiene además un `status`: `pending` → `active` → (o `rejected`).
 Solo usuarios `active` pueden crear reservaciones. Los usuarios creados antes
@@ -42,7 +42,7 @@ están cerrados (#38, #39, #40, #41, #42). `super-admin` existe en
 `UserRole`, `firestore.rules` lo reconoce (`isAdmin()` lo incluye como
 superset; `isSuperAdmin()` es la única vía para cambiar `role` de otro
 usuario o escribir `settings/theme`), `adminCreateColono` lo acepta igual
-que `admin`. Todo vive en `/admin` → pestaña "Avanzado" (`AdvancedTab` en
+que `admin`. Todo vive en `/configuracion` → pestaña "Avanzado" (`AdvancedTab` en
 `AdminPage.tsx`, solo visible para super-admin):
 - **Asignar roles** — se quitó del tab Usuarios normal.
 - **Logo del sitio** — sube a Firebase Storage (`src/services/branding.ts`,
@@ -73,6 +73,37 @@ que `admin`. Todo vive en `/admin` → pestaña "Avanzado" (`AdvancedTab` en
 Promover a alguien a `super-admin` sigue sin tener UI — requiere editar
 el doc `users/{uid}` directo en Firestore (consola o script).
 
+## Navegación autenticada y diseño responsive (actualizado 2026-09-08)
+
+Todas las rutas autenticadas viven dentro de `AppShell.tsx`. En móvil usa
+una **tab bar** fija inferior y desde el breakpoint `md` (tableta y desktop)
+la misma navegación se presenta como un **sidebar** fijo, al estilo de una
+app de iPad. `navigationForRole()` en `src/services/navigationRules.ts` es
+la fuente de verdad tanto de los destinos visibles como de su orden:
+
+| Destino | Ruta | Visible para |
+|---|---|---|
+| Calendario | `/` | todos |
+| Reservaciones | `/reservaciones` | todos |
+| Ayuda | `/ayuda` | todos |
+| Pagos | `/pagos` | tesorero, admin y super-admin |
+| Configuración | `/configuracion` | admin y super-admin |
+
+La barra superior muestra el nombre configurable del sitio y el del usuario.
+La campana solo es decorativa por ahora (`Notificaciones próximamente`). Al
+tocar el encabezado de cuenta se abre una hoja con nombre, domicilio y
+**Cerrar sesión**, disponible para todos los roles; en desktop el mismo
+acceso queda al fondo del sidebar. Las rutas históricas `/admin` y
+`/tesorero` redirigen respectivamente a `/configuracion` y `/pagos`, para
+conservar favoritos y enlaces existentes.
+
+El Calendario tiene un selector segmentado **Cancha / Casa Club**. Al cambiar
+de fecha, `useCourtData()` oculta la disponibilidad mientras llega el
+snapshot de esa fecha, para que nunca se vea ni se pueda seleccionar la
+información del día anterior. `DateSelector` y el selector del panel de
+reservaciones de Configuración tienen nombres accesibles para sus acciones
+de día anterior/siguiente.
+
 ## Flujo de alta y login (actualizado 2026-08-30 — reemplaza el auto-registro)
 
 Desde el alta de colonos por admin (ver Epic
@@ -80,7 +111,7 @@ Desde el alta de colonos por admin (ver Epic
 auto-registro por default. El flujo real:
 
 1. **Alta**: un admin (o `super-admin` — ver "Roles" arriba) va a
-   `/admin` → Usuarios → "+ Agregar colono", captura
+   `/configuracion` → Usuarios → "Agregar colono", captura
    nombre, calle, número y teléfono. `adminCreateColono`
    (`functions/src/index.ts`, Cloud Function con Admin SDK) crea la cuenta
    de Firebase Auth (por teléfono) + `users/{uid}` con `status: 'active'`
@@ -117,21 +148,25 @@ las notificaciones, ese es el primer lugar a revisar.
 
 ## Flujo de reservación
 
-- `HomePage` muestra una sola cancha activa (`getActiveCourts()[0]` en
-  `useCourtData.ts` — **asume una sola cancha activa**; si se activan varias,
-  solo se usa la primera que devuelva Firestore).
+- `HomePage` muestra un recurso activo por tipo mediante el selector Cancha /
+  Casa Club. `useCourtData()` encuentra el primer recurso activo cuyo `type`
+  coincida; por ahora no hay un selector entre dos canchas (o dos casas club)
+  activas del mismo tipo.
 - Slots de horario se generan con `generateTimeSlots()` según
   `court.settings` (hora apertura/cierre, intervalo). Slots pasados (si es
   hoy) o que no alcanzan la duración mínima antes del cierre se ocultan.
 - Al elegir un slot libre, `getAvailableDurations()` calcula qué duraciones
   caben sin chocar con otra reservación que "ocupe" el horario (ver abajo),
   topado en 2h (`MAX_RESERVATION_DURATION_HOURS`).
-- **4 estados** (`ReservationStatus` en `src/types/index.ts`): `solicitada`
+- **6 estados** (`ReservationStatus` en `src/types/index.ts`): `solicitada`
   (recién creada, pendiente de pago) → `pagada` (el tesorero confirmó el
-  pago) → `cancelada` | `finalizada`. `solicitada` y `pagada` "ocupan" el
-  horario (cuentan para traslapes y para el límite de reservaciones activas
-  por usuario) — ver `OCCUPYING_STATUSES` en `src/services/reservationRules.ts`.
-  `cancelada` y `finalizada` no ocupan.
+  pago) → `cancelada` | `finalizada`; una reservación de Casa Club
+  `finalizada` puede terminar además como `deposito-devuelto` o
+  `deposito-retenido`, decidido por tesorero o admin. `solicitada` y
+  `pagada` "ocupan" el horario (cuentan para traslapes y para los límites
+  activos del usuario); los demás estados no ocupan — ver
+  `OCCUPYING_STATUSES` y `canTransition()` en
+  `src/services/reservationRules.ts`.
 - **Expiración "lazy" del status** (issue 4/7 del épico #10 — decisión
   explícita por simplicidad, no por restricción de plan: el proyecto ya
   está en Blaze por `functions/`, pero corregir el status exacto al
@@ -186,16 +221,18 @@ las notificaciones, ese es el primer lugar a revisar.
   sugerido 300, editable por admin — issue 6/7) y fecha/hora límite
   (`paymentDueAt`, formateada con `formatDateTimeShort()` en
   `src/utils/time.ts`).
-- `StatusBadge` (`src/components/StatusBadge.tsx`) centraliza el texto y
-  color de los 4 estados ("Pendiente de pago", "Confirmada", "Cancelada",
-  "Finalizada") — usado en `MyReservations` y en el bloque de "tu
-  reservación" de `SlotsGrid`. En la práctica, como esas dos vistas solo
-  reciben reservaciones cuyo status *efectivo* sigue ocupando el horario
-  (ver expiración lazy arriba), en el día a día solo se ven ahí los badges
-  de `solicitada`/`pagada` — `cancelada`/`finalizada` quedan listos para
-  cuando el panel admin (issue 6/7) muestre historial completo.
+- `StatusBadge` (`src/components/StatusBadge.tsx`) centraliza texto y color
+  de los seis estados, incluidos "Depósito devuelto" y "Depósito retenido".
+  Las vistas de colono solo muestran reservaciones activas (`solicitada` /
+  `pagada`); Configuración conserva el historial completo.
+- Para **Casa Club** la reservación es de día completo. El sheet pide número
+  de invitados (hasta el aforo configurado), muestra depósito y parte
+  reembolsable, y al confirmar conserva el aviso de pago hasta que la persona
+  lo cierre. También aplica su anticipación mínima, tope mensual por usuario
+  y plazo de cancelación configurables; una cancelación fuera de ese plazo se
+  rechaza. Cancha conserva horarios y selección de duración.
 
-## Panel de administración (`/admin`)
+## Panel de administración (`/configuracion`)
 
 Cuatro pestañas — la cuarta solo la ve `super-admin` (`AdminPage.tsx`,
 `isSuperAdmin`/`tabs`; ver "Roles" arriba y Epic #43):
@@ -255,24 +292,24 @@ Cuatro pestañas — la cuarta solo la ve `super-admin` (`AdminPage.tsx`,
   - **Nombre del sitio y contacto**: `settings/general` (`siteName`,
     `whatsappUrl` opcional — ver `src/services/siteSettings.ts`).
 
-## Vista de tesorero (`/tesorero`)
+## Vista de tesorero (`/pagos`)
 
-Página chica y separada de `/admin` a propósito (`TesoreroPage.tsx`) —
-lista todas las reservaciones `solicitada` (pendientes de pago) de
-cualquier fecha/cancha, ordenadas por `paymentDueAt` (las más urgentes
-primero), con un botón "Confirmar pago" por reservación
-(`confirmPayment()`). No hay paginación: el conjunto de `solicitada`
-siempre debería ser chico porque expiran solas (issue 4/7) si nadie las
-paga a tiempo.
+Página chica y separada de Configuración a propósito (`TesoreroPage.tsx`) —
+lista todas las reservaciones `solicitada` (pendientes de pago) de cualquier
+fecha/recurso, ordenadas por `paymentDueAt` (las más urgentes primero), con
+un botón "Confirmar pago" por reservación (`confirmPayment()`). Debajo
+muestra "Depósitos por resolver" de Casa Club finalizada, con acciones para
+devolver o retener la parte reembolsable. No hay paginación: el conjunto de
+pendientes debería ser chico porque los pagos vencidos se liberan solos.
 
 ## Ayuda (`/ayuda`)
 
-Tutorial + preguntas frecuentes por rol (`HelpPage.tsx`), accesible desde
-un botón "Ayuda" en la barra de cualquier pantalla autenticada (`HomePage`,
-`AdminPage`, `TesoreroPage`). El contenido es **acumulativo según lo que
+Tutorial + preguntas frecuentes por rol (`HelpPage.tsx`), accesible desde la
+tab bar o sidebar de cualquier pantalla autenticada. El contenido es
+**acumulativo según lo que
 cada rol puede hacer de verdad en la app**, no solo su "función principal":
 un admin ve la sección de reservar (puede hacerlo como cualquier colono),
-la de confirmar pagos (tiene acceso a `/tesorero`) y la de panel admin. Un
+la de confirmar pagos (tiene acceso a `/pagos`) y la de panel admin. Un
 tesorero ve reservar + confirmar pagos. Un colono solo ve reservar. La
 lógica vive en el arreglo `SECTIONS` dentro de `HelpPage.tsx` (cada
 sección declara `visibleTo`) — es contenido estático en el cliente, no hay
@@ -364,20 +401,13 @@ shape de estos documentos en el cliente.
   la segunda para el calendario público de cancha/casa club, ver sección
   dedicada arriba). El proyecto está en plan Blaze por esto. Ver "La
   regla más importante del repo" en AGENTS.md.
-- `CONTEXT.md` → "Flujo de reservación" no se actualizó para reflejar el
-  modelo de casa club (depósito, 6 estados incluyendo
-  `deposito-devuelto`/`deposito-retenido`, tope mensual, plazo de
-  cancelación de 48h) introducido por el Epic #60 (issues #61-67) —
-  sigue describiendo el modelo original de solo cancha (4 estados, "una
-  sola cancha activa"). Pendiente de reescribir esa sección completa;
-  mientras tanto, `src/services/reservationRules.ts` y
-  `functions/src/reservationRules.ts` son la fuente de verdad real.
 - Hay tests unitarios (Vitest — `npm run test` para el cliente,
   `npm run test:functions` para `functions/`) para toda la lógica de
   negocio pura, tests de componentes (Testing Library, ej. `BookingSheet`,
-  `StatusBadge`) y un flujo E2E crítico con Playwright
-  (`npm run test:e2e` — alta por admin → login → reserva → pago →
-  cancelación, contra los emuladores).
+  `StatusBadge`) y tres flujos E2E con Playwright (`npm run test:e2e`, contra
+  emuladores): cancha (alta → login → reserva → pago → cancelación), Casa
+  Club (depósito → pago → finalización → devolución → cancelación) y
+  navegación responsive (tab bar móvil/sidebar de tableta).
 - Un super-admin autenticado puede cambiar el `role` de **cualquier**
   usuario, incluido el suyo propio, directo contra Firestore (la rama
   `isSuperAdmin()` de `allow update` en `users/{uid}` no distingue
@@ -395,5 +425,5 @@ shape de estos documentos en el cliente.
 - La extensión de correo (`mail` collection) no está declarada en
   `firebase.json` — confirmar que esté instalada en el proyecto real antes de
   depender de las notificaciones por email.
-- `useCourtData` asume una única cancha activa; la UI de `HomePage` no lista
-  varias canchas aunque el modelo de datos sí lo soportaría.
+- `useCourtData` elige el primer recurso activo de cada tipo; la UI todavía
+  no lista varias canchas ni varias casas club activas simultáneamente.
