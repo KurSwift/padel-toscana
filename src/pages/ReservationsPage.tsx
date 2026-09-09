@@ -32,12 +32,21 @@ export default function ReservationsPage() {
           <p className="py-12 text-center text-sm text-gray-400">No tienes reservaciones activas.</p>
         ) : (
           <div className="mt-6 space-y-8">
-            {courts.filter((court) => reservations.some((reservation) => reservation.courtId === court.id)).map((court) => (
-              <section key={court.id}>
-                <h3 className="mb-3 text-sm font-semibold text-gray-600">{court.name}</h3>
-                <MyReservations reservations={reservations.filter((reservation) => reservation.courtId === court.id)} court={court} />
-              </section>
-            ))}
+            {courts.map((court) => {
+              const courtReservations = reservations.filter((reservation) => reservation.courtId === court.id)
+              if (courtReservations.length === 0) return null
+              return (
+                <section key={court.id}>
+                  <div className="mb-3 flex items-center justify-between px-1">
+                    <h3 className="text-sm font-semibold text-gray-800">{court.name}</h3>
+                    <span className="text-xs font-medium text-gray-400">
+                      {courtReservations.length} {courtReservations.length === 1 ? 'reservación' : 'reservaciones'}
+                    </span>
+                  </div>
+                  <MyReservations reservations={courtReservations} court={court} />
+                </section>
+              )
+            })}
           </div>
         )}
       </div>

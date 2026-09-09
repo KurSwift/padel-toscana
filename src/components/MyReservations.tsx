@@ -43,31 +43,40 @@ export default function MyReservations({ reservations, court }: Props) {
       {sorted.map((r) => (
         <div
           key={r.id}
-          className="bg-white rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3"
+          className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
         >
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold text-gray-800">
-                {formatDateShort(r.date)}
-              </p>
-              <StatusBadge status={r.status} />
+          <div className="flex items-start gap-3 px-4 py-4">
+            <span aria-hidden="true" className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-base font-semibold ${isCasaClub ? 'bg-amber-50 text-amber-700' : 'bg-brand-50 text-brand-700'}`}>
+              {isCasaClub ? '⌂' : '↗'}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{formatDateShort(r.date)}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {isCasaClub ? 'Día completo' : `${formatTime(r.startTime)} – ${formatTime(r.endTime)}`}
+                  </p>
+                </div>
+                <StatusBadge status={r.status} />
+              </div>
+              <p className="mt-3 text-xs font-medium text-gray-500">{court.name}</p>
+              {r.status === 'solicitada' && (
+                <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  <span className="font-semibold">Pago pendiente.</span> Antes de {formatDateTimeShort(r.paymentDueAt.toDate())}
+                </div>
+              )}
             </div>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {isCasaClub ? 'Día completo' : `${formatTime(r.startTime)} – ${formatTime(r.endTime)}`} · {court.name}
-            </p>
-            {r.status === 'solicitada' && (
-              <p className="text-xs text-amber-600 mt-1">
-                Paga antes de {formatDateTimeShort(r.paymentDueAt.toDate())}
-              </p>
-            )}
           </div>
-          <button
-            onClick={() => handleCancel(r)}
-            disabled={cancelling === r.id}
-            className="text-xs text-red-500 hover:text-red-600 font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition disabled:opacity-40"
-          >
-            {cancelling === r.id ? '...' : 'Cancelar'}
-          </button>
+          <div className="border-t border-gray-100 px-3 py-2">
+            <button
+              type="button"
+              onClick={() => handleCancel(r)}
+              disabled={cancelling === r.id}
+              className="min-h-10 w-full rounded-lg text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-40"
+            >
+              {cancelling === r.id ? 'Cancelando…' : 'Cancelar reservación'}
+            </button>
+          </div>
         </div>
       ))}
     </div>
