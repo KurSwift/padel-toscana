@@ -8,6 +8,7 @@ interface CourtData {
   reservations: Reservation[]
   userReservations: Reservation[]
   loading: boolean
+  reservationsLoading: boolean
 }
 
 // Antes de la épica #60 (issue 6/8) solo existía un tipo de recurso, así
@@ -23,6 +24,7 @@ export function useCourtData(userId: string, courtType: CourtType, selectedDate:
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [allUserReservations, setAllUserReservations] = useState<Reservation[]>([])
   const [loading, setLoading] = useState(true)
+  const [reservationsDate, setReservationsDate] = useState('')
 
   useEffect(() => {
     getActiveCourts().then((cs) => {
@@ -34,8 +36,17 @@ export function useCourtData(userId: string, courtType: CourtType, selectedDate:
   const court = courts.find((c) => (c.type ?? 'cancha') === courtType) ?? null
 
   useEffect(() => {
-    if (!court) return
-    return subscribeToReservations(court.id, selectedDate, setReservations)
+    if (!court) {
+      return
+    }
+    // La suscripción nueva entrega su primer snapshot de forma asíncrona.
+    // No conservamos las reservaciones de la fecha anterior ni exponemos la
+    // disponibilidad hasta recibirlo: podrían corresponder al día equivocado.
+    setReservations([])
+    return subscribeToReservations(court.id, selectedDate, (nextReservations) => {
+      setReservations(nextReservations)
+      setReservationsDate(selectedDate)
+    })
   }, [court, selectedDate])
 
   useEffect(() => {
@@ -47,5 +58,11 @@ export function useCourtData(userId: string, courtType: CourtType, selectedDate:
     ? allUserReservations.filter((r) => r.courtId === court.id)
     : []
 
-  return { court, reservations, userReservations, loading }
+  return {
+    court,
+    reservations,
+    userReservations,
+    loading,
+    reservationsLoading: court !== null && reservationsDate !== selectedDate,
+  }
 }

@@ -24,10 +24,10 @@ test('alta por admin → login → reserva → pago → cancelación', async ({ 
   // alta directo (ver adminCreateColono, functions/src/index.ts) y el
   // colono queda 'active' de inmediato, sin paso de aprobación.
   await loginWithPhone(page, { street: 'Nogal', streetNumber: '1', tenDigitPhone: ADMIN_PHONE })
-  await page.getByRole('button', { name: 'Admin' }).click()
+  await page.getByRole('link', { name: 'Configuración' }).click()
   await page.getByRole('button', { name: /^Usuarios/ }).click()
 
-  await page.getByRole('button', { name: '+ Agregar colono' }).click()
+  await page.getByRole('button', { name: 'Agregar colono' }).click()
   await page.getByPlaceholder('Ej: María García').fill(NEW_USER_NAME)
   await page.getByRole('button', { name: 'Olivo', exact: true }).click()
   await page.getByPlaceholder('Ej: 15').fill(NEW_USER_STREET_NUMBER)
@@ -38,12 +38,12 @@ test('alta por admin → login → reserva → pago → cancelación', async ({ 
 
   // ── Reserva ───────────────────────────────────────────────────────────
   await loginWithPhone(page, { street: 'Olivo', streetNumber: NEW_USER_STREET_NUMBER, tenDigitPhone: NEW_USER_PHONE })
-  await expect(page.getByText(`Hola, ${NEW_USER_NAME}`)).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Calendario' })).toBeVisible()
 
   // Pasado mañana: la cancha requiere minLeadHours=24 — "mañana" puede
   // quedar por debajo de eso según la hora del día en que corra el test.
-  await page.getByRole('button', { name: '›' }).click()
-  await page.getByRole('button', { name: '›' }).click()
+  await page.getByRole('button', { name: 'Ver día siguiente' }).click()
+  await page.getByRole('button', { name: 'Ver día siguiente' }).click()
 
   await page.getByRole('button', { name: /Reservar/ }).first().click()
 
@@ -52,22 +52,14 @@ test('alta por admin → login → reserva → pago → cancelación', async ({ 
   await expect(page.getByText('¡Reservación creada!')).toBeVisible()
   await page.getByRole('button', { name: 'Entendido' }).click()
 
-  await page.getByRole('button', { name: 'Mis reservaciones' }).click()
-  // Es la única reservación de este usuario (recién dado de alta) — el
-  // botón "Cancelar" alcanza para identificarla sin ambigüedad. No usamos
-  // el texto del horario reservado porque en MyReservations el status vive
-  // en un <div> interno que también matchearía por texto, resolviendo al
-  // wrapper interno en vez de a la tarjeta completa (la que trae el botón).
-  const reservationCard = page.locator('div').filter({
-    has: page.getByRole('button', { name: 'Cancelar' }),
-  }).last()
-  await expect(reservationCard.getByText('Pendiente de pago')).toBeVisible()
+  await page.getByRole('link', { name: 'Reservaciones' }).click()
+  await expect(page.getByText('Pendiente de pago')).toBeVisible()
 
   await logout(page)
 
   // ── Pago ──────────────────────────────────────────────────────────────
   await loginWithPhone(page, { street: 'Encino', streetNumber: '8', tenDigitPhone: TESORERO_PHONE })
-  await page.getByRole('button', { name: 'Pagos' }).click()
+  await page.getByRole('link', { name: 'Pagos' }).click()
   const pendingPaymentCard = page.locator('div', { hasText: NEW_USER_NAME }).filter({
     has: page.getByRole('button', { name: 'Confirmar pago' }),
   }).last()
@@ -77,11 +69,8 @@ test('alta por admin → login → reserva → pago → cancelación', async ({ 
 
   // ── Cancelación ───────────────────────────────────────────────────────
   await loginWithPhone(page, { street: 'Olivo', streetNumber: NEW_USER_STREET_NUMBER, tenDigitPhone: NEW_USER_PHONE })
-  await page.getByRole('button', { name: 'Mis reservaciones' }).click()
-  const confirmedCard = page.locator('div').filter({
-    has: page.getByRole('button', { name: 'Cancelar' }),
-  }).last()
-  await expect(confirmedCard.getByText('Confirmada')).toBeVisible()
-  await confirmedCard.getByRole('button', { name: 'Cancelar' }).click()
+  await page.getByRole('link', { name: 'Reservaciones' }).click()
+  await expect(page.getByText('Confirmada')).toBeVisible()
+  await page.getByRole('button', { name: 'Cancelar reservación' }).click()
   await expect(page.getByText('Reservación cancelada.')).toBeVisible()
 })

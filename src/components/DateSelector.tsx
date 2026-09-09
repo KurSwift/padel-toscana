@@ -25,7 +25,7 @@ export default function DateSelector({ date, minDate, maxDaysAhead, onChange }: 
     : weekday
 
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm">
+    <div role="group" aria-label={`Fecha seleccionada: ${fullDate}`} className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm">
       <button
         type="button"
         onClick={() => onChange(addDays(date, -1))}
