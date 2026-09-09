@@ -6,6 +6,7 @@
 // `@/types` van como `import type` para que se borren en compilación y no
 // arrastren accidentalmente `firebase/firestore` a los tests.
 import type { ReservationStatus, UserRole } from '@/types'
+import { addDays, toDate, toDateString } from '@/utils/time'
 
 // Estados que "ocupan" un horario: cuentan para traslapes (hasOverlap) y
 // para el límite de reservaciones activas por usuario
@@ -74,6 +75,19 @@ export function isDurationWithinHardCap(durationHours: number): boolean {
 // la validación equivalente en firestore.rules (comparando Timestamps).
 export function isLeadTimeSufficient(startAt: Date, now: Date, minLeadHours: number): boolean {
   return startAt.getTime() - now.getTime() >= minLeadHours * 60 * 60 * 1000
+}
+
+/**
+ * Devuelve la primera fecha cuyo `startTime` cumple la anticipación mínima.
+ * Evita que la UI ofrezca un día que `createReservation()` rechazaría; es
+ * especialmente importante para Casa Club, que comienza siempre a las 00:00.
+ */
+export function firstReservableDate(now: Date, startTime: string, minLeadHours: number): string {
+  let date = toDateString(now)
+  while (!isLeadTimeSufficient(toDate(date, startTime), now, minLeadHours)) {
+    date = addDays(date, 1)
+  }
+  return date
 }
 
 // ¿El inicio de la reservación está dentro de la ventana máxima de
