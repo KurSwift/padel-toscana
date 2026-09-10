@@ -23,6 +23,19 @@ import {
   OCCUPYING_STATUSES,
 } from '@/services/reservationRules'
 
+// Ningún onSnapshot de este archivo tenía callback de error — si el listener
+// fallaba (permission-denied transitorio, App Check, blip de red), el
+// callback de éxito simplemente dejaba de dispararse para siempre y la UI
+// se quedaba en su spinner de carga sin ninguna señal de qué pasó, sin
+// reintento automático de Firestore. Este logger es el piso mínimo (consola)
+// para las suscripciones que no exponen retry en la UI; las que sí lo
+// exponen (subscribeToReservations, subscribeToUserReservations) además
+// llaman a `onError` para que el hook que las usa pueda salir del estado de
+// carga y ofrecer "Reintentar" en vez de girar indefinidamente.
+function logSnapshotFailure(context: string, error: Error): void {
+  console.error(`[reservations] onSnapshot falló (${context}):`, error)
+}
+
 const ERRORS: Record<string, string> = {
   'admin-only': 'Solo administración puede reservar para un colono.',
   'resident-not-found': 'El colono seleccionado ya no existe.',
@@ -238,6 +251,7 @@ export function subscribeToReservations(
   courtId: string,
   date: string,
   onUpdate: (reservations: Reservation[]) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   return onSnapshot(
     query(
@@ -247,6 +261,10 @@ export function subscribeToReservations(
       where('status', 'in', OCCUPYING_STATUSES),
     ),
     (snap) => onUpdate(toOccupyingReservations(snap.docs)),
+    (error) => {
+      logSnapshotFailure('subscribeToReservations', error)
+      onError?.(error)
+    },
   )
 }
 
@@ -261,12 +279,14 @@ export function subscribeToAllReservationsByDate(
   return onSnapshot(
     query(collection(db, 'reservations'), where('date', '==', date)),
     (snap) => onUpdate(toEffectiveReservations(snap.docs)),
+    (error) => logSnapshotFailure('subscribeToAllReservationsByDate', error),
   )
 }
 
 export function subscribeToUserReservations(
   userId: string,
   onUpdate: (reservations: Reservation[]) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   return onSnapshot(
     query(
@@ -275,6 +295,10 @@ export function subscribeToUserReservations(
       where('status', 'in', OCCUPYING_STATUSES),
     ),
     (snap) => onUpdate(toOccupyingReservations(snap.docs)),
+    (error) => {
+      logSnapshotFailure('subscribeToUserReservations', error)
+      onError?.(error)
+    },
   )
 }
 
@@ -289,6 +313,7 @@ export function subscribeToPendingPayments(
   return onSnapshot(
     query(collection(db, 'reservations'), where('status', '==', 'solicitada')),
     (snap) => onUpdate(toEffectiveReservations(snap.docs).filter((r) => r.status === 'solicitada')),
+    (error) => logSnapshotFailure('subscribeToPendingPayments', error),
   )
 }
 
@@ -311,6 +336,7 @@ export function subscribeToPendingDepositDecisions(
           (r) => r.status === 'finalizada' && (r.courtType ?? 'cancha') === 'casa-club',
         ),
       ),
+    (error) => logSnapshotFailure('subscribeToPendingDepositDecisions', error),
   )
 }
 
