@@ -296,6 +296,12 @@ programada es un cambio localizado que reutiliza `effectiveStatus()`.
 **El flujo por default para desarrollar y probar es contra los emuladores,
 no contra producción.** `npm run dev` sin más solo pega a producción si no
 existe `.env.local` con `VITE_USE_EMULATORS=true` (ver `src/firebase.ts`).
+**Ese mismo archivo se cuela en un build de producción**: Vite lo lee antes
+que `.env`, así que un `npm run build` con `.env.local` presente hornea
+`VITE_USE_EMULATORS=true` en el bundle — el sitio desplegado (`npx firebase
+deploy`, ver CLAUDE.md → "Despliegue completo a producción") terminaría
+apuntando a los emuladores locales en vez de Firebase real. Muévelo fuera
+del repo antes de ese build y restáuralo justo después.
 
 ```bash
 cp .env.local.example .env.local   # una vez
