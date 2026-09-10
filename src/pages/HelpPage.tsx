@@ -15,20 +15,25 @@ interface HelpSection {
 
 const SECTIONS: HelpSection[] = [
   {
-    title: 'Reservar una cancha',
+    title: 'Reservar Cancha o Casa Club',
     visibleTo: ['all'],
     steps: [
-      'En la pestaña "Horarios", elige el día que quieres jugar (usa las flechas para cambiar de día).',
-      'Toca un horario libre — verás las duraciones disponibles (hasta 2 horas).',
-      'Elige cuántas horas, cuántos jugadores en total (1 a 10 — 4 son los que caben jugando a la vez, el resto son suplentes o acompañantes) y confirma quién es el residente a cargo (por default eres tú, pero puedes cambiarlo si la va a usar alguien más de tu domicilio).',
-      'Al confirmar, la app te dice cuánto pagar y la fecha límite. Paga directo al tesorero (fuera de la app) antes de esa fecha, o el horario se libera automáticamente.',
-      'Revisa el estado de tus reservaciones en "Mis reservaciones": "Pendiente de pago" hasta que el tesorero confirme, luego "Confirmada".',
-      'Puedes cancelar cualquier reservación tuya, pendiente o confirmada, desde "Mis reservaciones".',
+      'En la pestaña "Calendario", usa el selector Cancha / Casa Club de arriba para elegir qué quieres reservar.',
+      'Elige el día que quieres (usa las flechas para cambiar de día).',
+      'Cancha: toca un horario libre — verás las duraciones disponibles (hasta 2 horas). Casa Club: la reservación es de día completo, no hay horario que elegir.',
+      'Elige cuántas personas en total (Cancha: jugadores, 1 a 10 — 4 son los que caben jugando a la vez, el resto son suplentes o acompañantes; Casa Club: invitados, hasta el aforo configurado) y confirma quién es el residente a cargo (por default eres tú, pero puedes cambiarlo si la va a usar alguien más de tu domicilio).',
+      'Al confirmar, la app te dice cuánto pagar (en Casa Club, el depósito) y la fecha límite. Paga directo al tesorero (fuera de la app) antes de esa fecha, o el horario se libera automáticamente.',
+      'Revisa el estado de tus reservaciones en "Reservaciones": "Pendiente de pago" hasta que el tesorero confirme, luego "Confirmada". Al terminar una Casa Club, el tesorero resuelve el depósito y verás "Depósito devuelto" o "Depósito retenido".',
+      'Puedes cancelar cualquier reservación tuya, pendiente o confirmada, desde "Reservaciones" — Casa Club solo se puede cancelar respetando el plazo mínimo de cancelación configurado.',
     ],
     faq: [
       {
+        q: '¿En qué se diferencia Casa Club de Cancha?',
+        a: 'Casa Club se reserva por día completo (no eliges horario), pide número de invitados en vez de jugadores, y requiere un depósito además del pago de reservación. El tesorero devuelve o retiene la parte reembolsable del depósito al terminar el evento.',
+      },
+      {
         q: '¿Cuántas reservaciones puedo tener a la vez?',
-        a: 'Hasta que no se cancele o pase alguna, hay un máximo por colono (lo define el administrador, normalmente 2).',
+        a: 'Hasta que no se cancele o pase alguna, hay un máximo por colono (lo define el administrador, normalmente 2). Casa Club además puede tener un tope de reservaciones por usuario al mes.',
       },
       {
         q: '¿Con cuánta anticipación tengo que reservar?',
@@ -43,12 +48,16 @@ const SECTIONS: HelpSection[] = [
         a: 'Al tesorero, directamente (efectivo, transferencia, etc. — fuera de la app). Si tienes dudas de a quién contactar, pregunta en el grupo de WhatsApp.',
       },
       {
-        q: '¿Puedo reservar más de 2 horas?',
+        q: '¿Puedo reservar más de 2 horas en cancha?',
         a: 'No, el máximo por reservación es 2 horas.',
       },
       {
+        q: '¿Qué pasa si cancelo Casa Club a última hora?',
+        a: 'Si ya no alcanzas el plazo mínimo de cancelación (lo define el administrador), la app no te deja cancelar — contacta al administrador si es un caso especial.',
+      },
+      {
         q: '¿Qué significan las etiquetas de color en mis reservaciones?',
-        a: '"Pendiente de pago" = falta que el tesorero confirme tu pago. "Confirmada" = ya se pagó. "Cancelada"/"Finalizada" = ya no aplica.',
+        a: '"Pendiente de pago" = falta que el tesorero confirme tu pago. "Confirmada" = ya se pagó. "Cancelada"/"Finalizada" = ya no aplica. En Casa Club, al terminar el evento el tesorero marca el depósito como "Depósito devuelto" o "Depósito retenido".',
       },
     ],
   },
@@ -57,14 +66,19 @@ const SECTIONS: HelpSection[] = [
     visibleTo: ['tesorero', 'admin', 'super-admin'],
     steps: [
       'Abre la pestaña "Pagos" en la navegación principal.',
-      'Verás la lista de reservaciones pendientes de pago, ordenadas de la más urgente a la menos urgente.',
+      'Verás la lista de reservaciones pendientes de pago (Cancha y Casa Club), ordenadas de la más urgente a la menos urgente.',
       'Cuando alguien te pague (fuera de la app), busca su reservación en la lista y presiona "Confirmar pago".',
       'La reservación desaparece de tu lista y el colono ve su estado cambiar a "Confirmada".',
+      'Debajo verás "Depósitos por resolver": Casa Club ya finalizada, esperando que devuelvas o retengas la parte reembolsable del depósito.',
     ],
     faq: [
       {
         q: '¿Cómo sé quién me debe pagar?',
-        a: 'Cada tarjeta de la lista muestra el nombre del residente a cargo, su domicilio y el horario — coteja contra lo que te llegó.',
+        a: 'Cada tarjeta de la lista muestra el nombre del residente a cargo, su domicilio y el horario (o "Día completo" en Casa Club) — coteja contra lo que te llegó.',
+      },
+      {
+        q: '¿Qué son los "Depósitos por resolver"?',
+        a: 'Reservaciones de Casa Club ya finalizadas donde falta decidir si se devuelve o se retiene el depósito reembolsable (por ejemplo, si hubo daños). Aparecen debajo de la lista de pagos pendientes.',
       },
       {
         q: '¿Qué pasa si confirmo un pago por error?',
@@ -81,8 +95,9 @@ const SECTIONS: HelpSection[] = [
     visibleTo: ['admin', 'super-admin'],
     steps: [
       'Abre "Configuración" en la navegación principal.',
-      'Pestaña "Reservaciones": ve todas las reservaciones de un día (los 4 estados) y cambia el estado de cualquiera si hace falta.',
-      'Pestaña "Canchas": activa/desactiva canchas, y ajusta horarios, duración, límites de anticipación, plazo de pago y el monto a cobrar.',
+      'Pestaña "Reservaciones": ve todas las reservaciones de un día, de Cancha y Casa Club (los 6 estados), y cambia el estado de cualquiera si hace falta.',
+      'En esa misma pestaña, "Reservar para un colono" te deja buscar a un colono por nombre o domicilio y reservarle Cancha o Casa Club — el residente a cargo se precarga con su nombre pero lo puedes editar.',
+      'Pestaña "Canchas": activa/desactiva recursos y crea uno nuevo eligiendo tipo (Cancha o Casa Club). Cancha muestra horarios y duración; Casa Club muestra depósito, reembolsable, aforo y plazo de cancelación. Ambos comparten límites de anticipación, plazo de pago y monto a cobrar (Casa Club agrega el tope mensual por usuario).',
       'Pestaña "Usuarios": aprueba o rechaza solicitudes de registro nuevas, y agrega colonos nuevos directamente.',
     ],
     faq: [
@@ -91,16 +106,24 @@ const SECTIONS: HelpSection[] = [
         a: 'Pestaña Usuarios → sección "Pendientes de aprobación" → botón Aprobar o Rechazar.',
       },
       {
+        q: '¿Cómo reservo Cancha o Casa Club a nombre de un colono?',
+        a: 'Pestaña Reservaciones → "Reservar para un colono" → búscalo por nombre o domicilio → sigue el mismo flujo de reservación normal. Queda registrado que tú la creaste, pero los límites (máximo de activas, tope mensual, etc.) aplican al colono, no a ti.',
+      },
+      {
         q: '¿Cómo hago a alguien tesorero?',
         a: 'Asignar roles es exclusivo de super-admin, desde la pestaña "Avanzado" — si no tienes ese rol, pídeselo a un super-admin.',
       },
       {
         q: '¿Cómo cambio el monto que se cobra por reservación?',
-        a: 'Pestaña Canchas → campo "Monto a pagar ($)" de la cancha correspondiente.',
+        a: 'Pestaña Canchas → campo "Monto a pagar ($)" del recurso correspondiente.',
       },
       {
-        q: '¿Cómo agrego una cancha nueva?',
-        a: 'Pestaña Canchas → botón "+ Agregar cancha".',
+        q: '¿Cómo cambio el depósito o el plazo de cancelación de Casa Club?',
+        a: 'Pestaña Canchas → el recurso de tipo Casa Club muestra sus campos exclusivos: Depósito ($), Reembolsable ($), Plazo de cancelación (horas) y Aforo (personas).',
+      },
+      {
+        q: '¿Cómo agrego una cancha o una Casa Club nueva?',
+        a: 'Pestaña Canchas → botón "+ Agregar cancha" → elige el tipo (Cancha o Casa Club).',
       },
     ],
   },
