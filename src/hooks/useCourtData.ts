@@ -9,6 +9,8 @@ interface CourtData {
   userReservations: Reservation[]
   loading: boolean
   reservationsLoading: boolean
+  error: boolean
+  retry: () => void
 }
 
 // Antes de la épica #60 (issue 6/8) solo existía un tipo de recurso, así
@@ -25,13 +27,31 @@ export function useCourtData(userId: string, courtType: CourtType, selectedDate:
   const [allUserReservations, setAllUserReservations] = useState<Reservation[]>([])
   const [loading, setLoading] = useState(true)
   const [reservationsDate, setReservationsDate] = useState('')
+  const [error, setError] = useState(false)
+  // Cambiar retryKey fuerza a los dos efectos de abajo a recrear sus
+  // suscripciones — es lo que ofrece "Reintentar" en vez de exigir un
+  // refresh de página cuando un listener de Firestore falla (ver
+  // logSnapshotFailure en services/reservations.ts: sin esto, un error
+  // dejaba `reservationsLoading`/`loading` atorados en true para siempre).
+  const [retryKey, setRetryKey] = useState(0)
+
+  function retry() {
+    setError(false)
+    setRetryKey((k) => k + 1)
+  }
 
   useEffect(() => {
-    getActiveCourts().then((cs) => {
-      setCourts(cs)
-      setLoading(false)
-    })
-  }, [])
+    setLoading(true)
+    getActiveCourts()
+      .then((cs) => {
+        setCourts(cs)
+        setLoading(false)
+      })
+      .catch(() => {
+        setError(true)
+        setLoading(false)
+      })
+  }, [retryKey])
 
   const court = courts.find((c) => (c.type ?? 'cancha') === courtType) ?? null
 
@@ -43,16 +63,21 @@ export function useCourtData(userId: string, courtType: CourtType, selectedDate:
     // No conservamos las reservaciones de la fecha anterior ni exponemos la
     // disponibilidad hasta recibirlo: podrían corresponder al día equivocado.
     setReservations([])
-    return subscribeToReservations(court.id, selectedDate, (nextReservations) => {
-      setReservations(nextReservations)
-      setReservationsDate(selectedDate)
-    })
-  }, [court, selectedDate])
+    return subscribeToReservations(
+      court.id,
+      selectedDate,
+      (nextReservations) => {
+        setReservations(nextReservations)
+        setReservationsDate(selectedDate)
+      },
+      () => setError(true),
+    )
+  }, [court, selectedDate, retryKey])
 
   useEffect(() => {
     if (!userId) return
-    return subscribeToUserReservations(userId, setAllUserReservations)
-  }, [userId])
+    return subscribeToUserReservations(userId, setAllUserReservations, () => setError(true))
+  }, [userId, retryKey])
 
   const userReservations = court
     ? allUserReservations.filter((r) => r.courtId === court.id)
@@ -63,6 +88,8 @@ export function useCourtData(userId: string, courtType: CourtType, selectedDate:
     reservations,
     userReservations,
     loading,
-    reservationsLoading: court !== null && reservationsDate !== selectedDate,
+    reservationsLoading: !error && court !== null && reservationsDate !== selectedDate,
+    error,
+    retry,
   }
 }

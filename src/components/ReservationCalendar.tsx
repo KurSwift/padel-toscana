@@ -29,7 +29,7 @@ export default function ReservationCalendar({ profile, forResident = false }: {
   const [selectedDate, setSelectedDate] = useState(todayString())
   const [selectedSlot, setSelectedSlot] = useState<SelectedSlot | null>(null)
 
-  const { court, reservations, loading, reservationsLoading } = useCourtData(
+  const { court, reservations, loading, reservationsLoading, error, retry } = useCourtData(
     profile.uid,
     resourceType,
     selectedDate,
@@ -96,7 +96,18 @@ export default function ReservationCalendar({ profile, forResident = false }: {
             <ResourceSegmentedControl value={resourceType} onChange={handleSelectResource} />
           </section>
 
-          {loading ? (
+          {error ? (
+            <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-12 text-center">
+              <p className="text-sm text-gray-500">No se pudo cargar la disponibilidad.</p>
+              <button
+                type="button"
+                onClick={retry}
+                className="mt-3 min-h-11 rounded-xl bg-brand-50 px-4 text-sm font-semibold text-brand-700 hover:bg-brand-100"
+              >
+                Reintentar
+              </button>
+            </div>
+          ) : loading ? (
             <div className="flex items-center justify-center py-20">
               <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
             </div>
