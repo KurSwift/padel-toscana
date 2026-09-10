@@ -9,7 +9,7 @@ import { loginWithPhone, logout } from './helpers'
 const RUN_ID = String(Date.now()).slice(-8)
 const NEW_USER_PHONE = `56${RUN_ID}`
 const NEW_USER_STREET_NUMBER = RUN_ID
-const NEW_USER_NAME = 'Elena Club E2E'
+const NEW_USER_NAME = `Elena Club E2E ${RUN_ID}`
 const ADMIN_PHONE = '5500000001' // Admin Seed — Nogal 1, ver SEED_USERS en scripts/seed.mjs.
 const TESORERO_PHONE = '5500000005' // Tere Tesorera — Encino 8.
 

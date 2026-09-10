@@ -14,7 +14,7 @@
 // firestore.rules ahora deniega `create` en reservations por completo
 // (`allow create: if false`) — esta función es la ÚNICA vía legítima para
 // crear una reservación. También deriva userId/userName/userAddress del
-// lado del servidor (de request.auth.uid y users/{uid}) en vez de confiar
+// lado del servidor (beneficiario autorizado y users/{uid}) en vez de confiar
 // en lo que mande el cliente — cierra un vector de spoofing adicional que
 // el `addDoc` directo del cliente tenía antes.
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
@@ -36,6 +36,7 @@ import {
   isVisibleOnPublicCalendar,
 } from './reservationRules'
 import { toDate, addHours, monthDateRange } from './time'
+import { bookingPermissionError, isValidBookingTarget } from './bookingRules'
 import { checkRateLimit, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_CALLS } from './rateLimit'
 import { isValidStreet, isAddressAvailable, normalizeAddress, isValidColonoName, isValidMxPhone } from './colonoRules'
 
@@ -43,6 +44,7 @@ initializeApp()
 const db = getFirestore()
 
 interface CreateReservationInput {
+  targetUserId?: string
   courtId: string
   date: string
   startTime: string
@@ -63,7 +65,8 @@ function isValidInput(data: unknown): data is CreateReservationInput {
     typeof d.startTime === 'string' &&
     typeof d.durationHours === 'number' &&
     typeof d.playerCount === 'number' &&
-    typeof d.residentInChargeName === 'string'
+    typeof d.residentInChargeName === 'string' &&
+    isValidBookingTarget(d.targetUserId)
   )
 }
 
@@ -90,6 +93,7 @@ async function enforceRateLimit(uid: string): Promise<void> {
   })
 }
 
+/** Crea para el actor o un colono autorizado; conserva reglas comunes y registra al actor real. */
 export const createReservation = onCall(
   { region: 'us-central1', enforceAppCheck: true },
   async (request) => {
@@ -104,14 +108,9 @@ export const createReservation = onCall(
     const { courtId, date, playerCount } = request.data
     const residentInChargeName = request.data.residentInChargeName.trim()
 
-    const [userSnap, courtSnap] = await Promise.all([
-      db.doc(`users/${uid}`).get(),
-      db.doc(`courts/${courtId}`).get(),
-    ])
-
-    if (!userSnap.exists) throw new HttpsError('failed-precondition', 'user-not-found')
-    const user = userSnap.data() as { name: string; address: string; status?: string }
-    if (user.status !== 'active') throw new HttpsError('failed-precondition', 'inactive-user')
+    const targetUserId = request.data.targetUserId
+    const ownerUid = targetUserId ?? uid
+    const courtSnap = await db.doc(`courts/${courtId}`).get()
 
     if (!courtSnap.exists) throw new HttpsError('failed-precondition', 'court-not-found')
     const court = courtSnap.data() as {
@@ -178,6 +177,20 @@ export const createReservation = onCall(
     const newRef = db.collection('reservations').doc()
 
     await db.runTransaction(async (tx) => {
+      // Permisos y beneficiario se leen en la misma transacción que la reserva:
+      // una baja o cambio de rol concurrente obliga a revalidar antes del write.
+      const actorSnap = await tx.get(db.doc(`users/${uid}`))
+      const ownerSnap = ownerUid === uid ? actorSnap : await tx.get(db.doc(`users/${ownerUid}`))
+      const actor = actorSnap.exists ? actorSnap.data() as { role?: string; status?: string } : null
+      const owner = ownerSnap.exists
+        ? ownerSnap.data() as { name: string; address: string; role?: string; status?: string }
+        : null
+      const permissionError = bookingPermissionError(actor, targetUserId, owner)
+      if (permissionError) {
+        throw new HttpsError(permissionError === 'admin-only' ? 'permission-denied' : 'failed-precondition', permissionError)
+      }
+      if (!owner) throw new HttpsError('failed-precondition', 'user-not-found')
+
       // Reservaciones activas del usuario (límite maxActiveReservationsPerUser),
       // filtradas por courtType EN MEMORIA (no en la query): sin este
       // filtro, un colono con sus reservaciones de cancha al tope quedaría
@@ -189,7 +202,7 @@ export const createReservation = onCall(
       // resto de campos nuevos del épico (issue 1/8), no en la query.
       const userQuery = db
         .collection('reservations')
-        .where('userId', '==', uid)
+        .where('userId', '==', ownerUid)
         .where('status', 'in', OCCUPYING_STATUSES)
       const userReservationsSnap = await tx.get(userQuery)
       const userReservations = userReservationsSnap.docs
@@ -227,9 +240,10 @@ export const createReservation = onCall(
       tx.set(newRef, {
         courtId,
         courtType,
-        userId: uid,
-        userName: user.name,
-        userAddress: user.address,
+        userId: ownerUid,
+        createdByUid: uid,
+        userName: owner.name,
+        userAddress: owner.address,
         date,
         startTime,
         endTime,

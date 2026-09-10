@@ -9,6 +9,7 @@ interface Props {
   startTime: string
   availableDurations: number[]
   maxPlayerCount: number
+  beneficiary?: string
   defaultResidentName: string
   reservationFee: number
   paymentDeadlineHours: number
@@ -40,6 +41,7 @@ export default function BookingSheet({
   availableDurations,
   maxPlayerCount,
   defaultResidentName,
+  beneficiary,
   reservationFee,
   paymentDeadlineHours,
   depositAmount,
@@ -81,13 +83,14 @@ export default function BookingSheet({
           <p className="mt-1 text-sm text-gray-500">
             {isCasaClub ? formatDateLong(date) : `${formatDateLong(date)} · ${formatTime(startTime)} – ${formatTime(endTime)}`}
           </p>
+          {beneficiary && <p className="mt-3 text-sm font-medium text-gray-700">Reservación para {beneficiary}</p>}
           <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left">
             <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Siguiente paso</p>
-            <p className="mt-1 text-sm text-amber-900">Paga <span className="font-bold">${reservationFee}</span> al tesorero antes de</p>
+            <p className="mt-1 text-sm text-amber-900">{beneficiary ? 'El colono debe pagar' : 'Paga'} <span className="font-bold">${reservationFee}</span> al tesorero antes de</p>
             <p className="mt-1 text-base font-bold text-amber-950">{formatDateTimeShort(paymentDueAt)}</p>
             {isCasaClub && depositRefundableAmount != null && (
               <p className="mt-3 text-xs leading-5 text-amber-800">
-                ${depositRefundableAmount} de ese depósito se te devuelve después del evento, salvo que se retenga por daños o incumplimiento.
+                ${depositRefundableAmount} de ese depósito {beneficiary ? 'se devuelve al colono' : 'se te devuelve'} después del evento, salvo que se retenga por daños o incumplimiento.
               </p>
             )}
             <p className="mt-3 text-xs leading-5 text-amber-800">
@@ -112,6 +115,7 @@ export default function BookingSheet({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
         <section aria-label="Resumen de reservación" className="rounded-2xl bg-brand-50 p-4">
+          {beneficiary && <p className="mb-2 text-sm font-medium text-brand-800">Para {beneficiary}</p>}
           <p className="text-sm font-semibold text-brand-900">{formatDateLong(date)}</p>
           {isCasaClub ? (
             <p className="mt-1 text-xl font-bold text-brand-700">Día completo</p>

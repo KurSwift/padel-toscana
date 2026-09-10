@@ -203,7 +203,9 @@ service cloud.firestore {
       // son seguras porque dependen de request.time (reloj del servidor),
       // no de nada que mande el cliente. Ninguna transición no-admin puede
       // tocar los demás campos.
-      allow update: if (
+      // La autoría es de servidor e inmutable incluso para administradores.
+      allow update: if request.resource.data.get('createdByUid', null) == resource.data.get('createdByUid', null)
+        && ((
           isOwner(resource.data.userId)
           && resource.data.status in ['solicitada', 'pagada']
           && request.resource.data.status == 'cancelada'
@@ -237,7 +239,7 @@ service cloud.firestore {
           && request.resource.data.status in ['deposito-devuelto', 'deposito-retenido']
           && reservationCoreFieldsUnchanged()
         )
-        || isAdmin();
+        || isAdmin());
 
       allow delete: if false;
     }
