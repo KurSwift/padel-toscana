@@ -413,14 +413,17 @@ Contexto completo de las decisiones (depósito, tope mensual, formato
 del calendario) en `PRD.md` § 14 y en el historial de esta conversación
 si se retoma sin ese contexto.
 
-## 7. Reservación manual por administración — issue #100
+## 7. ~~Reservación manual por administración~~ — hecha
 
-**Implementación en revisión**: [#100](https://github.com/KurSwift/padel-toscana/issues/100).
-Desde Configuración → Reservaciones, admin/super-admin seleccionan un colono
-activo por nombre/domicilio y usan el mismo calendario de Cancha/Casa Club.
-El residente a cargo se precarga y sigue editable. La función de creación
-valida permisos y beneficiario dentro de la transacción, aplica los límites
-al colono y registra al administrador en `createdByUid`.
+**Hecho** (2026-09-09): [#100](https://github.com/KurSwift/padel-toscana/issues/100),
+implementado en el [PR #101](https://github.com/KurSwift/padel-toscana/pull/101),
+mergeado a `main` y desplegado a producción (Hosting, `firestore.rules` y
+`createReservation`). Desde Configuración → Reservaciones, admin/super-admin
+seleccionan un colono activo por nombre/domicilio y usan el mismo calendario
+de Cancha/Casa Club. El residente a cargo se precarga y sigue editable. La
+función valida permisos y beneficiario dentro de la transacción, aplica los
+límites al colono, mantiene el rate limit por actor y registra al administrador
+en `createdByUid`, que no puede alterarse desde el cliente.
 
 Alcance original:
 
