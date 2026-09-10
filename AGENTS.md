@@ -142,10 +142,12 @@ e2e/                      # Playwright — npm run test:e2e, ver más abajo
   helpers.ts              # loginWithPhone (domicilio + teléfono + OTP vía emulador), logout
   critical-flow.spec.ts   # alta por admin → login → reserva de cancha → pago → cancelación
   casa-club-flow.spec.ts  # reserva de casa club con depósito → pago → devolución de depósito → cancelación
+  admin-reservation-flow.spec.ts  # admin reserva para colono, autoría y rechazo de suplantación
 functions/                # Cloud Functions v2 + TypeScript — build/deploy propios, ver "Comandos"
   src/index.ts             # createReservation, adminCreateColono/adminDeleteColono/adminSetUserRole,
                             # getResidentsByAddress, getPublicCalendar (todas onCall)
   src/reservationRules.ts  # copia de la lógica pura que necesita (ver comentario de cabecera)
+  src/bookingRules.ts       # permisos para crear reservaciones por administración (espejo en src/services/)
   src/colonoRules.ts        # lógica pura de alta de colonos (calle válida, cupo, teléfono) — sin mirror en src/
   src/rateLimit.ts           # rate limiting genérico (ventana fija), usado por createReservation
   src/time.ts               # copia de src/utils/time.ts (toDate/addHours) + monthDateRange (solo acá)
@@ -258,6 +260,16 @@ una reservación viven ahora en tres lugares que hay que mantener en sync:
 `firestore.rules` para lo que NO es `create` (la matriz de transición de
 status sigue reforzada ahí, ver abajo). Si cambias una regla de negocio de
 reservaciones, revisa los tres.
+
+**Reservaciones por administración (#100):** `createReservation` acepta
+`targetUserId` opcional. Solo admin/super-admin activos pueden seleccionar un
+colono activo; `bookingRules.ts` valida esta autorización (espejo entre
+`src/services/` y `functions/src/`). La transacción lee ambos perfiles,
+aplica los límites al beneficiario y escribe su identidad desde Firestore.
+El rate limit corresponde al actor autenticado. `createdByUid` registra al
+actor y las rules impiden alterarlo incluso al admin, usando `get(..., null)`
+para conservar las transiciones de documentos históricos sin ese campo.
+La creación directa sigue denegada y las demás reglas de creación se reutilizan.
 
 **Máquina de estados de reservaciones:** `canTransition(actor, from, to)`
 en `src/services/reservationRules.ts` es el espejo puro de la matriz de

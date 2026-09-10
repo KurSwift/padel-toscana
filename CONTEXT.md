@@ -245,6 +245,15 @@ Cuatro pestañas — la cuarta solo la ve `super-admin` (`AdminPage.tsx`,
   cualquier estado con un `<select>` (`setReservationStatus`, sin pasar
   por la matriz de transición normal — reforzado en rules: solo
   admin/super-admin).
+  La acción **Reservar para un colono** permite a admin/super-admin activos
+  buscar un colono activo por nombre o domicilio y reservar Cancha/Casa Club
+  usando el mismo calendario y hoja de confirmación. El residente a cargo se
+  precarga con el nombre del beneficiario y se puede editar. `createReservation`
+  acepta `targetUserId` opcional, valida actor y beneficiario dentro de la
+  transacción y aplica los límites al beneficiario. Nombre y domicilio se
+  obtienen en el servidor; `createdByUid` registra al actor autenticado y es
+  inmutable desde el cliente. El rate limit sigue contando por actor. La
+  reservación nace `solicitada`, con los mismos plazos de pago y depósito.
 - **Canchas** (issue 7/8 del Epic #60 generalizó esta pestaña, antes solo
   manejaba canchas de padel): activar/desactivar recursos, crear uno
   nuevo eligiendo tipo (Cancha/Casa Club — `createCourt(name, type)` en
@@ -404,10 +413,12 @@ shape de estos documentos en el cliente.
 - Hay tests unitarios (Vitest — `npm run test` para el cliente,
   `npm run test:functions` para `functions/`) para toda la lógica de
   negocio pura, tests de componentes (Testing Library, ej. `BookingSheet`,
-  `StatusBadge`) y tres flujos E2E con Playwright (`npm run test:e2e`, contra
+  `StatusBadge`) y cuatro flujos E2E con Playwright (`npm run test:e2e`, contra
   emuladores): cancha (alta → login → reserva → pago → cancelación), Casa
-  Club (depósito → pago → finalización → devolución → cancelación) y
-  navegación responsive (tab bar móvil/sidebar de tableta).
+  Club (depósito → pago → finalización → devolución → cancelación),
+  navegación responsive (tab bar móvil/sidebar de tableta) y reserva por
+  administración (beneficiario, autoría protegida, cancelación y rechazo
+  de suplantación).
 - Un super-admin autenticado puede cambiar el `role` de **cualquier**
   usuario, incluido el suyo propio, directo contra Firestore (la rama
   `isSuperAdmin()` de `allow update` en `users/{uid}` no distingue

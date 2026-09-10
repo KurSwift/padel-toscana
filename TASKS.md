@@ -405,17 +405,24 @@ plazo, día completo en vez de horario) más un bug real ya identificado
 (el conteo de reservaciones activas por usuario era global entre
 recursos, no por tipo — issue #63 lo arregló).
 
-**Pendiente identificado durante #68, no bloqueante:** `CONTEXT.md` →
-"Flujo de reservación" nunca se actualizó para el modelo de casa club
-(depósito, 6 estados, tope mensual, plazo de cancelación) — sigue
-describiendo solo el modelo original de cancha. Documentado como gap
-conocido en `CONTEXT.md`; reescribir esa sección es tarea aparte.
+**Pendiente documental de #68 resuelto:** el PR #98 actualizó el flujo de
+reservación en `CONTEXT.md` para Cancha y Casa Club (depósito, seis estados,
+tope mensual y plazo de cancelación).
 
 Contexto completo de las decisiones (depósito, tope mensual, formato
 del calendario) en `PRD.md` § 14 y en el historial de esta conversación
 si se retoma sin ese contexto.
 
-## 7. Reservación manual por administración
+## 7. Reservación manual por administración — issue #100
+
+**Implementación en revisión**: [#100](https://github.com/KurSwift/padel-toscana/issues/100).
+Desde Configuración → Reservaciones, admin/super-admin seleccionan un colono
+activo por nombre/domicilio y usan el mismo calendario de Cancha/Casa Club.
+El residente a cargo se precarga y sigue editable. La función de creación
+valida permisos y beneficiario dentro de la transacción, aplica los límites
+al colono y registra al administrador en `createdByUid`.
+
+Alcance original:
 
 Agregar a `/configuracion` la capacidad para que `admin` y `super-admin`
 creen una reservación en nombre de un colono. Debe reutilizar las mismas

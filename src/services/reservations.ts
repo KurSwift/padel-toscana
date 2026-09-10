@@ -24,14 +24,19 @@ import {
 } from '@/services/reservationRules'
 
 const ERRORS: Record<string, string> = {
+  'admin-only': 'Solo administración puede reservar para un colono.',
+  'resident-not-found': 'El colono seleccionado ya no existe.',
+  'invalid-resident': 'Selecciona un colono activo para reservar.',
+  'inactive-user': 'Tu cuenta debe estar activa para reservar.',
+  'rate-limited': 'Has realizado demasiados intentos. Espera unos minutos.',
   'slot-taken': 'Este horario ya fue reservado. Elige otro.',
-  'max-reservations': 'Ya tienes el máximo de reservaciones activas permitido.',
+  'max-reservations': 'Este usuario ya tiene el máximo de reservaciones activas permitido.',
   'outside-hours': 'El horario está fuera del rango permitido.',
   'duration-too-long': 'La duración máxima de una reservación es de 2 horas.',
   'too-far-ahead': 'No puedes reservar con tanta anticipación todavía.',
   'invalid-player-count': 'El número de personas está fuera del rango permitido.',
   'resident-in-charge-required': 'Indica el nombre del residente a cargo.',
-  'monthly-limit': 'Ya alcanzaste el máximo de reservaciones de este recurso para este mes.',
+  'monthly-limit': 'Este usuario ya alcanzó el máximo de reservaciones de este recurso para este mes.',
 }
 
 // 'lead-time-too-short' no vive en ERRORS: minLeadHours varía por recurso
@@ -114,15 +119,11 @@ const createReservationCallable = httpsCallable(functions, 'createReservation')
 // reservación por una razón que el cliente no anticipó, el código de
 // error (`err.message`) es el mismo string que ya mapea
 // reservationErrorMessage() — no hace falta un mapeo aparte.
-// userId/userName/userAddress NO se mandan a la función: esta los deriva
-// de request.auth.uid y de users/{uid} en Firestore, para que un cliente
-// no pueda crear una reservación "como" otro usuario. Se quedan en la
-// firma de esta función solo por compatibilidad con el caller (HomePage).
+// targetUserId solo se envía desde el flujo administrativo. El servidor
+// autoriza al actor y deriva nombre/domicilio del beneficiario en Firestore.
 export async function createReservation(params: {
   court: Court
-  userId: string
-  userName: string
-  userAddress: string
+  targetUserId?: string
   date: string
   startTime: string
   durationHours: number
@@ -156,6 +157,7 @@ export async function createReservation(params: {
   try {
     await createReservationCallable({
       courtId: court.id,
+      ...(params.targetUserId !== undefined ? { targetUserId: params.targetUserId } : {}),
       date,
       startTime,
       durationHours,

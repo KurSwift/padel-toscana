@@ -17,6 +17,7 @@ import { isValidLogoFile } from '@/services/brandingRules'
 import { MAX_RESERVATION_DURATION_HOURS } from '@/services/reservationRules'
 import { subscribeToAllReservationsByDate, setReservationStatus } from '@/services/reservations'
 import { todayString, addDays, formatDateLong, formatTime } from '@/utils/time'
+import AdminReservationForm from '@/components/AdminReservationForm'
 import StatusBadge, { RESERVATION_STATUS_LABELS } from '@/components/StatusBadge'
 
 type Tab = 'reservations' | 'courts' | 'users' | 'avanzado'
@@ -151,6 +152,7 @@ function SettingsOverview({ tabs, pendingCount, onSelect }: {
 // ── Reservations Tab ───────────────────────────────────────────────────────────
 
 function ReservationsTab() {
+  const [creating, setCreating] = useState(false)
   const [date, setDate] = useState(todayString())
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [changing, setChanging] = useState<string | null>(null)
@@ -177,8 +179,13 @@ function ReservationsTab() {
 
   const today = todayString()
 
+  if (creating) return <AdminReservationForm onClose={() => setCreating(false)} />
+
   return (
     <div className="space-y-4">
+      <button type="button" onClick={() => setCreating(true)} className="min-h-12 rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white hover:bg-brand-700">
+        Reservar para un colono
+      </button>
       {/* Date nav */}
       <div role="group" aria-label={`Fecha seleccionada: ${formatDateLong(date)}`} className="flex items-center justify-between bg-white rounded-2xl px-4 py-3 shadow-sm">
         <button
