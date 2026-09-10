@@ -46,10 +46,18 @@ tocar código:
   forma explícita, ejecuta `npm run build` desde `main` actualizado y después
   `npx firebase deploy`. Esto publica los dos sitios de Hosting, Functions,
   reglas/índices de Firestore, reglas de Storage y la configuración de Auth
-  declarados en `firebase.json`. El build modifica archivos versionados en
-  `public/`; después de desplegar, restaura únicamente esos artefactos para
-  dejar el árbol limpio (`git restore public` y elimina solo los hashes nuevos
-  generados por ese build, tras confirmar sus nombres con `git status`).
+  declarados en `firebase.json`. Si existe `.env.local` (flujo normal de
+  desarrollo contra emuladores, ver arriba), Vite lo recoge antes que
+  cualquier `.env` — un `npm run build` con ese archivo presente hornea
+  `VITE_USE_EMULATORS=true` en el bundle de producción, y el sitio
+  desplegado terminaría apuntando a los emuladores locales en vez de
+  Firebase real. **Muévelo fuera del repo antes del build y restáuralo
+  justo después** (por ejemplo `mv .env.local /tmp/... && npm run build &&
+  mv /tmp/... .env.local`). El build también modifica archivos versionados
+  en `public/`; después de desplegar, restaura únicamente esos artefactos
+  para dejar el árbol limpio (`git restore public` y elimina solo los
+  hashes nuevos generados por ese build, tras confirmar sus nombres con
+  `git status`).
 - **Cualquier script en `scripts/` que acepte `--confirm` escribe en
   producción real** (`push-to-prod.mjs`, `migrate-users-role.mjs`,
   `preregister-colonos.mjs`, y cualquiera que se agregue después con ese
