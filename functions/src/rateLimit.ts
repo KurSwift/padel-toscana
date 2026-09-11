@@ -4,8 +4,12 @@
 // (ver index.ts para el wiring con Firestore; esto es solo la decisión pura,
 // testeable sin tocar la base de datos).
 
+import { createHash } from 'node:crypto'
+
 export const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000
 export const RATE_LIMIT_MAX_CALLS = 10
+export const LOOKUP_RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000
+export const LOOKUP_RATE_LIMIT_MAX_CALLS = 10
 
 export interface RateLimitState {
   windowStart: Date
@@ -15,6 +19,11 @@ export interface RateLimitState {
 export interface RateLimitResult {
   allowed: boolean
   nextState: RateLimitState
+}
+
+/** Deriva un id de Firestore estable sin persistir la IP pre-auth en texto plano. */
+export function lookupRateLimitKey(ip: string): string {
+  return createHash('sha256').update(ip).digest('hex')
 }
 
 // ¿Puede este uid hacer una llamada más? `state` es null si nunca ha
