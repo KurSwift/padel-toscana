@@ -7,8 +7,9 @@ import { firstReservableDate } from '@/services/reservationRules'
 import DateSelector from '@/components/DateSelector'
 import SlotsGrid from '@/components/SlotsGrid'
 import CasaClubAvailability from '@/components/CasaClubAvailability'
+import CasaClubMonthCalendar from '@/components/CasaClubMonthCalendar'
 import BookingSheet from '@/components/BookingSheet'
-import { todayString } from '@/utils/time'
+import { addDays, todayString } from '@/utils/time'
 
 interface SelectedSlot {
   startTime: string
@@ -127,13 +128,22 @@ export default function ReservationCalendar({ profile, forResident = false }: {
                 </span>
               </div>
 
-              {/* Date selector */}
+              {isCasaClub ? (
+                <CasaClubMonthCalendar
+                  courtId={court.id}
+                  selectedDate={selectedDate}
+                  minDate={firstBookableDate}
+                  maxDate={addDays(todayString(), court.settings.daysAheadAllowed)}
+                  onChange={setSelectedDate}
+                />
+              ) : (
                 <DateSelector
                   date={selectedDate}
                   minDate={firstBookableDate}
                   maxDaysAhead={court.settings.daysAheadAllowed}
-                onChange={setSelectedDate}
-              />
+                  onChange={setSelectedDate}
+                />
+              )}
 
               {/* Disponibilidad: grilla de horarios (cancha) o bloque de
                   día completo (casa club, issue 2/8 del épico #60) */}

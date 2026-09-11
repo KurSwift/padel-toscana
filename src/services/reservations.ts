@@ -268,6 +268,31 @@ export function subscribeToReservations(
   )
 }
 
+// Suscribe las reservaciones ocupantes de un recurso en un rango inclusivo de
+// fechas. CasaClubMonthCalendar la usa para marcar un mes completo sin hacer
+// una lectura por cada día; el índice courtId+date ya cubre esta consulta.
+export function subscribeToReservationsByDateRange(
+  courtId: string,
+  firstDate: string,
+  lastDate: string,
+  onUpdate: (reservations: Reservation[]) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  return onSnapshot(
+    query(
+      collection(db, 'reservations'),
+      where('courtId', '==', courtId),
+      where('date', '>=', firstDate),
+      where('date', '<=', lastDate),
+    ),
+    (snap) => onUpdate(toOccupyingReservations(snap.docs)),
+    (error) => {
+      logSnapshotFailure('subscribeToReservationsByDateRange', error)
+      onError?.(error)
+    },
+  )
+}
+
 // A diferencia de subscribeToReservations/subscribeToUserReservations, NO
 // filtra por status — usada por AdminPage (pestaña Reservaciones), que
 // necesita ver los 4 estados de un día, incluyendo solicitada sin pagar,
