@@ -452,13 +452,20 @@ bandeja/centro de notificaciones dentro de la app. La épica debe decidir cómo
 generar los avisos temporizados sin introducir un costo recurrente inesperado
 y qué lecturas/escrituras de Firestore implica.
 
-## 9. Alta masiva de colonos desde JSON en Configuración
+## 9. ~~Alta masiva de colonos desde JSON en Configuración~~ — hecho
 
-Agregar a `admin` y `super-admin` una interfaz en `/configuracion` para
-subir un JSON de colonos y darlos de alta en lote. Ya existe
-`scripts/preregister-colonos.mjs` como herramienta administrativa fuera de
-la UI (tarea 2); esta tarea es llevar esa capacidad al portal de forma segura,
-con validación previa, reporte por fila y sin exponer credenciales de Admin
-SDK al cliente. Definir si el flujo permite revisar y confirmar el lote antes
-de crear cuentas, y reutilizar las mismas reglas de domicilio, teléfono y
-cupo que `adminCreateColono`.
+**Hecho** (2026-09-11, [PR #104](https://github.com/KurSwift/padel-toscana/pull/104)),
+mergeado a `main` y desplegado a producción (Hosting y Cloud Functions).
+
+Desde Configuración → Usuarios, `admin` y `super-admin` pueden seleccionar
+un archivo con el formato de `scripts/preregister-colonos.example.json`
+(`calle`, `numero_casa`, `nombre_completo`, `telefono`, `email` opcional).
+La app muestra primero una vista previa por fila; no crea cuentas hasta que
+se presiona “Confirmar altas”.
+
+La Cloud Function `adminBulkCreateColonos` vuelve a validar permisos, formato,
+calle, nombre, teléfono, duplicados y cupo de domicilio en el servidor. Cada
+fila se reporta como creada u omitida, por lo que volver a subir el mismo JSON
+no duplica ni sobreescribe usuarios existentes. El lote está limitado a 100
+filas y reutiliza el mismo shape de Auth, `users/{uid}` y `addresses/{key}`
+que `adminCreateColono`.
