@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
 import { Court, CourtSettings, CourtType, UserProfile, UserRole, Reservation, ReservationStatus, ValidStreet, VALID_STREETS } from '@/types'
 import { getAllCourts, updateCourtSettings, toggleCourtActive, createCourt, DEFAULT_COURT_SETTINGS_BY_TYPE } from '@/services/courts'
-import { getAllUsers, setUserRole, setUserRoleErrorMessage, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage, deleteColono, deleteColonoErrorMessage } from '@/services/users'
+import { getAllUsers, setUserRole, setUserRoleErrorMessage, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage, adminBulkCreateColonos, adminBulkCreateColonosErrorMessage, type BulkColonoResult, deleteColono, deleteColonoErrorMessage } from '@/services/users'
 import { canAssignRole, canActOnUser } from '@/services/userRules'
 import { uploadLogo, getLogoUrl, uploadLogoErrorMessage } from '@/services/branding'
 import { setThemePalette } from '@/services/theme'
@@ -15,6 +15,7 @@ import { useSiteSettings } from '@/context/SiteSettingsContext'
 import { PALETTES } from '@/theme/palettes'
 import { isValidLogoFile } from '@/services/brandingRules'
 import { MAX_RESERVATION_DURATION_HOURS } from '@/services/reservationRules'
+import { parseBulkColonosJson, type BulkColonoInput } from '@/services/bulkColonoRules'
 import { subscribeToAllReservationsByDate, setReservationStatus } from '@/services/reservations'
 import { todayString, addDays, formatDateLong, formatTime } from '@/utils/time'
 import AdminReservationForm from '@/components/AdminReservationForm'
@@ -657,6 +658,11 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
   const [newStreetNumber, setNewStreetNumber] = useState('')
   const [newPhoneDigits, setNewPhoneDigits] = useState('')
   const [creating, setCreating] = useState(false)
+  const [bulkResults, setBulkResults] = useState<BulkColonoResult[] | null>(null)
+  const [bulkFileName, setBulkFileName] = useState('')
+  const [previewingBulk, setPreviewingBulk] = useState(false)
+  const [confirmingBulk, setConfirmingBulk] = useState(false)
+  const [bulkColonos, setBulkColonos] = useState<BulkColonoInput[]>([])
 
   useEffect(() => {
     getAllUsers().then((u) => {
@@ -709,6 +715,41 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
       toast.error(adminCreateColonoErrorMessage((err as Error).message))
     } finally {
       setCreating(false)
+    }
+  }
+
+  /** Lee el JSON y solicita una vista previa sin crear cuentas todavía. */
+  async function handleBulkFile(file: File) {
+    setPreviewingBulk(true)
+    setBulkResults(null)
+    try {
+      const parsed = parseBulkColonosJson(await file.text())
+      if (!parsed.ok) { toast.error(parsed.error); return }
+      const results = await adminBulkCreateColonos(parsed.colonos, false)
+      setBulkColonos(parsed.colonos)
+      setBulkResults(results)
+      setBulkFileName(file.name)
+    } catch (err) {
+      toast.error(adminBulkCreateColonosErrorMessage((err as Error).message))
+    } finally {
+      setPreviewingBulk(false)
+    }
+  }
+
+  /** Confirma solo las filas válidas que se mostraron en la vista previa. */
+  async function handleConfirmBulk() {
+    setConfirmingBulk(true)
+    try {
+      const results = await adminBulkCreateColonos(bulkColonos, true)
+      setBulkResults(results)
+      const created = results.filter((result) => result.status === 'created').length
+      const refreshedUsers = await getAllUsers()
+      setUsers(refreshedUsers.sort((a, b) => a.name.localeCompare(b.name)))
+      toast.success(created === 1 ? 'Se creó 1 colono.' : `Se crearon ${created} colonos.`)
+    } catch (err) {
+      toast.error(adminBulkCreateColonosErrorMessage((err as Error).message))
+    } finally {
+      setConfirmingBulk(false)
     }
   }
 
@@ -814,15 +855,69 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
             </div>
           </div>
         ) : (
-          <button
-            onClick={() => setAdding(true)}
-            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
-          >
-            <span aria-hidden="true" className="mr-1.5 text-lg leading-none">+</span>
-            Agregar colono
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setAdding(true)}
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700"
+            >
+              <span aria-hidden="true" className="mr-1.5 text-lg leading-none">+</span>
+              Agregar colono
+            </button>
+            <label className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl border border-brand-200 bg-white px-4 text-sm font-semibold text-brand-700 transition hover:bg-brand-50">
+              {previewingBulk ? <Spinner sm /> : 'Cargar JSON'}
+              <input
+                type="file"
+                accept="application/json,.json"
+                className="sr-only"
+                disabled={previewingBulk || confirmingBulk}
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (file) void handleBulkFile(file)
+                  event.target.value = ''
+                }}
+              />
+            </label>
+          </div>
         )}
       </div>
+
+      {bulkResults && (
+        <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
+          <p className="text-sm font-semibold text-gray-800">
+            {bulkResults.some((result) => result.status === 'created') ? 'Resultado de la carga' : 'Vista previa'}: {bulkFileName}
+          </p>
+          <p className="mt-1 text-xs text-gray-600">
+            {bulkResults.filter((result) => result.status === 'ready').length} listos · {bulkResults.filter((result) => result.status === 'skipped').length} omitidos
+          </p>
+          <div className="mt-3 max-h-56 space-y-1.5 overflow-y-auto">
+            {bulkResults.map((result) => (
+              <p key={result.index} className={`text-xs ${result.status === 'skipped' ? 'text-red-700' : result.status === 'created' ? 'text-brand-800' : 'text-gray-700'}`}>
+                Fila {result.index + 1}{result.name ? ` · ${result.name}` : ''}: {result.message}
+              </p>
+            ))}
+          </div>
+          {bulkResults.some((result) => result.status === 'ready') && (
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => void handleConfirmBulk()}
+                disabled={confirmingBulk}
+                className="flex-1 rounded-xl bg-brand-600 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+              >
+                {confirmingBulk ? <Spinner sm /> : 'Confirmar altas'}
+              </button>
+              <button
+                type="button"
+                disabled={confirmingBulk}
+                onClick={() => { setBulkResults(null); setBulkFileName(''); setBulkColonos([]) }}
+                className="flex-1 rounded-xl border border-gray-300 py-2.5 text-sm text-gray-600"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Pending approvals */}
       {pending.length > 0 && (

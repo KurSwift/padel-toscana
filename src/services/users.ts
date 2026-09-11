@@ -11,6 +11,7 @@ import {
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/firebase'
 import { UserProfile, UserRole, ValidStreet } from '@/types'
+import type { BulkColonoInput } from '@/services/bulkColonoRules'
 
 // Can be called before authentication (addresses are publicly readable)
 export async function checkAddressAvailability(
@@ -211,6 +212,34 @@ const ADMIN_CREATE_COLONO_ERRORS: Record<string, string> = {
 
 export function adminCreateColonoErrorMessage(code: string): string {
   return ADMIN_CREATE_COLONO_ERRORS[code] ?? 'No se pudo agregar al colono. Intenta de nuevo.'
+}
+
+export interface BulkColonoResult {
+  index: number
+  name: string
+  status: 'ready' | 'created' | 'skipped'
+  message: string
+}
+
+const adminBulkCreateColonosCallable = httpsCallable(functions, 'adminBulkCreateColonos')
+
+/** Pide una vista previa o confirma un lote; la función vuelve a validar cada fila. */
+export async function adminBulkCreateColonos(
+  colonos: BulkColonoInput[],
+  confirm: boolean,
+): Promise<BulkColonoResult[]> {
+  try {
+    const result = await adminBulkCreateColonosCallable({ colonos, confirm })
+    return (result.data as { results: BulkColonoResult[] }).results
+  } catch (err) {
+    throw new Error((err as { message?: string }).message ?? 'unknown-error')
+  }
+}
+
+export function adminBulkCreateColonosErrorMessage(code: string): string {
+  if (code === 'admin-only') return 'No tienes permisos de administrador.'
+  if (code === 'invalid-bulk-input') return 'El archivo contiene un lote inválido.'
+  return 'No se pudo procesar el archivo. Intenta de nuevo.'
 }
 
 // Elimina una cuenta por completo (Auth + Firestore + libera el cupo del
