@@ -131,6 +131,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Contadores pre-auth de getResidentsByAddress. La llave es un hash de
+    // IP creado por la Cloud Function; ningún cliente puede consultarla ni
+    // reiniciarla por escritura directa.
+    match /lookupRateLimits/{ipHash} {
+      allow read, write: if false;
+    }
+
     // ── Mail ───────────────────────────────────────────────────────────────
     // Written by the app on new registration; read/processed by the extension.
     match /mail/{docId} {

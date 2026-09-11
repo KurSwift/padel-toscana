@@ -37,7 +37,14 @@ import {
 } from './reservationRules'
 import { toDate, addHours, monthDateRange } from './time'
 import { bookingPermissionError, isValidBookingTarget } from './bookingRules'
-import { checkRateLimit, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_CALLS } from './rateLimit'
+import {
+  checkRateLimit,
+  RATE_LIMIT_WINDOW_MS,
+  RATE_LIMIT_MAX_CALLS,
+  LOOKUP_RATE_LIMIT_WINDOW_MS,
+  LOOKUP_RATE_LIMIT_MAX_CALLS,
+  lookupRateLimitKey,
+} from './rateLimit'
 import { isValidStreet, isAddressAvailable, normalizeAddress, isValidColonoName, isValidMxPhone } from './colonoRules'
 import { MAX_BULK_COLONOS, validateBulkColono, type BulkColonoInput } from './bulkColonoRules'
 
@@ -87,6 +94,23 @@ async function enforceRateLimit(uid: string): Promise<void> {
     if (!result.allowed) {
       throw new HttpsError('resource-exhausted', 'rate-limited')
     }
+    tx.set(ref, {
+      windowStart: Timestamp.fromDate(result.nextState.windowStart),
+      count: result.nextState.count,
+    })
+  })
+}
+
+/** Limita consultas pre-auth por IP sin almacenar la IP legible en Firestore. */
+async function enforceLookupRateLimit(ip: string): Promise<void> {
+  const ref = db.doc(`lookupRateLimits/${lookupRateLimitKey(ip)}`)
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref)
+    const state = snap.exists
+      ? { windowStart: (snap.get('windowStart') as Timestamp).toDate(), count: snap.get('count') as number }
+      : null
+    const result = checkRateLimit(state, new Date(), LOOKUP_RATE_LIMIT_WINDOW_MS, LOOKUP_RATE_LIMIT_MAX_CALLS)
+    if (!result.allowed) throw new HttpsError('resource-exhausted', 'rate-limited')
     tx.set(ref, {
       windowStart: Timestamp.fromDate(result.nextState.windowStart),
       count: result.nextState.count,
@@ -287,6 +311,7 @@ function isValidResidentsInput(data: unknown): data is GetResidentsByAddressInpu
 export const getResidentsByAddress = onCall(
   { region: 'us-central1', enforceAppCheck: true },
   async (request) => {
+    await enforceLookupRateLimit(request.rawRequest.ip ?? 'unknown')
     if (!isValidResidentsInput(request.data)) {
       throw new HttpsError('invalid-argument', 'invalid-argument')
     }
