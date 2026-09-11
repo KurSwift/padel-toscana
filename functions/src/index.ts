@@ -39,6 +39,7 @@ import { toDate, addHours, monthDateRange } from './time'
 import { bookingPermissionError, isValidBookingTarget } from './bookingRules'
 import { checkRateLimit, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_CALLS } from './rateLimit'
 import { isValidStreet, isAddressAvailable, normalizeAddress, isValidColonoName, isValidMxPhone } from './colonoRules'
+import { MAX_BULK_COLONOS, validateBulkColono, type BulkColonoInput } from './bulkColonoRules'
 
 initializeApp()
 const db = getFirestore()
@@ -409,6 +410,124 @@ export const adminCreateColono = onCall(
     }
 
     return { uid: newUid }
+  },
+)
+
+interface AdminBulkCreateColonosInput {
+  colonos: BulkColonoInput[]
+  confirm: boolean
+}
+
+interface BulkColonoResult {
+  index: number
+  name: string
+  status: 'ready' | 'created' | 'skipped'
+  message: string
+}
+
+/** Comprueba el límite y la forma mínima antes de procesar un lote administrativo. */
+function isValidBulkCreateInput(data: unknown): data is AdminBulkCreateColonosInput {
+  if (typeof data !== 'object' || data === null) return false
+  const value = data as Record<string, unknown>
+  return Array.isArray(value.colonos) && value.colonos.length > 0 && value.colonos.length <= MAX_BULK_COLONOS && typeof value.confirm === 'boolean'
+}
+
+/**
+ * Previsualiza o crea colonos desde el formato JSON administrativo. El modo
+ * de vista previa no escribe nada; al confirmar, revalida cada fila y el cupo
+ * dentro de transacciones para que el resultado no dependa de la UI.
+ */
+export const adminBulkCreateColonos = onCall(
+  { region: 'us-central1', enforceAppCheck: true },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'unauthenticated')
+    const callerSnap = await db.doc(`users/${request.auth.uid}`).get()
+    const callerRole = callerSnap.get('role')
+    if (!callerSnap.exists || (callerRole !== 'admin' && callerRole !== 'super-admin')) {
+      throw new HttpsError('permission-denied', 'admin-only')
+    }
+    if (!isValidBulkCreateInput(request.data)) {
+      throw new HttpsError('invalid-argument', 'invalid-bulk-input')
+    }
+
+    const { colonos, confirm } = request.data
+    const results: BulkColonoResult[] = []
+    // Refleja también las filas anteriores del mismo archivo, para detectar
+    // cupos agotados sin tener que escribir durante la vista previa.
+    const reservedAddressSlots = new Map<string, number>()
+    const reservedPhones = new Set<string>()
+
+    for (const [index, row] of colonos.entries()) {
+      const validated = validateBulkColono(row)
+      if (!validated.ok) {
+        results.push({ index, name: '', status: 'skipped', message: validated.reason })
+        continue
+      }
+      const colono = validated.colono
+      if (reservedPhones.has(colono.phone)) {
+        results.push({ index, name: colono.name, status: 'skipped', message: 'El teléfono se repite en el archivo.' })
+        continue
+      }
+      const existingAuthUser = await getAuth().getUserByPhoneNumber(colono.phone).catch(() => null)
+      if (existingAuthUser) {
+        results.push({ index, name: colono.name, status: 'skipped', message: 'El teléfono ya tiene una cuenta.' })
+        continue
+      }
+
+      const addressRef = db.doc(`addresses/${colono.addressKey}`)
+      const addressSnap = await addressRef.get()
+      const existingUids: string[] = addressSnap.exists ? (addressSnap.get('uids') as string[]) : []
+      const reserved = reservedAddressSlots.get(colono.addressKey) ?? 0
+      if (!isAddressAvailable([...existingUids, ...Array(reserved)])) {
+        results.push({ index, name: colono.name, status: 'skipped', message: 'El domicilio ya tiene 2 colonos.' })
+        continue
+      }
+
+      if (!confirm) {
+        reservedAddressSlots.set(colono.addressKey, reserved + 1)
+        reservedPhones.add(colono.phone)
+        results.push({ index, name: colono.name, status: 'ready', message: 'Listo para crear.' })
+        continue
+      }
+
+      let uid: string
+      try {
+        uid = (await getAuth().createUser({ phoneNumber: colono.phone, displayName: colono.name })).uid
+      } catch (err) {
+        const isDuplicate = (err as { code?: string }).code === 'auth/phone-number-already-exists'
+        results.push({ index, name: colono.name, status: 'skipped', message: isDuplicate ? 'El teléfono ya tiene una cuenta.' : 'No se pudo crear la cuenta.' })
+        continue
+      }
+
+      try {
+        await db.runTransaction(async (tx) => {
+          const latestAddress = await tx.get(addressRef)
+          const uids: string[] = latestAddress.exists ? (latestAddress.get('uids') as string[]) : []
+          if (!isAddressAvailable(uids)) throw new HttpsError('failed-precondition', 'address-full')
+          tx.set(db.doc(`users/${uid}`), {
+            name: colono.name,
+            street: colono.street,
+            streetNumber: colono.streetNumber,
+            address: `${colono.street} ${colono.streetNumber}`,
+            addressNormalized: colono.addressKey,
+            phone: colono.phone,
+            email: colono.email,
+            role: 'colono',
+            status: 'active',
+            createdAt: FieldValue.serverTimestamp(),
+          })
+          tx.set(addressRef, { uids: [...new Set([...uids, uid])] }, { merge: true })
+        })
+        results.push({ index, name: colono.name, status: 'created', message: 'Creado.' })
+        reservedPhones.add(colono.phone)
+      } catch (err) {
+        await getAuth().deleteUser(uid).catch(() => {})
+        const isFull = err instanceof HttpsError && err.message === 'address-full'
+        results.push({ index, name: colono.name, status: 'skipped', message: isFull ? 'El domicilio se llenó antes de crear esta fila.' : 'No se pudo guardar el perfil.' })
+      }
+    }
+
+    return { results }
   },
 )
 
