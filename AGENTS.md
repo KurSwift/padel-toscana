@@ -310,6 +310,17 @@ npm run seed                       # terminal 2 — prepobla courts/users/addres
 npm run dev                        # terminal 2
 ```
 
+**Probar desde un celular en la misma red WiFi** (2026-09-12): `firebase.json`
+→ `emulators.host: "0.0.0.0"` ya hace que los emuladores escuchen en todas
+las interfaces, no solo loopback — pero el cliente (`src/firebase.ts`)
+sigue conectando a `127.0.0.1` por default, que en el celular apunta al
+celular mismo, no a la computadora. Para probar ahí: agrega
+`VITE_EMULATOR_HOST=<IP local de tu Mac>` a `.env.local` (`ipconfig
+getifaddr en0` la obtiene) y levanta `npm run dev -- --host` (sin `--host`,
+Vite puede enlazar solo en IPv6 en algunas máquinas — ver referencia de
+memoria "Local Playwright IPv6 quirk"). Abre `http://<esa-IP>:5173` desde
+el celular — mismo WiFi que la computadora.
+
 - **`npm run emulators`** (`firebase emulators:start`) requiere Java (JRE)
   para el emulador de Firestore — instálalo con `brew install openjdk` si
   `java -version` falla. El script `emulators` ya agrega al `PATH` las

@@ -62,11 +62,15 @@ export const storage = getStorage(app)
 // Apunta Auth/Firestore a los emuladores locales en vez de producción.
 // Actívalo copiando .env.local.example a .env.local (VITE_USE_EMULATORS=true)
 // y corriendo `npm run emulators` en paralelo. Ver AGENTS.md.
+// EMULATOR_HOST es 127.0.0.1 por default; para probar desde el celular en la
+// misma red WiFi, pon VITE_EMULATOR_HOST=<IP local de tu Mac> en .env.local
+// (ver AGENTS.md) — 127.0.0.1 en el celular apunta al celular mismo, no a la Mac.
 if (useEmulators) {
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
-  connectFirestoreEmulator(db, '127.0.0.1', 8080)
-  connectFunctionsEmulator(functions, '127.0.0.1', 5001)
-  connectStorageEmulator(storage, '127.0.0.1', 9199)
+  const emulatorHost = import.meta.env.VITE_EMULATOR_HOST || '127.0.0.1'
+  connectAuthEmulator(auth, `http://${emulatorHost}:9099`, { disableWarnings: true })
+  connectFirestoreEmulator(db, emulatorHost, 8080)
+  connectFunctionsEmulator(functions, emulatorHost, 5001)
+  connectStorageEmulator(storage, emulatorHost, 9199)
   // Evita que el login por teléfono dependa de resolver el reCAPTCHA real
   // de Google (lento e intermitente contra servicios externos) — el
   // emulador de Auth no lo necesita para generar/validar el código OTP.
