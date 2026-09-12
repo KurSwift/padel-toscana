@@ -276,7 +276,7 @@ export const createReservation = onCall(
         status: 'solicitada',
         startAt: Timestamp.fromDate(startAt),
         endAt: Timestamp.fromDate(endAt),
-        paymentDueAt: Timestamp.fromDate(computePaymentDueAt(startAt, court.settings.paymentDeadlineHours)),
+        paymentDueAt: Timestamp.fromDate(computePaymentDueAt(courtType, startAt, now, court.settings.paymentDeadlineHours)),
         playerCount,
         residentInChargeName,
         createdAt: FieldValue.serverTimestamp(),

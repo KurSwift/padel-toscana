@@ -55,6 +55,11 @@ export default function BookingSheet({
   const [residentInChargeName, setResidentInChargeName] = useState(defaultResidentName)
   const [loading, setLoading] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
+  // Aproximación de `createdAt` para calcular el aviso de pago de Casa Club
+  // (computePaymentDueAt suma paymentDeadlineHours a este instante, no a
+  // startAt) — se captura una sola vez al confirmar para que no se corra
+  // hacia adelante en re-renders posteriores de esta misma pantalla de éxito.
+  const [confirmedAt, setConfirmedAt] = useState<Date | null>(null)
   const endTime = addHours(startTime, duration)
 
   const residentNameValid = residentInChargeName.trim().length > 0
@@ -64,6 +69,7 @@ export default function BookingSheet({
     setLoading(true)
     try {
       await onConfirm({ durationHours: duration, playerCount, residentInChargeName })
+      setConfirmedAt(new Date())
       setConfirmed(true)
     } catch {
       // El toast de error y el cierre del sheet ya los maneja el caller
@@ -74,7 +80,7 @@ export default function BookingSheet({
   }
 
   if (confirmed) {
-    const paymentDueAt = computePaymentDueAt(toDate(date, startTime), paymentDeadlineHours)
+    const paymentDueAt = computePaymentDueAt(courtType, toDate(date, startTime), confirmedAt ?? new Date(), paymentDeadlineHours)
     return (
       <SheetFrame labelledBy="booking-success-title" onClose={onClose}>
         <div className="px-5 pb-5 pt-2 text-center">

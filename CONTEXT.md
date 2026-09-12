@@ -181,8 +181,13 @@ las notificaciones, ese es el primer lugar a revisar.
   segundo seguiría necesitando una función programada aparte, y no vale la
   pena — "la próxima vez que alguien cargue la vista" es suficiente):
   una `solicitada` se libera (efectivamente `cancelada`) si
-  nadie confirma el pago antes de `paymentDueAt` (`startAt -
-  court.settings.paymentDeadlineHours`, default 12h); una `solicitada` o
+  nadie confirma el pago antes de `paymentDueAt`, calculado con
+  `computePaymentDueAt()` — la fórmula depende del recurso (reportado y
+  corregido 2026-09-12): cancha resta `paymentDeadlineHours` a `startAt`
+  (antes del evento, default 12h); casa club se lo suma a `createdAt`
+  (después de reservar, default 24h) — con su anticipación mínima de 72h,
+  "antes del evento" dejaba semanas de margen para pagar aunque la
+  reservación fuera para pronto. Una `solicitada` o
   `pagada` se vuelve efectivamente `finalizada` al pasar `endAt`. Nada
   corrige el campo `status` en Firestore en el instante exacto en que
   expira — `effectiveStatus(reservation, now)` en `reservationRules.ts`

@@ -39,7 +39,7 @@ const CASA_CLUB_SETTINGS = {
   maxActiveReservationsPerUser: 2,
   daysAheadAllowed: 90,
   minLeadHours: 72,
-  paymentDeadlineHours: 12,
+  paymentDeadlineHours: 24,
   reservationFee: 3000,
   maxPlayerCount: 30,
   depositAmount: 3000,
@@ -66,13 +66,16 @@ function dateStr(d) {
 // Reservación de día completo (issue 2/8): startTime/endTime =
 // openTime/closeTime del recurso, durationHours = minDurationHours — mismo
 // bloque fijo que deriva createReservation (functions/src/index.ts, issue
-// 3/8) para casa club.
-function fullDayReservation({ id, owner, status, dayOffset, paymentDueOffsetHours = 0 }) {
+// 3/8) para casa club. paymentDueAt = createdAt + paymentDueHoursFromNow —
+// para Casa Club el plazo de pago cuenta desde que se reserva, no desde el
+// evento (ver computePaymentDueAt en reservationRules.ts de cliente/functions).
+function fullDayReservation({ id, owner, status, dayOffset, paymentDueHoursFromNow = 0 }) {
   const day = dateOffset(dayOffset)
   const date = dateStr(day)
   const startAt = new Date(`${date}T${CASA_CLUB_SETTINGS.openTime}:00`)
   const endAt = new Date(`${date}T${CASA_CLUB_SETTINGS.closeTime}:00`)
-  const paymentDueAt = new Date(startAt.getTime() + paymentDueOffsetHours * 60 * 60 * 1000)
+  const createdAt = new Date()
+  const paymentDueAt = new Date(createdAt.getTime() + paymentDueHoursFromNow * 60 * 60 * 1000)
 
   return {
     id,
@@ -92,7 +95,7 @@ function fullDayReservation({ id, owner, status, dayOffset, paymentDueOffsetHour
       paymentDueAt: Timestamp.fromDate(paymentDueAt),
       playerCount: 25,
       residentInChargeName: owner.name,
-      createdAt: Timestamp.now(),
+      createdAt: Timestamp.fromDate(createdAt),
     },
   }
 }
@@ -106,7 +109,7 @@ const RESERVATIONS = [
     owner: ANA,
     status: 'solicitada',
     dayOffset: 10,
-    paymentDueOffsetHours: -CASA_CLUB_SETTINGS.paymentDeadlineHours,
+    paymentDueHoursFromNow: CASA_CLUB_SETTINGS.paymentDeadlineHours,
   }),
   // Pagada, a futuro (+20 días) — sigue "ocupando" el recurso (cuenta para
   // el tope mensual y bloquea ese día), pero el evento no ha pasado: no
