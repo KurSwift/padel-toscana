@@ -4,6 +4,7 @@ import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions'
 import { getStorage, connectStorageEmulator } from 'firebase/storage'
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check'
+import { getAnalytics, isSupported, type Analytics } from 'firebase/analytics'
 
 const firebaseConfig = {
   apiKey: 'AIzaSyB7vK1y9IlrRGaWZ0191tfgyQtZOtvQklw',
@@ -16,6 +17,19 @@ const firebaseConfig = {
 }
 
 const app = initializeApp(firebaseConfig)
+// Analytics nunca corre contra emuladores: sus eventos de prueba contaminarían
+// las métricas de producción y no aportan verificación útil al flujo local.
+const useEmulators = import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === 'true'
+
+// `isSupported()` evita inicializar Analytics en navegadores sin las APIs que
+// necesita (o durante tests). El servicio analytics.ts omite eventos hasta
+// que esta instancia esté lista, sin interrumpir ningún flujo de la app.
+export let analytics: Analytics | null = null
+if (!useEmulators) {
+  void isSupported().then((supported) => {
+    if (supported) analytics = getAnalytics(app)
+  }).catch(() => {})
+}
 
 // In dev, the SDK prints a debug token to the console.
 // Register that token in Firebase Console → App Check → Manage debug tokens.
@@ -48,8 +62,6 @@ export const storage = getStorage(app)
 // Apunta Auth/Firestore a los emuladores locales en vez de producción.
 // Actívalo copiando .env.local.example a .env.local (VITE_USE_EMULATORS=true)
 // y corriendo `npm run emulators` en paralelo. Ver AGENTS.md.
-const useEmulators = import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === 'true'
-
 if (useEmulators) {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
   connectFirestoreEmulator(db, '127.0.0.1', 8080)
