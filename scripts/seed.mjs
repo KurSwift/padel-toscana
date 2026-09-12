@@ -44,7 +44,7 @@ const DEFAULT_CASA_CLUB_SETTINGS = {
   maxActiveReservationsPerUser: 2,
   daysAheadAllowed: 90,
   minLeadHours: 72,
-  paymentDeadlineHours: 12,
+  paymentDeadlineHours: 24,
   reservationFee: 3000,
   maxPlayerCount: 30,
   depositAmount: 3000,
