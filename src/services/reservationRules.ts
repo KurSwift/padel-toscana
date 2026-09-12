@@ -5,7 +5,7 @@
 // inicialización de la app (App Check, etc.). Los imports de tipos de
 // `@/types` van como `import type` para que se borren en compilación y no
 // arrastren accidentalmente `firebase/firestore` a los tests.
-import type { ReservationStatus, UserRole } from '@/types'
+import type { CourtType, ReservationStatus, UserRole } from '@/types'
 import { addDays, toDate, toDateString } from '@/utils/time'
 
 // Estados que "ocupan" un horario: cuentan para traslapes (hasOverlap) y
@@ -97,10 +97,28 @@ export function isWithinMaxAdvanceWindow(startAt: Date, now: Date, maxDaysAhead:
   return startAt.getTime() - now.getTime() <= maxDaysAhead * 24 * 60 * 60 * 1000
 }
 
-// paymentDueAt = startAt - paymentDeadlineHours, calculado al crear una
-// reservación. Espejo puro de la resta equivalente en firestore.rules
-// (isPaymentDueAtValid) — si cambia la fórmula, hay que actualizar ambos.
-export function computePaymentDueAt(startAt: Date, paymentDeadlineHours: number): Date {
+// paymentDueAt, calculado al crear una reservación — la fórmula depende del
+// tipo de recurso:
+// - Cancha: startAt - paymentDeadlineHours (antes del evento). Tiene sentido
+//   con anticipaciones cortas (mínimo 24h, minLeadHours) — se paga poco
+//   antes de jugar.
+// - Casa Club: createdAt + paymentDeadlineHours (después de reservar). Con
+//   anticipaciones largas (mínimo 72h) "antes del evento" dejaba semanas de
+//   margen para pagar aunque la reservación fuera hoy — se corrigió a pedido
+//   del usuario (reporte 2026-09-12) para que el plazo cuente desde el
+//   momento de la reservación, sin importar qué tan lejos esté la fecha.
+// `createdAt` es una aproximación de cliente/servidor a `now` en el momento
+// de crear — no hay problema de precisión porque el aviso de pago solo se
+// muestra redondeado a minutos.
+export function computePaymentDueAt(
+  courtType: CourtType,
+  startAt: Date,
+  createdAt: Date,
+  paymentDeadlineHours: number,
+): Date {
+  if (courtType === 'casa-club') {
+    return new Date(createdAt.getTime() + paymentDeadlineHours * 60 * 60 * 1000)
+  }
   return new Date(startAt.getTime() - paymentDeadlineHours * 60 * 60 * 1000)
 }
 
