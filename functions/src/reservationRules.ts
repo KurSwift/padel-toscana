@@ -77,8 +77,20 @@ export function isWithinMaxAdvanceWindow(startAt: Date, now: Date, maxDaysAhead:
   return startAt.getTime() - now.getTime() <= maxDaysAhead * 24 * 60 * 60 * 1000
 }
 
-// paymentDueAt = startAt - paymentDeadlineHours.
-export function computePaymentDueAt(startAt: Date, paymentDeadlineHours: number): Date {
+// paymentDueAt — depende del tipo de recurso (espejo de
+// src/services/reservationRules.ts, ver el comentario ahí para el porqué):
+// Cancha resta paymentDeadlineHours a startAt (antes del evento); Casa Club
+// se lo suma a createdAt (después de reservar) — con anticipaciones largas
+// (mínimo 72h), "antes del evento" dejaba demasiado margen para pagar.
+export function computePaymentDueAt(
+  courtType: string,
+  startAt: Date,
+  createdAt: Date,
+  paymentDeadlineHours: number,
+): Date {
+  if (courtType === 'casa-club') {
+    return new Date(createdAt.getTime() + paymentDeadlineHours * 60 * 60 * 1000)
+  }
   return new Date(startAt.getTime() - paymentDeadlineHours * 60 * 60 * 1000)
 }
 

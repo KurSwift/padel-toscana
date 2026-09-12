@@ -185,10 +185,18 @@ describe('isWithinMaxAdvanceWindow', () => {
 })
 
 describe('computePaymentDueAt', () => {
-  it('resta paymentDeadlineHours a startAt', () => {
+  it('cancha: resta paymentDeadlineHours a startAt (antes del evento)', () => {
     const startAt = new Date('2026-08-30T12:00:00')
-    const dueAt = computePaymentDueAt(startAt, 12)
+    const createdAt = new Date('2026-08-25T09:00:00')
+    const dueAt = computePaymentDueAt('cancha', startAt, createdAt, 12)
     expect(dueAt.getTime()).toBe(startAt.getTime() - 12 * 60 * 60 * 1000)
+  })
+
+  it('casa club: suma paymentDeadlineHours a createdAt (después de reservar), sin importar startAt', () => {
+    const startAt = new Date('2026-09-20T00:00:00') // muy lejos — minLeadHours 72h
+    const createdAt = new Date('2026-08-25T09:00:00')
+    const dueAt = computePaymentDueAt('casa-club', startAt, createdAt, 24)
+    expect(dueAt.getTime()).toBe(createdAt.getTime() + 24 * 60 * 60 * 1000)
   })
 })
 
