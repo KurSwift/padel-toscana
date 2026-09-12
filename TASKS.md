@@ -161,16 +161,11 @@ perderlas:
   opción más simple es un magic link (Firebase Email Link), que puede
   reusar la extensión de correo (Trigger Email) que ya está en el proyecto
   para notificaciones — no requiere agregar infraestructura nueva.
-- **Rate limiting en `getResidentsByAddress`**: es el único callable de
-  toda la app que no requiere `request.auth` (corre antes de que la persona
-  entre) — funcionalmente es un oráculo de "¿existe este domicilio?". Hoy
-  solo está protegido por `enforceAppCheck`. El costo de un abuso ahí es
-  bajo (una lectura de Firestore, no SMS), así que no se consideró
-  bloqueante, pero si se quiere cerrar del todo: reusar `checkRateLimit` de
-  `functions/src/rateLimit.ts`, con una llave nueva (no hay `uid` pre-auth
-  — usar IP del caller, `request.rawRequest.ip`) y una colección
-  `lookupRateLimits/{ip}` separada de `rateLimits/{uid}` para no mezclar
-  esquemas de llave.
+- ~~**Rate limiting en `getResidentsByAddress`**~~ — **hecho** (2026-09-11,
+  [PR #106](https://github.com/KurSwift/padel-toscana/pull/106)), mergeado y
+  desplegado. Limita la consulta pre-auth a 10 llamadas por IP en 5 minutos.
+  `lookupRateLimits/{sha256(ip)}` mantiene el contador sin persistir la IP
+  legible; `firestore.rules` bloquea lectura y escritura directa del cliente.
 
 También queda pendiente, no crítico: reconstruir el helper `registerWithPhone`
 en `e2e/helpers.ts` (se quitó — automatizar el flujo dormido de
@@ -413,6 +408,11 @@ Contexto completo de las decisiones (depósito, tope mensual, formato
 del calendario) en `PRD.md` § 14 y en el historial de esta conversación
 si se retoma sin ese contexto.
 
+**Extensión posterior — calendario mensual de Casa Club**: **hecha y
+desplegada** (2026-09-11, PR #107). `CasaClubMonthCalendar` reemplaza el
+selector por día para ese recurso: marca días ocupados y permite navegar por
+mes, respetando la ventana de anticipación. Cancha conserva su UI por horario.
+
 ## 7. ~~Reservación manual por administración~~ — hecha
 
 **Hecho** (2026-09-09): [#100](https://github.com/KurSwift/padel-toscana/issues/100),
@@ -469,3 +469,24 @@ fila se reporta como creada u omitida, por lo que volver a subir el mismo JSON
 no duplica ni sobreescribe usuarios existentes. El lote está limitado a 100
 filas y reutiliza el mismo shape de Auth, `users/{uid}` y `addresses/{key}`
 que `adminCreateColono`.
+
+## 10. Épica: Analytics de adopción y facilidad de uso (2026-09-11)
+
+Épica [#108](https://github.com/KurSwift/padel-toscana/issues/108). El
+objetivo es medir si el portal se entiende sin recopilar datos identificables
+de colonos. No se deben enviar nombres, teléfonos, domicilios, correos, UID,
+contenido ni identificadores de reservaciones.
+
+- ~~[#109 — Base segura de Analytics](https://github.com/KurSwift/padel-toscana/issues/109)~~ — **hecha** (PR #113, mergeada y desplegada):
+  `firebase.ts` inicializa Firebase Analytics solo fuera de emuladores y en
+  navegadores compatibles. `analyticsRules.ts` acepta únicamente eventos y
+  parámetros categóricos aprobados; `analytics.ts` filtra antes de registrar.
+- ~~[#110 — Aviso de privacidad](https://github.com/KurSwift/padel-toscana/issues/110)~~ — **hecha** (PR #115, mergeada y desplegada): ruta pública `/privacidad`
+  y enlaces desde login, calendario público y Ayuda. El aviso declara la
+  activación automática, métricas agregadas de navegación/interacción y los
+  datos excluidos.
+- [#111 — Instrumentar login y reservaciones](https://github.com/KurSwift/padel-toscana/issues/111) — **siguiente**. Usar exclusivamente
+  `trackAnalyticsEvent()` y el contrato de `analyticsRules.ts`; no añadir
+  valores libres ni PII.
+- [#112 — Validar DebugView y documentar](https://github.com/KurSwift/padel-toscana/issues/112) — después de #111. Verificar los eventos en
+  producción con DebugView/Realtime y documentar una checklist de operación.
