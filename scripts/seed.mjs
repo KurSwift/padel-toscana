@@ -69,6 +69,7 @@ const SEED_USERS = [
   { uid: 'seed-active-2', phone: '+525500000003', name: 'Beto Activo', street: 'Encino', streetNumber: '5', role: 'colono', status: 'active' },
   { uid: 'seed-pending-1', phone: '+525500000004', name: 'Carla Pendiente', street: 'Nogal', streetNumber: '20', role: 'colono', status: 'pending' },
   { uid: 'seed-tesorero-1', phone: '+525500000005', name: 'Tere Tesorera', street: 'Encino', streetNumber: '8', role: 'tesorero', status: 'active' },
+  { uid: 'seed-colono-1', phone: '+528712345678', name: 'Colono Test', street: 'Nogal', streetNumber: '150', role: 'colono', status: 'active' },
 ]
 
 // Crea (o reutiliza) el usuario de Auth para cada seed, con uid fijo, para
