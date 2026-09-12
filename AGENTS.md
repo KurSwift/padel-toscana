@@ -416,6 +416,32 @@ toast de error genérico, no un timeout obvio de App Check. Fija
 una vez (Console o API) — ver `.env.local.example`. Sin esto, `npm run
 test:e2e` falla en el primer paso que llame a cualquier función protegida.
 
+**Gap conocido, no arreglado (2026-09-11):** con un `VITE_APPCHECK_DEBUG_TOKEN`
+fijo y registrado, `npm run test:e2e` sigue siendo intermitente — a veces
+0/4, a veces 2-3/4 specs pasan en la misma corrida, siempre fallando en el
+mismo punto (`getResidentsByAddress` responde `Unauthenticated`, mismo
+síntoma que un token no registrado). Causa probable: cada test arranca un
+contexto de navegador nuevo, y el intercambio del debug token pasa por la
+red real hacia `firebaseappcheck.googleapis.com` (no hay bypass de
+emulador para ese intercambio específico) — cuando ese round-trip tarda
+más que el timeout default de Playwright (5s) para el primer `expect(...).
+toBeVisible()` de `loginWithPhone()`, el test falla aunque el token sea
+válido. Confirmado que no es un token corrupto/no registrado: la misma
+corrida, mismo token, pasa en algunos specs y falla en otros. Mitigación
+no aplicada todavía: subir el timeout default de `expect` en
+`playwright.config.ts` (o el timeout puntual de ese `expect`) le daría más
+margen a ese round-trip — evaluarlo si esta flakiness bloquea CI/verificación
+recurrente.
+
+Además, ADVERTENCIA operativa encontrada al diagnosticar esto: la lista de
+`GET .../debugTokens` (Console o API de App Check) nunca expone el valor
+real del token, aunque el nombre del recurso *parezca* ser el token
+codificado en base64 (es un id opaco, coincide en forma con un UUID pero
+no lo es) — si el valor real de un token se pierde, no hay forma de
+recuperarlo vía API; hay que borrar esa entrada y crear una nueva con
+`POST .../debugTokens` (que sí acepta o genera el valor real una sola vez,
+en la respuesta de creación) y actualizar `.env.local`.
+
 ## Al agregar features
 
 - Si tocas el modelo de reservaciones/canchas, actualiza `src/types/index.ts`
