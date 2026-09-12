@@ -287,8 +287,10 @@ Cuatro pestañas — la cuarta solo la ve `super-admin` (`AdminPage.tsx`,
   mínima, plazo de pago, monto a pagar) — casa club agrega ahí Tope
   mensual por usuario.
 - **Usuarios**: aprobar/rechazar pendientes, agregar colonos nuevos
-  directamente (`adminCreateColono`). El rol de cada usuario se muestra
-  aquí de **solo lectura** — asignarlo se movió a Avanzado (#38/#39).
+  directamente (`adminCreateColono`) o en bloque desde un archivo JSON
+  (`adminBulkCreateColonos`, con vista previa antes de confirmar — mismo
+  formato que `scripts/preregister-colonos.mjs`). El rol de cada usuario se
+  muestra aquí de **solo lectura** — asignarlo se movió a Avanzado (#38/#39).
 - **Avanzado** (`AdvancedTab`, exclusivo de super-admin):
   - **Usuarios**: mismo listado que la pestaña Usuarios, pero con
     `RoleSelector` (asignar colono/admin/tesorero/super-admin —

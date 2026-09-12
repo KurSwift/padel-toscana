@@ -9,15 +9,16 @@ React 19 + TypeScript + Vite 6, Tailwind CSS 3, React Router 7, Firebase v11
 (Auth, Firestore, Storage, App Check) vía SDK modular. Sin servidor propio: casi
 toda la lógica de negocio vive en `src/services/*` y se refuerza en
 `firestore.rules`. La excepción es `functions/` (Cloud Functions v2,
-TypeScript) — seis funciones: `createReservation` (existe porque esa
+TypeScript) — siete funciones: `createReservation` (existe porque esa
 validación requiere una query agregada que `firestore.rules` no puede
 hacer — ver "La regla más importante del repo" más abajo),
-`adminCreateColono`/`adminDeleteColono`/`adminSetUserRole` (alta/baja de
-colonos y asignación de roles por admin — crean/eliminan cuentas de Auth
-ajenas y setean custom claims, Admin SDK), y
-`getResidentsByAddress`/`getPublicCalendar` (lecturas pre-auth con
-Admin SDK — saludo de login y calendario público de cancha/casa club,
-respectivamente). El proyecto está en plan Blaze (de pago) por esto.
+`adminCreateColono`/`adminBulkCreateColonos`/`adminDeleteColono`/`adminSetUserRole`
+(alta individual o en bloque, baja de colonos y asignación de roles por
+admin — crean/eliminan cuentas de Auth ajenas y setean custom claims,
+Admin SDK), y `getResidentsByAddress`/`getPublicCalendar` (lecturas
+pre-auth con Admin SDK — saludo de login y calendario público de cancha/
+casa club, respectivamente). El proyecto está en plan Blaze (de pago) por
+esto.
 
 ## Comandos
 
@@ -144,7 +145,7 @@ e2e/                      # Playwright — npm run test:e2e, ver más abajo
   casa-club-flow.spec.ts  # reserva de casa club con depósito → pago → devolución de depósito → cancelación
   admin-reservation-flow.spec.ts  # admin reserva para colono, autoría y rechazo de suplantación
 functions/                # Cloud Functions v2 + TypeScript — build/deploy propios, ver "Comandos"
-  src/index.ts             # createReservation, adminCreateColono/adminDeleteColono/adminSetUserRole,
+  src/index.ts             # createReservation, adminCreateColono/adminBulkCreateColonos/adminDeleteColono/adminSetUserRole,
                             # getResidentsByAddress, getPublicCalendar (todas onCall)
   src/reservationRules.ts  # copia de la lógica pura que necesita (ver comentario de cabecera)
   src/bookingRules.ts       # permisos para crear reservaciones por administración (espejo en src/services/)

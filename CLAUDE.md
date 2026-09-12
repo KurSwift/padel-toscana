@@ -42,6 +42,14 @@ tocar código:
   registrar un debug token en Firebase Console. Espera un `403` en
   Auth/Firestore a menos que ese token ya esté registrado — no es una
   regresión tuya.
+- **El emulador de Firestore nunca exige índices compuestos** — una query
+  nueva con igualdad + rango en campos distintos puede "funcionar" en local
+  y fallar en producción con `FAILED_PRECONDITION` (bug real 2026-09-12,
+  ver AGENTS.md → "Emuladores, seeds y push-to-prod"). Si agregas una query
+  así, no asumas que un índice más ancho ya declarado la cubre como
+  prefijo — verifícalo corriéndola contra producción (o pide confirmación
+  al usuario) antes de dar el cambio por probado solo porque pasó en el
+  emulador.
 - **Despliegue completo a producción:** solo cuando el usuario lo pida de
   forma explícita, ejecuta `npm run build` desde `main` actualizado y después
   `npx firebase deploy`. Esto publica los dos sitios de Hosting, Functions,

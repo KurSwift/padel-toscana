@@ -44,6 +44,16 @@ Los datos del emulador persisten entre corridas en `.emulator-data/`
 (ignorado por git, vía `--export-on-exit`/`--import` en el script
 `emulators`).
 
+### Probar desde un celular en la misma red WiFi
+
+Los emuladores ya escuchan en todas las interfaces (`firebase.json` →
+`emulators.*.host: "0.0.0.0"`), pero el cliente sigue conectando a
+`127.0.0.1` por default — inútil desde otro dispositivo. Agrega
+`VITE_EMULATOR_HOST=<IP local de tu máquina>` a `.env.local` (`ipconfig
+getifaddr en0` en macOS) y levanta `npm run dev -- --host`. Abre
+`http://<esa-IP>:5173` desde el celular, en la misma red. Detalle completo
+en [AGENTS.md](./AGENTS.md#emuladores-seeds-y-push-to-prod).
+
 ### Alternativa: desarrollar contra producción
 
 No recomendado para trabajo día a día (lees/escribes datos reales), pero a
@@ -123,9 +133,11 @@ en producción real con `--confirm`).
   identificadores de reservaciones.
 - La base para eventos personalizados vive en `src/services/analytics.ts` y
   `analyticsRules.ts`: solo admite un catálogo de eventos y parámetros
-  categóricos. La instrumentación de flujos de login y reservación sigue
-  pendiente (issues [#111](https://github.com/KurSwift/padel-toscana/issues/111)
-  y [#112](https://github.com/KurSwift/padel-toscana/issues/112)).
+  categóricos. Login, selección de recurso, reservación, cancelación, pago
+  y calendario público ya están instrumentados (Epic
+  [#108](https://github.com/KurSwift/padel-toscana/issues/108), cerrada) —
+  ver "Métricas de Analytics" en [CONTEXT.md](./CONTEXT.md) para la guía de
+  revisión semanal.
 
 ## Estructura
 
