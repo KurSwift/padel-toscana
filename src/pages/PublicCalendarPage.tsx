@@ -3,6 +3,7 @@ import { CourtType } from '@/types'
 import { getPublicCalendar, type PublicCalendarEntry } from '@/services/reservations'
 import { useSiteSettings } from '@/context/SiteSettingsContext'
 import { formatMonthYear, formatTime, todayString } from '@/utils/time'
+import PrivacyNoticeLink from '@/components/PrivacyNoticeLink'
 
 const WEEKDAY_LABELS = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
 
@@ -193,6 +194,10 @@ export default function PublicCalendarPage() {
             ))}
           </div>
         )}
+      </div>
+
+      <div className="mt-5">
+        <PrivacyNoticeLink />
       </div>
     </div>
   )
