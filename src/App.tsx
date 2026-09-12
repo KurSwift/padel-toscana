@@ -12,6 +12,7 @@ import AdminPage from '@/pages/AdminPage'
 import TesoreroPage from '@/pages/TesoreroPage'
 import HelpPage from '@/pages/HelpPage'
 import PublicCalendarPage from '@/pages/PublicCalendarPage'
+import PrivacyPage from '@/pages/PrivacyPage'
 import ReservationsPage from '@/pages/ReservationsPage'
 import AppShell from '@/components/AppShell'
 
@@ -43,6 +44,7 @@ export default function App() {
                 path="/calendario"
                 element={<PublicCalendarPage />}
               />
+              <Route path="/privacidad" element={<PrivacyPage />} />
               <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/reservaciones" element={<ReservationsPage />} />

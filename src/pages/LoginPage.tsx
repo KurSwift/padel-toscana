@@ -7,6 +7,7 @@ import { signInWithGoogle, sendPhoneOtp, verifyOtp, signOut } from '@/services/a
 import { getResidentsByAddress, checkUserExists } from '@/services/users'
 import { VALID_STREETS, ValidStreet } from '@/types'
 import Logo from '@/components/Logo'
+import PrivacyNoticeLink from '@/components/PrivacyNoticeLink'
 import { useSiteSettings } from '@/context/SiteSettingsContext'
 
 // Excepción hardcodeada: esta es la única cuenta que predata el modelo de
@@ -162,7 +163,7 @@ export default function LoginPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-brand-50 px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-brand-50 px-4">
       <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm overflow-hidden">
 
         {/* Header */}
@@ -336,6 +337,9 @@ export default function LoginPage() {
       </div>
 
       <div id="recaptcha-container" />
+      <footer className="mt-5 text-center">
+        <PrivacyNoticeLink />
+      </footer>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useAuth } from '@/context/AuthContext'
 import { useSiteSettings } from '@/context/SiteSettingsContext'
 import { UserRole } from '@/types'
+import PrivacyNoticeLink from '@/components/PrivacyNoticeLink'
 
 interface HelpSection {
   title: string
@@ -211,6 +212,9 @@ export default function HelpPage() {
               Escribe al grupo de WhatsApp "Reservaciones - La Toscana".
             </p>
           )}
+        </div>
+        <div className="pt-1 text-center">
+          <PrivacyNoticeLink />
         </div>
       </div>
     </main>
