@@ -14,10 +14,10 @@ import { useTheme } from '@/context/ThemeContext'
 import { useSiteSettings } from '@/context/SiteSettingsContext'
 import { PALETTES } from '@/theme/palettes'
 import { isValidLogoFile } from '@/services/brandingRules'
-import { MAX_RESERVATION_DURATION_HOURS } from '@/services/reservationRules'
+import { MAX_RESERVATION_DURATION_HOURS, matchesReservationFilters } from '@/services/reservationRules'
 import { parseBulkColonosJson, type BulkColonoInput } from '@/services/bulkColonoRules'
-import { subscribeToAllReservationsByDate, setReservationStatus } from '@/services/reservations'
-import { todayString, addDays, formatDateLong, formatTime } from '@/utils/time'
+import { getReservationsByDateRange, setReservationStatus } from '@/services/reservations'
+import { todayString, addDays, formatDateShort, formatTime } from '@/utils/time'
 import AdminReservationForm from '@/components/AdminReservationForm'
 import StatusBadge, { RESERVATION_STATUS_LABELS } from '@/components/StatusBadge'
 
@@ -152,17 +152,43 @@ function SettingsOverview({ tabs, pendingCount, onSelect }: {
 
 // ── Reservations Tab ───────────────────────────────────────────────────────────
 
+// Rango por default: hoy → +90 días, cubre la anticipación máxima
+// configurable de cualquier recurso (daysAheadAllowed) — el admin puede
+// ampliarlo hacia atrás o adelante con los inputs de fecha.
+const DEFAULT_RANGE_DAYS_AHEAD = 90
+
 function ReservationsTab() {
   const [creating, setCreating] = useState(false)
-  const [date, setDate] = useState(todayString())
+  const [firstDate, setFirstDate] = useState(todayString())
+  const [lastDate, setLastDate] = useState(() => addDays(todayString(), DEFAULT_RANGE_DAYS_AHEAD))
+  const [resourceType, setResourceType] = useState<CourtType | ''>('')
+  const [statusFilter, setStatusFilter] = useState<ReservationStatus | ''>('')
+  const [searchTerm, setSearchTerm] = useState('')
   const [reservations, setReservations] = useState<Reservation[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [changing, setChanging] = useState<string | null>(null)
 
+  async function loadReservations() {
+    setLoading(true)
+    setError(false)
+    try {
+      const r = await getReservationsByDateRange(firstDate, lastDate)
+      setReservations([...r].sort((a, b) => a.date === b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date)))
+    } catch {
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    return subscribeToAllReservationsByDate(date, (r) =>
-      setReservations([...r].sort((a, b) => a.startTime.localeCompare(b.startTime))),
-    )
-  }, [date])
+    loadReservations()
+    // Solo al montar — cambiar de fecha requiere presionar "Actualizar"
+    // explícitamente (ver diseño: es una vista de búsqueda/historial, no
+    // necesita refetch en cada tecleo de fecha).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleChangeStatus(r: Reservation, status: ReservationStatus) {
     if (status === r.status) return
@@ -178,47 +204,112 @@ function ReservationsTab() {
     }
   }
 
-  const today = todayString()
-
   if (creating) return <AdminReservationForm onClose={() => setCreating(false)} />
+
+  const filtered = reservations.filter((r) =>
+    matchesReservationFilters(r, {
+      resourceType: resourceType || undefined,
+      status: statusFilter || undefined,
+      searchTerm,
+    }),
+  )
 
   return (
     <div className="space-y-4">
       <button type="button" onClick={() => setCreating(true)} className="min-h-12 rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white hover:bg-brand-700">
         Reservar para un colono
       </button>
-      {/* Date nav */}
-      <div role="group" aria-label={`Fecha seleccionada: ${formatDateLong(date)}`} className="flex items-center justify-between bg-white rounded-2xl px-4 py-3 shadow-sm">
+
+      {/* Filtros */}
+      <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-xs font-medium text-gray-600">
+            Desde
+            <input
+              type="date"
+              value={firstDate}
+              onChange={(e) => setFirstDate(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </label>
+          <label className="block text-xs font-medium text-gray-600">
+            Hasta
+            <input
+              type="date"
+              value={lastDate}
+              onChange={(e) => setLastDate(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </label>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-xs font-medium text-gray-600">
+            Recurso
+            <select
+              value={resourceType}
+              onChange={(e) => setResourceType(e.target.value as CourtType | '')}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="">Todos</option>
+              <option value="cancha">Cancha</option>
+              <option value="casa-club">Casa Club</option>
+            </select>
+          </label>
+          <label className="block text-xs font-medium text-gray-600">
+            Status
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as ReservationStatus | '')}
+              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="">Todos</option>
+              {(Object.keys(RESERVATION_STATUS_LABELS) as ReservationStatus[]).map((s) => (
+                <option key={s} value={s}>{RESERVATION_STATUS_LABELS[s]}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <label className="block text-xs font-medium text-gray-600">
+          Buscar por nombre o domicilio
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Ej: Natalia u Olivo 60"
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </label>
         <button
           type="button"
-          onClick={() => setDate(addDays(date, -1))}
-          aria-label="Ver día anterior"
-          className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 transition"
+          onClick={loadReservations}
+          disabled={loading}
+          className="min-h-11 w-full rounded-xl bg-gray-100 text-sm font-semibold text-gray-700 hover:bg-gray-200 disabled:opacity-40"
         >
-          ‹
-        </button>
-        <span className="font-semibold text-gray-800 text-sm">
-          {date === today ? 'Hoy' : formatDateLong(date)}
-        </span>
-        <button
-          type="button"
-          onClick={() => setDate(addDays(date, 1))}
-          aria-label="Ver día siguiente"
-          className="w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 transition"
-        >
-          ›
+          {loading ? 'Actualizando…' : 'Actualizar'}
         </button>
       </div>
 
-      {reservations.length === 0 ? (
-        <p className="text-center text-sm text-gray-400 py-8">Sin reservaciones este día.</p>
+      {error ? (
+        <div className="py-8 text-center">
+          <p className="text-sm text-gray-400">No se pudieron cargar las reservaciones.</p>
+          <button type="button" onClick={loadReservations} className="mt-3 min-h-11 rounded-xl bg-brand-50 px-4 text-sm font-semibold text-brand-700 hover:bg-brand-100">
+            Reintentar
+          </button>
+        </div>
+      ) : loading ? (
+        <div className="flex justify-center py-8">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <p className="text-center text-sm text-gray-400 py-8">No hay reservaciones que coincidan con estos filtros.</p>
       ) : (
         <div className="space-y-2">
-          {reservations.map((r) => (
+          {filtered.map((r) => (
             <div key={r.id} className="bg-white rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-gray-800">
+                    {formatDateShort(r.date)} ·{' '}
                     {(r.courtType ?? 'cancha') === 'casa-club'
                       ? 'Día completo'
                       : `${formatTime(r.startTime)} – ${formatTime(r.endTime)}`}
