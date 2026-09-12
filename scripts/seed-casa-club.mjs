@@ -59,8 +59,16 @@ function dateOffset(days) {
   return d
 }
 
+// Fecha local 'YYYY-MM-DD' — toISOString() convierte a UTC primero, lo que
+// desfasaba un día el resultado de dateOffset() según la hora y zona horaria
+// en que corriera el script (bug encontrado 2026-09-12 al investigar un
+// reporte de calendario: la reservación de ejemplo terminaba en un día
+// distinto al que decía el comentario de "+N días").
 function dateStr(d) {
-  return d.toISOString().slice(0, 10)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 // Reservación de día completo (issue 2/8): startTime/endTime =
