@@ -231,3 +231,32 @@ export function canTransition(
   }
   return false
 }
+
+// Filtros de la lista de reservaciones del panel admin (Configuración →
+// Reservaciones): recurso/status/búsqueda se aplican en JS sobre lo que ya
+// trajo getReservationsByDateRange (acotado por fecha en la query) — evita
+// depender de un índice compuesto de Firestore por cada combinación de
+// filtros. `undefined` en resourceType/status significa "todos".
+export interface ReservationListFilters {
+  resourceType?: CourtType
+  status?: ReservationStatus
+  searchTerm?: string
+}
+
+export function matchesReservationFilters(
+  reservation: { courtType?: CourtType; status: ReservationStatus; userName: string; userAddress: string },
+  filters: ReservationListFilters,
+): boolean {
+  if (filters.resourceType && (reservation.courtType ?? 'cancha') !== filters.resourceType) {
+    return false
+  }
+  if (filters.status && reservation.status !== filters.status) {
+    return false
+  }
+  const term = filters.searchTerm?.trim().toLocaleLowerCase('es')
+  if (term) {
+    const haystack = `${reservation.userName} ${reservation.userAddress}`.toLocaleLowerCase('es')
+    if (!haystack.includes(term)) return false
+  }
+  return true
+}

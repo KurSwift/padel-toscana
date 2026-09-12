@@ -249,15 +249,23 @@ las notificaciones, ese es el primer lugar a revisar.
 
 Cuatro pestañas — la cuarta solo la ve `super-admin` (`AdminPage.tsx`,
 `isSuperAdmin`/`tabs`; ver "Roles" arriba y Epic #43):
-- **Reservaciones**: navega por fecha, ve **todas** las reservaciones del
-  día de cualquier recurso (los 6 estados, con `StatusBadge` — incluye
+- **Reservaciones**: lista (no navegación día por día — cambiado
+  2026-09-12 a pedido del usuario, "no tenerlas que buscar") las
+  reservaciones de un rango de fechas (default hoy → +90 días, ajustable),
+  de **cualquier** recurso y los 6 estados (con `StatusBadge` — incluye
   `deposito-devuelto`/`deposito-retenido`, exclusivos de casa club, ver
   Epic #60 — a diferencia de las vistas de colono, aquí no se filtra por
-  status, ver `subscribeToAllReservationsByDate` en
-  `src/services/reservations.ts`), puede cambiar el status de cualquiera a
-  cualquier estado con un `<select>` (`setReservationStatus`, sin pasar
-  por la matriz de transición normal — reforzado en rules: solo
-  admin/super-admin).
+  status en la query). Carga única (`getReservationsByDateRange`,
+  `src/services/reservations.ts` — `getDocs`, no `onSnapshot`: es una
+  vista de búsqueda/historial, no operativa momento a momento) con botón
+  "Actualizar"; filtros de recurso, status y búsqueda por nombre/domicilio
+  se aplican en JS sobre lo ya cargado (`matchesReservationFilters` en
+  `reservationRules.ts`) para no depender de un índice compuesto de
+  Firestore por cada combinación — la query a Firestore solo filtra por
+  `date` (rango de un campo, sin índice compuesto nuevo). Puede cambiar el
+  status de cualquiera a cualquier estado con un `<select>`
+  (`setReservationStatus`, sin pasar por la matriz de transición normal —
+  reforzado en rules: solo admin/super-admin).
   La acción **Reservar para un colono** permite a admin/super-admin activos
   buscar un colono activo por nombre o domicilio y reservar Cancha/Casa Club
   usando el mismo calendario y hoja de confirmación. El residente a cargo se
