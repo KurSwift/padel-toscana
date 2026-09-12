@@ -120,10 +120,21 @@ async function seedUsersAndAddresses() {
 // pasa por firestore.rules, así que puede escribir cualquier
 // status/startAt/endAt/paymentDueAt directo, incluso combinaciones que la
 // app nunca produciría por sí sola (como la ya-expirada de abajo).
+// Fecha local 'YYYY-MM-DD' — toISOString() convierte a UTC primero, lo que
+// puede desfasar un día el resultado según la hora/zona horaria en que
+// corra el script (mismo bug que se encontró y corrigió en
+// seed-casa-club.mjs el 2026-09-12).
+function dateStr(d) {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 async function seedReservations() {
   const tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
-  const tomorrowDate = tomorrow.toISOString().slice(0, 10)
+  const tomorrowDate = dateStr(tomorrow)
 
   // Empieza en 2h (dentro de las 24h de minLeadHours si se creara vía la
   // app — pero el seed no pasa por esa validación) y su paymentDueAt
@@ -151,7 +162,7 @@ async function seedReservations() {
     {
       // Ya expirada por falta de pago — ver comentario arriba.
       ownerUid: 'seed-active-1', status: 'solicitada',
-      date: soon.toISOString().slice(0, 10),
+      date: dateStr(soon),
       startTime: `${String(soon.getHours()).padStart(2, '0')}:00`,
       endTime: `${String(soonEnd.getHours()).padStart(2, '0')}:00`,
       startAt: soon, endAt: soonEnd,

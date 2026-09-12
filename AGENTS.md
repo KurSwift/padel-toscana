@@ -452,6 +452,23 @@ en la respuesta de creación) y actualizar `.env.local`.
   firestore:indexes` **no borra** el índice ya creado en producción, solo
   deja de declararlo; si quieres liberar el espacio/costo real hay que
   borrarlo a mano desde la consola de Firebase.
+- **El emulador de Firestore no valida índices compuestos** — cualquier
+  query corre ahí sin importar si en producción exigiría un índice nuevo.
+  Un bug real (2026-09-12): `subscribeToReservationsByDateRange` y
+  `getPublicCalendar` (`courtId` igualdad + `date` rango, sin filtro de
+  `status`) se asumían servidas por el prefijo `courtId+date` del índice de
+  3 campos `courtId+date+status` — cierto en teoría para muchos casos, pero
+  Firestore igual exigió en producción un índice dedicado de 2 campos
+  (`courtId+date`, sin `status`) para esta combinación exacta de igualdad +
+  rango. Nunca falló en local (emulador) ni dio error visible en la UI de
+  producción (el listener falla en silencio si el caller no revisa la
+  consola) — solo se notó porque un colono reportó que una fecha reservada
+  no se veía ocupada en el calendario mensual de Casa Club. Si agregas una
+  query nueva con igualdad + rango sobre campos distintos, **verifica el
+  índice exacto corriéndola una vez contra producción** (o revisando la
+  consola del navegador en producción) en vez de asumir que un índice más
+  ancho ya declarado la cubre — el emulador no te va a avisar si te
+  equivocas.
 - Nuevas reglas de negocio en reservaciones casi siempre necesitan tocar
   tanto `src/services/reservations.ts` como `firestore.rules` (ver sección
   anterior) — y si la regla aplica a la creación de una reservación
