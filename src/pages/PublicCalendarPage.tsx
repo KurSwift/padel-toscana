@@ -4,6 +4,7 @@ import { getPublicCalendar, type PublicCalendarEntry } from '@/services/reservat
 import { useSiteSettings } from '@/context/SiteSettingsContext'
 import { formatMonthYear, formatTime, todayString } from '@/utils/time'
 import PrivacyNoticeLink from '@/components/PrivacyNoticeLink'
+import { trackAnalyticsEvent } from '@/services/analytics'
 
 const WEEKDAY_LABELS = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
 
@@ -41,6 +42,10 @@ export default function PublicCalendarPage() {
       document.head.removeChild(meta)
     }
   }, [])
+
+  useEffect(() => {
+    trackAnalyticsEvent('public_calendar_viewed', { resource_type: resourceType, role: 'anonymous' })
+  }, [resourceType])
 
   useEffect(() => {
     let cancelled = false

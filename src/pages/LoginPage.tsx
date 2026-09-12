@@ -9,6 +9,8 @@ import { VALID_STREETS, ValidStreet } from '@/types'
 import Logo from '@/components/Logo'
 import PrivacyNoticeLink from '@/components/PrivacyNoticeLink'
 import { useSiteSettings } from '@/context/SiteSettingsContext'
+import { trackAnalyticsEvent } from '@/services/analytics'
+import { authErrorToAnalyticsCode } from '@/services/analyticsRules'
 
 // Excepción hardcodeada: esta es la única cuenta que predata el modelo de
 // alta por admin (entra con Google, no con teléfono asignado) — ver
@@ -76,10 +78,12 @@ export default function LoginPage() {
   async function afterAuth(uid: string) {
     const exists = await checkUserExists(uid)
     if (exists) {
+      trackAnalyticsEvent('login_completed', { role: 'anonymous', result: 'success' })
       navigate('/')
       return
     }
     await signOut()
+    trackAnalyticsEvent('login_failed', { role: 'anonymous', result: 'error', error_code: 'account-not-found' })
     toast.error('No encontramos tu cuenta. Contacta al administrador.', { duration: 5000 })
   }
 
@@ -90,16 +94,24 @@ export default function LoginPage() {
       toast.error('Selecciona tu calle e ingresa tu número.')
       return
     }
+    trackAnalyticsEvent('login_started', { role: 'anonymous', stage: 'address' })
     setAddressLoading(true)
     try {
       const names = await getResidentsByAddress(street, streetNumber)
       if (names.length === 0) {
+        trackAnalyticsEvent('login_failed', { role: 'anonymous', stage: 'address', result: 'error', error_code: 'address-not-found' })
         toast.error('No encontramos un colono registrado en este domicilio. Contacta al administrador.', { duration: 5000 })
         return
       }
       setResidentNames(names)
       setStep('phone')
-    } catch {
+    } catch (err) {
+      trackAnalyticsEvent('login_failed', {
+        role: 'anonymous',
+        stage: 'address',
+        result: 'error',
+        error_code: (err as Error).message,
+      })
       toast.error('No se pudo verificar el domicilio. Intenta de nuevo.')
     } finally {
       setAddressLoading(false)
@@ -128,10 +140,17 @@ export default function LoginPage() {
     try {
       const result = await sendPhoneOtp(`+52${digits}`, getVerifier())
       confirmationRef.current = result
+      trackAnalyticsEvent('otp_sent', { role: 'anonymous', stage: 'otp', result: 'success' })
       setStep('otp')
       setResendTimer(RESEND_SECONDS)
     } catch (err) {
       clearVerifier()
+      trackAnalyticsEvent('login_failed', {
+        role: 'anonymous',
+        stage: 'otp',
+        result: 'error',
+        error_code: authErrorToAnalyticsCode((err as { code?: string }).code ?? ''),
+      })
       const msg = getErrorMessage(err)
       if (msg) toast.error(msg)
     } finally {
@@ -147,6 +166,12 @@ export default function LoginPage() {
       const result = await verifyOtp(confirmationRef.current, otp)
       await afterAuth(result.user.uid)
     } catch (err) {
+      trackAnalyticsEvent('login_failed', {
+        role: 'anonymous',
+        stage: 'otp',
+        result: 'error',
+        error_code: authErrorToAnalyticsCode((err as { code?: string }).code ?? ''),
+      })
       const msg = getErrorMessage(err)
       if (msg) toast.error(msg)
     } finally {

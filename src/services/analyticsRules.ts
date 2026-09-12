@@ -27,6 +27,7 @@ export interface AnalyticsParams {
 
 const ERROR_CODES = [
   'address-not-found',
+  'account-not-found',
   'invalid-phone',
   'otp-failed',
   'rate-limited',
@@ -43,6 +44,24 @@ type AnalyticsErrorCode = (typeof ERROR_CODES)[number]
 /** Determina si un nombre pertenece al catálogo de eventos aprobado. */
 export function isAnalyticsEventName(value: string): value is AnalyticsEventName {
   return (ANALYTICS_EVENT_NAMES as readonly string[]).includes(value)
+}
+
+// Los códigos de error de Firebase Auth (`err.code`, ej.
+// 'auth/invalid-phone-number') son específicos de la SDK, no del catálogo de
+// negocio que ya usan reservationErrorMessage/adminCreateColonoErrorMessage.
+// Este mapa traduce solo los que tienen equivalente categórico aprobado —
+// el resto queda sin error_code (login_failed se registra igual, solo sin
+// ese detalle) en vez de inventar una categoría nueva por cada código de Auth.
+const AUTH_ERROR_CODE_MAP: Record<string, AnalyticsErrorCode> = {
+  'auth/invalid-phone-number': 'invalid-phone',
+  'auth/too-many-requests': 'rate-limited',
+  'auth/invalid-verification-code': 'otp-failed',
+  'auth/code-expired': 'otp-failed',
+}
+
+/** Traduce un código de error de Firebase Auth al catálogo de Analytics, si aplica. */
+export function authErrorToAnalyticsCode(code: string): AnalyticsErrorCode | undefined {
+  return AUTH_ERROR_CODE_MAP[code]
 }
 
 /** Conserva exclusivamente parámetros categóricos aprobados para Analytics. */

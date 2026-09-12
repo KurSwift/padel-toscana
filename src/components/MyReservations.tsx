@@ -4,6 +4,8 @@ import { Court, Reservation } from '@/types'
 import { formatDateShort, formatTime, formatDateTimeShort } from '@/utils/time'
 import { cancelReservation } from '@/services/reservations'
 import StatusBadge from '@/components/StatusBadge'
+import { trackAnalyticsEvent } from '@/services/analytics'
+import { useAuth } from '@/context/AuthContext'
 
 interface Props {
   reservations: Reservation[]
@@ -11,6 +13,7 @@ interface Props {
 }
 
 export default function MyReservations({ reservations, court }: Props) {
+  const { profile } = useAuth()
   const [cancelling, setCancelling] = useState<string | null>(null)
   const isCasaClub = (court.type ?? 'cancha') === 'casa-club'
 
@@ -22,6 +25,7 @@ export default function MyReservations({ reservations, court }: Props) {
     setCancelling(r.id)
     try {
       await cancelReservation(r.id, r, court)
+      trackAnalyticsEvent('reservation_cancelled', { resource_type: court.type ?? 'cancha', role: profile?.role })
       toast.success('Reservación cancelada.')
     } catch (err) {
       toast.error(err instanceof Error && err.message ? err.message : 'No se pudo cancelar. Intenta de nuevo.')

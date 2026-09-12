@@ -13,51 +13,66 @@ const NEW_USER_NAME = `Elena Club E2E ${RUN_ID}`
 const ADMIN_PHONE = '5500000001' // Admin Seed — Nogal 1, ver SEED_USERS en scripts/seed.mjs.
 const TESORERO_PHONE = '5500000005' // Tere Tesorera — Encino 8.
 
-// Casa club: minLeadHours=72 y daysAheadAllowed=90 (ver
-// DEFAULT_COURT_SETTINGS_BY_TYPE en src/services/courts.ts). Los días
-// extra se suman a la primera fecha que la UI permite reservar, que puede
-// no ser Hoy por esa anticipación.
-const FIRST_BOOKING_DAYS_AHEAD = 5
-const SECOND_BOOKING_DAYS_AHEAD = 7
-
 async function goToCasaClub(page: Page) {
   await page.getByRole('tab', { name: 'Casa Club' }).click()
 }
 
-async function advanceDate(page: Page, days: number) {
+// Desde el calendario mensual de Casa Club (CasaClubMonthCalendar.tsx,
+// PR #107 — reemplazó la navegación día por día que tenía este flujo antes)
+// cada celda es un botón con aria-label "{fecha ISO}, disponible/ocupada/no
+// disponible". Recorre los meses hacia adelante hasta encontrar fechas
+// libres (una corrida previa puede haber ocupado las de ejemplo) y elige la
+// tercera en vez de la primera: la primera fecha disponible cumple el
+// mínimo de anticipación (minLeadHours) por un margen de segundos/minutos,
+// no de horas — el mismo tiempo que tarda este test en llegar del cálculo
+// de disponibilidad al submit real puede bastar para que deje de cumplirlo
+// (mismo motivo por el que el flujo viejo, con navegación día por día,
+// usaba "5 días" en vez del mínimo de 3). Selecciona la fecha y abre la
+// hoja de reservación con "Casa Club disponible" (CasaClubAvailability.tsx,
+// el mismo componente que usa cancha).
+async function bookAvailableCasaClubDate(page: Page): Promise<string> {
+  const calendar = page.getByRole('region', { name: 'Disponibilidad mensual de Casa Club' })
+  const available = calendar.getByRole('button', { name: /, disponible$/ })
+  let date: string | null = null
+  for (let i = 0; i < 24; i++) {
+    try {
+      await expect(available.first()).toBeVisible({ timeout: 2000 })
+      const count = await available.count()
+      const target = available.nth(Math.min(2, count - 1))
+      date = (await target.getAttribute('aria-label'))!.split(',')[0]
+      await target.click()
+      break
+    } catch {
+      await calendar.getByRole('button', { name: 'Ver mes siguiente' }).click()
+    }
+  }
+  if (!date) throw new Error('No se encontró una fecha disponible de Casa Club')
+  await expect(page.getByRole('status')).toBeHidden()
+  await page.getByRole('button', { name: 'Casa Club disponible' }).click()
+  return date
+}
+
+// El panel de admin (ReservationsTab) sigue navegando día por día — solo la
+// selección de fecha del propio colono para Casa Club cambió a calendario
+// mensual. Para llegar a la fecha de una reservación ya creada, calcula
+// cuántos "Ver día siguiente" hacen falta desde Hoy (el default de esa
+// vista) en vez de comparar etiquetas formateadas.
+function todayIso(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function daysBetween(fromIso: string, toIso: string): number {
+  const [fy, fm, fd] = fromIso.split('-').map(Number)
+  const [ty, tm, td] = toIso.split('-').map(Number)
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000)
+}
+
+async function advanceAdminDateTo(page: Page, targetIso: string) {
+  const days = daysBetween(todayIso(), targetIso)
   for (let i = 0; i < days; i++) {
     await page.getByRole('button', { name: 'Ver día siguiente' }).click()
-    await expect(page.getByRole('status')).toBeHidden()
   }
-}
-
-async function selectedDateLabel(page: Page) {
-  return page.locator('[role="group"][aria-label^="Fecha seleccionada:"]').getAttribute('aria-label')
-}
-
-async function advanceUntilDate(page: Page, targetDateLabel: string) {
-  for (let i = 0; i < 90; i++) {
-    if (await selectedDateLabel(page) === targetDateLabel) return
-    await page.getByRole('button', { name: 'Ver día siguiente' }).click()
-  }
-  throw new Error(`No se encontró la fecha ${targetDateLabel}`)
-}
-
-// Una corrida previa puede haber ocupado las fechas de ejemplo. Busca la
-// siguiente fecha que la UI expone como reservable en vez de asumir un offset
-// fijo desde Hoy; así el E2E permanece repetible con datos persistentes.
-async function advanceUntilCasaClubAvailable(page: Page) {
-  const available = page.getByRole('button', { name: /Casa Club disponible/ })
-  for (let i = 0; i < 90; i++) {
-    if (await available.isVisible()) {
-      const dateLabel = await selectedDateLabel(page)
-      await available.click()
-      return dateLabel
-    }
-    await page.getByRole('button', { name: 'Ver día siguiente' }).click()
-    await expect(page.getByRole('status')).toBeHidden()
-  }
-  throw new Error('No se encontró una fecha disponible de Casa Club')
 }
 
 test('reserva casa club: depósito, pago, devolución de depósito y cancelación', async ({ page }) => {
@@ -77,8 +92,7 @@ test('reserva casa club: depósito, pago, devolución de depósito y cancelació
   // ── Reserva A: depósito al confirmar ─────────────────────────────────────
   await loginWithPhone(page, { street: 'Olivo', streetNumber: NEW_USER_STREET_NUMBER, tenDigitPhone: NEW_USER_PHONE })
   await goToCasaClub(page)
-  await advanceDate(page, FIRST_BOOKING_DAYS_AHEAD)
-  const firstBookingDate = await advanceUntilCasaClubAvailable(page)
+  const firstBookingDate = await bookAvailableCasaClubDate(page)
 
   await expect(page.getByText(/Depósito de/)).toBeVisible()
   await expect(page.getByText(/reembolsables después del evento/)).toBeVisible()
@@ -112,7 +126,7 @@ test('reserva casa club: depósito, pago, devolución de depósito y cancelació
   await loginWithPhone(page, { street: 'Nogal', streetNumber: '1', tenDigitPhone: ADMIN_PHONE })
   await page.getByRole('link', { name: 'Configuración' }).click()
   await page.getByRole('button', { name: 'Reservaciones' }).click()
-  await advanceUntilDate(page, firstBookingDate ?? '')
+  await advanceAdminDateTo(page, firstBookingDate)
   const reservationRow = page.locator('div', { hasText: NEW_USER_NAME.split(' ')[0] }).filter({
     has: page.locator('select'),
   }).last()
@@ -138,8 +152,7 @@ test('reserva casa club: depósito, pago, devolución de depósito y cancelació
   // "reservaciones activas"). El toast de arriba ya confirma la devolución.
   await loginWithPhone(page, { street: 'Olivo', streetNumber: NEW_USER_STREET_NUMBER, tenDigitPhone: NEW_USER_PHONE })
   await goToCasaClub(page)
-  await advanceDate(page, SECOND_BOOKING_DAYS_AHEAD)
-  await advanceUntilCasaClubAvailable(page)
+  await bookAvailableCasaClubDate(page)
   await page.getByRole('button', { name: 'Confirmar reservación' }).click()
   await expect(page.getByText('¡Reservación creada!')).toBeVisible()
   await page.getByRole('button', { name: 'Entendido' }).click()

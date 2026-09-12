@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isAnalyticsEventName, sanitizeAnalyticsParams } from './analyticsRules'
+import { authErrorToAnalyticsCode, isAnalyticsEventName, sanitizeAnalyticsParams } from './analyticsRules'
 
 describe('isAnalyticsEventName', () => {
   it('acepta únicamente eventos definidos por el producto', () => {
@@ -22,5 +22,18 @@ describe('sanitizeAnalyticsParams', () => {
 
   it('descarta valores fuera del catálogo para no enviar texto libre', () => {
     expect(sanitizeAnalyticsParams({ role: 'María García', result: 'todo salió bien', error_code: '5501234567' })).toEqual({})
+  })
+})
+
+describe('authErrorToAnalyticsCode', () => {
+  it('traduce códigos de Firebase Auth con equivalente categórico', () => {
+    expect(authErrorToAnalyticsCode('auth/invalid-phone-number')).toBe('invalid-phone')
+    expect(authErrorToAnalyticsCode('auth/too-many-requests')).toBe('rate-limited')
+    expect(authErrorToAnalyticsCode('auth/invalid-verification-code')).toBe('otp-failed')
+    expect(authErrorToAnalyticsCode('auth/code-expired')).toBe('otp-failed')
+  })
+
+  it('no inventa una categoría para códigos sin equivalente aprobado', () => {
+    expect(authErrorToAnalyticsCode('auth/popup-closed-by-user')).toBeUndefined()
   })
 })

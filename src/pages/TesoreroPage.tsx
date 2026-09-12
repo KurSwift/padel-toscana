@@ -10,8 +10,11 @@ import {
   retainDeposit,
 } from '@/services/reservations'
 import { formatDateShort, formatTime } from '@/utils/time'
+import { trackAnalyticsEvent } from '@/services/analytics'
+import { useAuth } from '@/context/AuthContext'
 
 export default function TesoreroPage() {
+  const { profile } = useAuth()
   const [courts, setCourts] = useState<Court[]>([])
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [loading, setLoading] = useState(true)
@@ -42,6 +45,7 @@ export default function TesoreroPage() {
     setConfirming(r.id)
     try {
       await confirmPayment(r.id)
+      trackAnalyticsEvent('payment_confirmed', { resource_type: r.courtType ?? 'cancha', role: profile?.role, stage: 'payment' })
       toast.success(`Pago de ${r.userName.split(' ')[0]} confirmado.`)
     } catch {
       toast.error('No se pudo confirmar el pago.')
