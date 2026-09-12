@@ -416,22 +416,21 @@ toast de error genérico, no un timeout obvio de App Check. Fija
 una vez (Console o API) — ver `.env.local.example`. Sin esto, `npm run
 test:e2e` falla en el primer paso que llame a cualquier función protegida.
 
-**Gap conocido, no arreglado (2026-09-11):** con un `VITE_APPCHECK_DEBUG_TOKEN`
-fijo y registrado, `npm run test:e2e` sigue siendo intermitente — a veces
-0/4, a veces 2-3/4 specs pasan en la misma corrida, siempre fallando en el
-mismo punto (`getResidentsByAddress` responde `Unauthenticated`, mismo
-síntoma que un token no registrado). Causa probable: cada test arranca un
-contexto de navegador nuevo, y el intercambio del debug token pasa por la
-red real hacia `firebaseappcheck.googleapis.com` (no hay bypass de
-emulador para ese intercambio específico) — cuando ese round-trip tarda
-más que el timeout default de Playwright (5s) para el primer `expect(...).
-toBeVisible()` de `loginWithPhone()`, el test falla aunque el token sea
-válido. Confirmado que no es un token corrupto/no registrado: la misma
-corrida, mismo token, pasa en algunos specs y falla en otros. Mitigación
-no aplicada todavía: subir el timeout default de `expect` en
-`playwright.config.ts` (o el timeout puntual de ese `expect`) le daría más
-margen a ese round-trip — evaluarlo si esta flakiness bloquea CI/verificación
-recurrente.
+**Gap conocido (2026-09-11, mitigado):** con un `VITE_APPCHECK_DEBUG_TOKEN`
+fijo y registrado, `npm run test:e2e` era intermitente — a veces 0/4, a
+veces 2-3/4 specs pasaban en la misma corrida, siempre fallando en el mismo
+punto (`getResidentsByAddress` responde `Unauthenticated`, mismo síntoma
+que un token no registrado). Causa probable: cada test arranca un contexto
+de navegador nuevo, y el intercambio del debug token pasa por la red real
+hacia `firebaseappcheck.googleapis.com` (no hay bypass de emulador para ese
+intercambio específico) — cuando ese round-trip tardaba más que el timeout
+default de Playwright (5s) para el primer `expect(...).toBeVisible()` de
+`loginWithPhone()`, el test fallaba aunque el token fuera válido. Confirmado
+que no era un token corrupto/no registrado: la misma corrida, mismo token,
+pasaba en algunos specs y fallaba en otros. **Mitigación aplicada**:
+`playwright.config.ts` sube el timeout default de `expect` a 15s — le da
+margen real a ese round-trip. Si sigue habiendo flakiness después de esto,
+sospechar de otra causa (no de un token no registrado).
 
 Además, ADVERTENCIA operativa encontrada al diagnosticar esto: la lista de
 `GET .../debugTokens` (Console o API de App Check) nunca expone el valor
