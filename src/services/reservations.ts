@@ -5,6 +5,7 @@ import {
   query,
   where,
   onSnapshot,
+  getDocs,
   type QueryDocumentSnapshot,
   type DocumentData,
 } from 'firebase/firestore'
@@ -306,6 +307,30 @@ export function subscribeToAllReservationsByDate(
     (snap) => onUpdate(toEffectiveReservations(snap.docs)),
     (error) => logSnapshotFailure('subscribeToAllReservationsByDate', error),
   )
+}
+
+// Lista de reservaciones de administración (panel Reservaciones, issue de
+// "verlas enlistadas en vez de navegar día por día") — carga única (getDocs,
+// no onSnapshot): es una vista de búsqueda/historial, no operativa momento a
+// momento, así que no necesita reflejar cambios de otros usuarios en vivo
+// (más barato en lecturas para un rango de fechas amplio). Solo filtra por
+// `date` en la query (rango de un solo campo, sin índice compuesto nuevo);
+// recurso/status/búsqueda por nombre o domicilio se filtran en JS sobre el
+// resultado — mismo patrón que la búsqueda de colonos en
+// AdminReservationForm — para no depender de un índice distinto por cada
+// combinación de filtros.
+export async function getReservationsByDateRange(
+  firstDate: string,
+  lastDate: string,
+): Promise<Reservation[]> {
+  const snap = await getDocs(
+    query(
+      collection(db, 'reservations'),
+      where('date', '>=', firstDate),
+      where('date', '<=', lastDate),
+    ),
+  )
+  return toEffectiveReservations(snap.docs)
 }
 
 export function subscribeToUserReservations(
