@@ -14,6 +14,7 @@ import {
   isResidentInChargeNameValid,
   isWithinMonthlyLimit,
   isCancellationAllowed,
+  matchesReservationFilters,
 } from './reservationRules'
 
 describe('hasOverlap', () => {
@@ -425,5 +426,38 @@ describe('isResidentInChargeNameValid', () => {
 
   it('rechaza una cadena de solo espacios', () => {
     expect(isResidentInChargeNameValid('   ')).toBe(false)
+  })
+})
+
+describe('matchesReservationFilters', () => {
+  const base = { courtType: 'casa-club' as const, status: 'solicitada' as const, userName: 'Natalia Martinez', userAddress: 'Olivo 60' }
+
+  it('sin filtros, siempre coincide', () => {
+    expect(matchesReservationFilters(base, {})).toBe(true)
+  })
+
+  it('filtra por recurso', () => {
+    expect(matchesReservationFilters(base, { resourceType: 'casa-club' })).toBe(true)
+    expect(matchesReservationFilters(base, { resourceType: 'cancha' })).toBe(false)
+  })
+
+  it('trata courtType ausente como cancha (fallback)', () => {
+    expect(matchesReservationFilters({ ...base, courtType: undefined }, { resourceType: 'cancha' })).toBe(true)
+  })
+
+  it('filtra por status', () => {
+    expect(matchesReservationFilters(base, { status: 'solicitada' })).toBe(true)
+    expect(matchesReservationFilters(base, { status: 'pagada' })).toBe(false)
+  })
+
+  it('busca por nombre o domicilio, sin distinguir mayúsculas/acentos de más', () => {
+    expect(matchesReservationFilters(base, { searchTerm: 'natalia' })).toBe(true)
+    expect(matchesReservationFilters(base, { searchTerm: 'OLIVO' })).toBe(true)
+    expect(matchesReservationFilters(base, { searchTerm: 'nogal' })).toBe(false)
+  })
+
+  it('combina todos los filtros a la vez (AND)', () => {
+    expect(matchesReservationFilters(base, { resourceType: 'casa-club', status: 'solicitada', searchTerm: 'olivo' })).toBe(true)
+    expect(matchesReservationFilters(base, { resourceType: 'casa-club', status: 'pagada', searchTerm: 'olivo' })).toBe(false)
   })
 })
