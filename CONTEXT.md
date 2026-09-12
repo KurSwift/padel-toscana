@@ -381,8 +381,46 @@ domicilios, correos, UID ni contenido o identificadores de reservaciones.
 `src/services/analyticsRules.ts` restringe cualquier evento personalizado a
 un catálogo y parámetros categóricos sin PII; `analytics.ts` aplica ese
 filtro antes de `logEvent`. La instrumentación de los flujos de login y
-reservación todavía no se ha conectado a la UI — ver Epic #108 / issues
-#111 y #112 en `TASKS.md`.
+reservación ya está conectada a la UI (issue #111, PR #117) — ver la
+siguiente sección para cómo leerla.
+
+## Métricas de Analytics: guía de revisión semanal (Epic #108, issue #112)
+
+Propiedad de GA4: `padel-toscana` (measurement ID `G-225T8DENJV`, ver
+`src/firebase.ts`). El catálogo de eventos es cerrado —
+`src/services/analyticsRules.ts` es la fuente de verdad de qué existe y qué
+parámetros acepta cada uno; ver "Aviso de privacidad" arriba para qué nunca
+se envía.
+
+**Dónde mirar** (dos vistas, propósitos distintos):
+- **DebugView** (GA4 → Administrar → busca "DebugView" en el buscador
+  superior) — stream evento por evento casi en tiempo real, filtrado a tu
+  propio dispositivo (`gtag('set', {'debug_mode': true})` en la consola del
+  navegador activa el modo debug para esa sesión). Sirve para *probar* que
+  un evento nuevo dispara correctamente, no para la revisión semanal — no
+  agrega histórico ni tasas.
+- **Informes → Interacción → Eventos** — conteo agregado por nombre de
+  evento, la fuente para la revisión semanal. **Los datos tardan hasta
+  24-48h en aparecer aquí** (a diferencia de DebugView) — no esperes ver
+  algo del mismo día.
+
+**Cómo leer cada métrica** (todas se calculan dividiendo dos conteos del
+reporte de Eventos, sin necesidad de armar una Exploración de embudo):
+
+| Métrica | Qué responde | Evento(s) | Cálculo / filtro |
+|---|---|---|---|
+| Activación | ¿Cuánta gente que intenta entrar lo logra? | `login_started`, `login_completed` | `login_completed` (parámetro `result=success`) ÷ `login_started` |
+| Abandono de login | ¿En qué paso se atora la gente? | `login_started` → `otp_sent` → `login_completed`, más `login_failed` | Caída entre esos tres conteos; `login_failed` desglosado por `error_code` (`address-not-found`, `rate-limited`, `invalid-phone`, `otp-failed`, `account-not-found`) dice la causa puntual |
+| Conversión a reserva | ¿La gente que empieza a reservar, termina reservando? | `reservation_started`, `reservation_created` | `reservation_created` ÷ `reservation_started`, desglosado por `resource_type` (`cancha`/`casa_club`) |
+| Cancelaciones | ¿Qué proporción de reservas se cancela? | `reservation_cancelled`, `reservation_created` | `reservation_cancelled` ÷ `reservation_created`, por `resource_type` |
+| Errores | ¿Cuáles son los motivos de fallo más comunes? | `reservation_failed`, `login_failed` | Desglose por `error_code` — el catálogo completo está en `analyticsRules.ts` |
+| Preferencia de recurso | ¿Cancha o Casa Club se usa más? | `resource_selected`, `reservation_created` | Conteo por `resource_type` |
+| Pago a tiempo *(extra)* | ¿Se confirma el pago de lo reservado? | `reservation_created`, `payment_confirmed` | `payment_confirmed` ÷ `reservation_created`, por `resource_type` |
+| Adopción del calendario público *(extra)* | ¿Se usa el link sin sesión? | `public_calendar_viewed` | Conteo total, por `resource_type` |
+
+Ninguna de estas vistas necesita desglosar por usuario — el catálogo no
+manda UID ni nombre (ver "Aviso de privacidad"), así que "por usuario" no
+es una dimensión disponible ni buscada.
 
 ## Modelo de datos (Firestore)
 

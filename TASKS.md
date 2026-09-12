@@ -485,8 +485,26 @@ contenido ni identificadores de reservaciones.
   y enlaces desde login, calendario público y Ayuda. El aviso declara la
   activación automática, métricas agregadas de navegación/interacción y los
   datos excluidos.
-- [#111 — Instrumentar login y reservaciones](https://github.com/KurSwift/padel-toscana/issues/111) — **siguiente**. Usar exclusivamente
-  `trackAnalyticsEvent()` y el contrato de `analyticsRules.ts`; no añadir
-  valores libres ni PII.
-- [#112 — Validar DebugView y documentar](https://github.com/KurSwift/padel-toscana/issues/112) — después de #111. Verificar los eventos en
-  producción con DebugView/Realtime y documentar una checklist de operación.
+- ~~[#111 — Instrumentar login y reservaciones](https://github.com/KurSwift/padel-toscana/issues/111)~~ — **hecha**
+  (PR #117, mergeada y desplegada, 2026-09-12): `login_started`/`otp_sent`/
+  `login_completed`/`login_failed` en `LoginPage.tsx`; `resource_selected` y
+  `reservation_started`/`created`/`failed` en `ReservationCalendar.tsx`;
+  `reservation_cancelled` en `MyReservations.tsx`; `payment_confirmed` en
+  `TesoreroPage.tsx`; `public_calendar_viewed` en `PublicCalendarPage.tsx`.
+  De paso, ese PR también arregló un E2E roto (`casa-club-flow.spec.ts`
+  seguía usando la navegación día por día que el calendario mensual de
+  Casa Club ya había reemplazado) y la configuración de Playwright
+  (`webServer` no enlazaba en IPv4 en esta máquina, `expect.timeout`
+  insuficiente para el intercambio del debug token de App Check contra la
+  red real — ver AGENTS.md).
+- ~~[#112 — Validar DebugView y documentar](https://github.com/KurSwift/padel-toscana/issues/112)~~ — **hecha**
+  (2026-09-12): eventos verificados en GA4 DebugView contra producción
+  (activó `debug_mode` en el navegador real, confirmó que cada evento
+  dispara sin PII en los parámetros). Guía de revisión semanal documentada
+  en `CONTEXT.md` → "Métricas de Analytics": qué evento(s) y qué cálculo
+  usar para activación, abandono de login, conversión a reserva,
+  cancelaciones, errores y preferencia de recurso (más dos métricas extra,
+  pago a tiempo y adopción del calendario público), con la aclaración de
+  que los datos tardan 24-48h en aparecer fuera de DebugView.
+
+**Épica #108 completa** — los 4 issues (#109-#112) están cerrados.
