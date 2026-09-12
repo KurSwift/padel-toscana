@@ -13,7 +13,7 @@ de código y comandos, ver [AGENTS.md](./AGENTS.md).
 ## Stack
 
 React 19 · TypeScript · Vite 6 · Tailwind CSS 3 · React Router 7 · Firebase
-(Auth, Firestore, Storage, Cloud Functions v2, App Check).
+(Auth, Firestore, Storage, Cloud Functions v2, App Check, Analytics).
 
 ## Requisitos
 
@@ -94,9 +94,9 @@ en producción real con `--confirm`).
   Plan Blaze (de pago) — lo requiere `functions/`.
 - `functions/` es un proyecto TypeScript aparte (su propio
   `package.json`/`tsconfig.json`, no forma parte de `tsc -b` de la raíz) —
-  seis Cloud Functions para las operaciones que necesitan Admin SDK
+  siete Cloud Functions para las operaciones que necesitan Admin SDK
   (crear reservaciones, alta/baja de colonos, asignar roles, lecturas
-  pre-auth). Ver AGENTS.md para el detalle de cada una.
+  pre-auth y alta masiva). Ver AGENTS.md para el detalle de cada una.
 - Deploy de hosting + reglas de Firestore:
   ```bash
   npm run build
@@ -112,16 +112,31 @@ en producción real con `--confirm`).
   sobreescribe documentos existentes con el mismo id. Lo mismo aplica a
   `migrate-users-role`/`preregister-colonos` con `--confirm`.
 
+### Privacidad y Analytics
+
+- Firebase Analytics se inicializa solo fuera de emuladores y solo en
+  navegadores compatibles. Los eventos de prueba locales no contaminan las
+  métricas de producción.
+- El aviso público en `/privacidad` explica la analítica automática. Muestra
+  que las métricas son agregadas de navegación e interacción y que no se
+  envían nombres, teléfonos, domicilios, correos, UID, ni contenido o
+  identificadores de reservaciones.
+- La base para eventos personalizados vive en `src/services/analytics.ts` y
+  `analyticsRules.ts`: solo admite un catálogo de eventos y parámetros
+  categóricos. La instrumentación de flujos de login y reservación sigue
+  pendiente (issues [#111](https://github.com/KurSwift/padel-toscana/issues/111)
+  y [#112](https://github.com/KurSwift/padel-toscana/issues/112)).
+
 ## Estructura
 
 ```
 src/
-  firebase.ts        # init de Firebase (auth, db, functions, app check, conexión a emuladores)
-  App.tsx            # rutas (incluye /calendario, la única pública sin login)
+  firebase.ts        # init de Firebase (auth, db, functions, app check, analytics, emuladores)
+  App.tsx            # rutas (incluye /calendario y /privacidad, públicas)
   context/           # AuthContext (usuario + perfil), ThemeContext, SiteSettingsContext
   components/        # UI reutilizable
   pages/             # LoginPage, RegisterPage, HomePage, AdminPage, TesoreroPage, HelpPage,
-                      # PublicCalendarPage (pública)
+                      # PublicCalendarPage y PrivacyPage (públicas)
   services/          # única capa que habla con Firestore/Auth/Storage/Functions
   hooks/             # useCourtData
   types/             # tipos de los documentos de Firestore

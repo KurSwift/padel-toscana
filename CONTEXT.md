@@ -16,9 +16,9 @@ Nogal · Olivo · Encino
 
 (ver `VALID_STREETS` en `src/types/index.ts`). No es una app pública — un
 administrador da de alta a cada colono directamente (ver "Flujo de alta y
-login" abajo; no hay auto-registro). La única excepción es
-`/calendario`, pública y sin login — ver sección dedicada más
-abajo.
+login" abajo; no hay auto-registro). Las excepciones públicas sin login son
+`/calendario` (disponibilidad) y `/privacidad` (aviso de Analytics) — ver
+sus secciones dedicadas más abajo.
 
 ## Roles
 
@@ -104,6 +104,12 @@ información del día anterior. `DateSelector` y el selector del panel de
 reservaciones de Configuración tienen nombres accesibles para sus acciones
 de día anterior/siguiente.
 
+Para **Casa Club**, `ReservationCalendar` sustituye el selector diario por
+`CasaClubMonthCalendar`: carga las reservaciones del mes visible y permite
+ver de un vistazo qué días están ocupados, dentro de la ventana configurable
+de anticipación. Cancha conserva la navegación por día porque sus
+reservaciones son por horario.
+
 ## Flujo de alta y login (actualizado 2026-08-30 — reemplaza el auto-registro)
 
 Desde el alta de colonos por admin (ver Epic
@@ -122,8 +128,10 @@ auto-registro por default. El flujo real:
 2. **Login** (`/login`, `LoginPage.tsx`): domicilio primero (calle +
    número) → `getResidentsByAddress` (Cloud Function, pre-auth) busca si
    hay un colono activo ahí y saluda por nombre ("Bienvenid@ {nombre}") →
-   teléfono +52 vía OTP (Firebase Auth). Si nadie está registrado en ese
-   domicilio, error — no hay fallback a auto-registro.
+   teléfono +52 vía OTP (Firebase Auth). La consulta se limita a 10 intentos
+   por IP en una ventana fija de 5 minutos; la IP se guarda solo como hash en
+   `lookupRateLimits`. Si nadie está registrado en ese domicilio, error — no
+   hay fallback a auto-registro.
 3. **Excepción hardcodeada**: `GOOGLE_LOGIN_ADDRESS = 'nogal 35'` en
    `LoginPage.tsx` — solo esa cuenta (la admin original, que predata este
    modelo) puede entrar con Google. Cualquier otro domicilio solo tiene
@@ -360,6 +368,22 @@ según `courtType`. **Nunca** se abre `firestore.rules` de `reservations`
 a lectura pública para esto — expondría status de pago/depósito de
 cualquier reservación a quien tenga el link.
 
+## Aviso de privacidad (`/privacidad`)
+
+Ruta pública, accesible también desde login, calendario público y Ayuda. Es
+un aviso informativo, no una pantalla de consentimiento: Analytics se activa
+automáticamente fuera de emuladores cuando el navegador es compatible.
+Explica que se usan métricas agregadas de navegación e interacción (por
+ejemplo, visitas a pantallas, desplazamientos y clics externos) para mejorar
+el portal. Declara expresamente que no se envían nombres, teléfonos,
+domicilios, correos, UID ni contenido o identificadores de reservaciones.
+
+`src/services/analyticsRules.ts` restringe cualquier evento personalizado a
+un catálogo y parámetros categóricos sin PII; `analytics.ts` aplica ese
+filtro antes de `logEvent`. La instrumentación de los flujos de login y
+reservación todavía no se ha conectado a la UI — ver Epic #108 / issues
+#111 y #112 en `TASKS.md`.
+
 ## Modelo de datos (Firestore)
 
 | Colección | Documento | Notas |
@@ -368,6 +392,7 @@ cualquier reservación a quien tenga el link.
 | `addresses/{addressKey}` | `{ uids: string[] }` | Máximo 2 `uids`. Lectura pública (se usa antes de autenticar, para validar disponibilidad de domicilio en el registro). |
 | `mail/{autoId}` | `{ to, message: { subject, html } }` | Solo creación por la app; lectura/actualización/borrado bloqueados — los procesa la extensión de correo. |
 | `rateLimits/{uid}` | `{ windowStart: Timestamp, count: number }` | Rate limiting de `createReservation` (ventana fija, ver `functions/src/rateLimit.ts`). Solo la Cloud Function (Admin SDK) la toca — bloqueada por completo para el cliente en `firestore.rules`. |
+| `lookupRateLimits/{ipHash}` | `{ windowStart: Timestamp, count: number }` | Rate limiting pre-auth de `getResidentsByAddress`: 10 consultas por IP cada 5 minutos. La IP se hashea con SHA-256 antes de usarla como id; el cliente no puede leer ni escribir esta colección. |
 | `courts/{courtId}` | `Court` (incluye `CourtSettings`) | Lectura para cualquier usuario autenticado, escritura solo admin. `type?: 'cancha' \| 'casa-club'` (Epic #60, issue 1/8) discrimina el recurso — opcional para no requerir migración, `?? 'cancha'` como fallback en quien lo lea. `CourtSettings` tiene campos exclusivos de casa club (`depositAmount`, `depositRefundableAmount`, `cancellationDeadlineHours`, `maxReservationsPerUserPerMonth`) que quedan `undefined`/sin usar en cancha. |
 | `settings/theme` | `{ paletteId: string }` | Paleta de acento activa (Epic #43, issue 5/5 — ver `src/theme/palettes.ts`). Lectura pública (se necesita antes de autenticar, en `/login`), escritura solo super-admin. Si no existe, se asume la paleta default (`'green'`). |
 | `settings/general` | `{ siteName: string, whatsappUrl?: string }` | Nombre del sitio (Home/Login/RegisterPage y `document.title`) y link de contacto de WhatsApp (tarjeta al final de `HelpPage`). Mismas reglas que `settings/theme`: lectura pública, escritura solo super-admin. Si no existe o `whatsappUrl` está vacío, cae a los defaults/texto plano de siempre — ver `src/context/SiteSettingsContext.tsx`. |
@@ -385,10 +410,10 @@ shape de estos documentos en el cliente.
 - **App Check** (`src/firebase.ts`) con reCAPTCHA v3 está siempre activo,
   incluso en dev — en local se apoya en el modo debug-token (ver README y
   AGENTS.md; para `npm run test:e2e` específicamente hace falta un debug
-  token fijo vía `VITE_APPCHECK_DEBUG_TOKEN`, ver AGENTS.md). Las seis
+  token fijo vía `VITE_APPCHECK_DEBUG_TOKEN`, ver AGENTS.md). Las siete
   Cloud Functions (`createReservation`, `adminCreateColono`,
-  `adminDeleteColono`, `adminSetUserRole`, `getResidentsByAddress`,
-  `getPublicCalendar`) tienen `enforceAppCheck: true`.
+  `adminBulkCreateColonos`, `adminDeleteColono`, `adminSetUserRole`,
+  `getResidentsByAddress`, `getPublicCalendar`) tienen `enforceAppCheck: true`.
 - La autorización real vive en `firestore.rules`; el cliente nunca debe ser la
   única línea de defensa para nada sensible (roles, límites, integridad de
   reservaciones).
@@ -396,14 +421,14 @@ shape de estos documentos en el cliente.
 ## Gaps / deuda conocida (útil antes de asumir que "ya existe")
 
 - Casi toda la lógica vive en el cliente + reglas de Firestore. Las
-  excepciones son las seis funciones en `functions/` (Cloud Functions
+  excepciones son las siete funciones en `functions/` (Cloud Functions
   v2): `createReservation` (existe porque crear una reservación necesita
   validar el límite de activas por usuario y traslapes de horario, algo
   que requiere queries agregadas que `firestore.rules` no puede hacer —
   solo `get()` de documentos puntuales; corre esa validación + el write
   dentro de una transacción atómica; `firestore.rules` deniega `create` en
   `reservations` por completo, `if false` — la función es la única vía),
-  `adminCreateColono`/`adminDeleteColono`/`adminSetUserRole` (necesitan
+  `adminCreateColono`/`adminBulkCreateColonos`/`adminDeleteColono`/`adminSetUserRole` (necesitan
   Admin SDK para crear/eliminar cuentas de Auth ajenas y setear custom
   claims), y `getResidentsByAddress`/`getPublicCalendar` (ambas leen
   Firestore pre-auth con Admin SDK — la primera para el saludo de login,
