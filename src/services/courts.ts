@@ -38,7 +38,9 @@ export const DEFAULT_COURT_SETTINGS_BY_TYPE: Record<CourtType, CourtSettings> = 
     maxActiveReservationsPerUser: 2,
     daysAheadAllowed: 90,
     minLeadHours: 72,
-    paymentDeadlineHours: 12,
+    // 24h después de reservar, no antes del evento (a diferencia de cancha) —
+    // ver computePaymentDueAt en reservationRules.ts.
+    paymentDeadlineHours: 24,
     reservationFee: 3000,
     maxPlayerCount: 30,
     depositAmount: 3000,

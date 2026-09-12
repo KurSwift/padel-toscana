@@ -11,9 +11,13 @@ export interface CourtSettings {
   // Anticipación mínima para poder reservar, en horas. Default 24 (ver
   // reglamento de colonos, issue 3/7 del épico #10).
   minLeadHours: number
-  // Horas desde que se crea la reservación hasta que se libera si nadie
-  // confirma el pago (paymentDueAt = startAt - paymentDeadlineHours).
-  // Default 12. Ver effectiveStatus() en reservationRules.ts (issue 4/7).
+  // Ventana de horas para pagar antes de que la reservación se libere sola.
+  // La fórmula depende del tipo de recurso (ver computePaymentDueAt en
+  // reservationRules.ts): cancha resta este valor a startAt (antes del
+  // evento, default 12); casa club se lo suma a createdAt (después de
+  // reservar, default 24) — con su anticipación mínima larga (72h),
+  // "antes del evento" dejaba demasiado margen para pagar. Ver
+  // effectiveStatus() en reservationRules.ts (issue 4/7) para el release.
   paymentDeadlineHours: number
   // Monto en pesos que el colono debe pagar al tesorero para confirmar la
   // reservación. Default sugerido 300. Editable por admin (issue 6/7 del
@@ -138,7 +142,8 @@ export interface Reservation {
   // el auto-release por falta de pago.
   startAt: Timestamp
   endAt: Timestamp
-  // startAt - court.settings.paymentDeadlineHours, calculado al crear.
+  // Calculado al crear con computePaymentDueAt() — la fórmula depende del
+  // tipo de recurso, ver el comentario de CourtSettings.paymentDeadlineHours.
   // Deadline para que el tesorero confirme el pago antes de que se libere
   // el horario — ver effectiveStatus() en reservationRules.ts.
   paymentDueAt: Timestamp
