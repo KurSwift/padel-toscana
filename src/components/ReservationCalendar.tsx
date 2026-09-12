@@ -4,6 +4,7 @@ import { CourtType, UserProfile } from '@/types'
 import { useCourtData } from '@/hooks/useCourtData'
 import { createReservation, reservationErrorMessage } from '@/services/reservations'
 import { firstReservableDate } from '@/services/reservationRules'
+import { trackAnalyticsEvent } from '@/services/analytics'
 import DateSelector from '@/components/DateSelector'
 import SlotsGrid from '@/components/SlotsGrid'
 import CasaClubAvailability from '@/components/CasaClubAvailability'
@@ -53,6 +54,7 @@ export default function ReservationCalendar({ profile, forResident = false }: {
 
   /** Cambia recurso, reinicia fecha y descarta una selección anterior. */
   function handleSelectResource(type: CourtType) {
+    trackAnalyticsEvent('resource_selected', { resource_type: type, role: profile.role, stage: 'booking' })
     setResourceType(type)
     // Una fecha válida para el recurso anterior podría no serlo para el
     // nuevo (días y anticipación mínima distintos) — el efecto de arriba la
@@ -71,6 +73,8 @@ export default function ReservationCalendar({ profile, forResident = false }: {
     residentInChargeName: string
   }) {
     if (!court || !selectedSlot) throw new Error('booking-unavailable')
+    const analyticsParams = { resource_type: resourceType, role: profile.role, stage: 'booking' as const }
+    trackAnalyticsEvent('reservation_started', analyticsParams)
     try {
       await createReservation({
         court,
@@ -79,7 +83,9 @@ export default function ReservationCalendar({ profile, forResident = false }: {
         startTime: selectedSlot.startTime,
         ...params,
       })
+      trackAnalyticsEvent('reservation_created', { ...analyticsParams, result: 'success' })
     } catch (err) {
+      trackAnalyticsEvent('reservation_failed', { ...analyticsParams, result: 'error', error_code: (err as Error).message })
       toast.error(reservationErrorMessage((err as Error).message, court.settings.minLeadHours))
       setSelectedSlot(null)
       throw err
