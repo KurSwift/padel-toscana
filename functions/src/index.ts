@@ -45,7 +45,16 @@ import {
   LOOKUP_RATE_LIMIT_MAX_CALLS,
   lookupRateLimitKey,
 } from './rateLimit'
-import { isValidStreet, isAddressAvailable, normalizeAddress, isValidColonoName, isValidMxPhone } from './colonoRules'
+import {
+  isValidStreet,
+  isAddressAvailable,
+  normalizeAddress,
+  isValidColonoName,
+  isValidMxPhone,
+  normalizeGmail,
+  googleLinkEmail,
+  pickGoogleLinkTarget,
+} from './colonoRules'
 import { MAX_BULK_COLONOS, validateBulkColono, type BulkColonoInput } from './bulkColonoRules'
 
 initializeApp()
@@ -335,6 +344,25 @@ interface AdminCreateColonoInput {
   street: string
   streetNumber: string
   phone: string
+  email?: string
+}
+
+// ¿Algún perfil distinto de `exceptUid` ya tiene este gmail? El correo es
+// credencial de login con Google (ver linkGoogleAccount), así que debe ser
+// único — pickGoogleLinkTarget rechaza el login si hay dos.
+async function isGmailTaken(email: string, exceptUid?: string): Promise<boolean> {
+  const snap = await db.collection('users').where('email', '==', email).limit(2).get()
+  return snap.docs.some((d) => d.id !== exceptUid)
+}
+
+// Lee el email opcional de un alta/edición: '' o ausente = sin correo
+// (null); cualquier otra cosa debe ser un @gmail.com válido.
+function parseOptionalGmail(raw: unknown): string | null {
+  const trimmed = typeof raw === 'string' ? raw.trim() : ''
+  if (!trimmed) return null
+  const email = normalizeGmail(trimmed)
+  if (!email) throw new HttpsError('invalid-argument', 'invalid-email')
+  return email
 }
 
 function isValidCreateColonoInput(data: unknown): data is AdminCreateColonoInput {
@@ -344,7 +372,9 @@ function isValidCreateColonoInput(data: unknown): data is AdminCreateColonoInput
     typeof d.name === 'string' &&
     typeof d.street === 'string' &&
     typeof d.streetNumber === 'string' &&
-    typeof d.phone === 'string'
+    typeof d.phone === 'string' &&
+    // El SDK de callables serializa `undefined` como null.
+    (d.email == null || typeof d.email === 'string')
   )
 }
 
@@ -376,6 +406,8 @@ export const adminCreateColono = onCall(
     if (!isValidStreet(street)) throw new HttpsError('invalid-argument', 'invalid-street')
     if (!streetNumber.trim()) throw new HttpsError('invalid-argument', 'invalid-street-number')
     if (!isValidMxPhone(phone)) throw new HttpsError('invalid-argument', 'invalid-phone')
+    const email = parseOptionalGmail(request.data.email)
+    if (email && await isGmailTaken(email)) throw new HttpsError('already-exists', 'email-already-registered')
 
     const addressKey = normalizeAddress(street, streetNumber)
     const addressRef = db.doc(`addresses/${addressKey}`)
@@ -419,7 +451,7 @@ export const adminCreateColono = onCall(
           address,
           addressNormalized: addressKey,
           phone,
-          email: null,
+          email,
           role: 'colono',
           status: 'active',
           createdAt: FieldValue.serverTimestamp(),
@@ -677,6 +709,107 @@ export const adminSetUserRole = onCall(
     await getAuth().setCustomUserClaims(uid, { role })
 
     return { success: true }
+  },
+)
+
+// Cambia (o borra, con '') el gmail de un colono — el correo con el que
+// puede entrar con Google (ver linkGoogleAccount abajo). Admin/super-admin,
+// mismo criterio que adminCreateColono. Pasa por aquí y no por un write
+// directo a Firestore porque el correo es credencial de login: hay que
+// validar que sea gmail y único, y firestore.rules bloquea cambiar `email`
+// desde el cliente (salvo super-admin, mismo gap que `role`).
+//
+// Si el colono ya había vinculado Google con su correo anterior, se
+// desvincula — si no, quitarle el correo no le quitaría el acceso.
+export const adminSetColonoEmail = onCall(
+  { region: 'us-central1', enforceAppCheck: true },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'unauthenticated')
+    }
+    const callerSnap = await db.doc(`users/${request.auth.uid}`).get()
+    const callerRole = callerSnap.get('role')
+    if (!callerSnap.exists || (callerRole !== 'admin' && callerRole !== 'super-admin')) {
+      throw new HttpsError('permission-denied', 'admin-only')
+    }
+
+    const { uid, email: rawEmail } = (request.data ?? {}) as { uid?: unknown; email?: unknown }
+    if (typeof uid !== 'string' || !uid || typeof rawEmail !== 'string') {
+      throw new HttpsError('invalid-argument', 'invalid-argument')
+    }
+    const email = parseOptionalGmail(rawEmail)
+
+    const userRef = db.doc(`users/${uid}`)
+    const userSnap = await userRef.get()
+    if (!userSnap.exists) {
+      throw new HttpsError('not-found', 'user-not-found')
+    }
+    if ((userSnap.get('email') ?? null) === email) return { success: true }
+    if (email && await isGmailTaken(email, uid)) {
+      throw new HttpsError('already-exists', 'email-already-registered')
+    }
+
+    const authUser = await getAuth().getUser(uid)
+    const providers = authUser.providerData.map((p) => p.providerId)
+    if (providers.includes('google.com')) {
+      // Una cuenta que nació con Google (sin teléfono) se quedaría sin forma
+      // de entrar si le quitamos el proveedor.
+      if (providers.length === 1) {
+        throw new HttpsError('failed-precondition', 'google-only-account')
+      }
+      await getAuth().updateUser(uid, { providersToUnlink: ['google.com'] })
+    }
+
+    await userRef.update({ email })
+    return { success: true }
+  },
+)
+
+// Entrar con Google para colonos dados de alta por teléfono (los SMS de
+// OTP no llegan en algunas compañías). Esas cuentas de Auth no tienen
+// Google vinculado, así que el popup de Google crea una cuenta NUEVA (otro
+// uid, sin perfil) — esta función la "reclama": si el gmail verificado por
+// Google coincide con el `email` de exactamente un colono activo, borra la
+// cuenta temporal y vincula ese Google a la cuenta original. El cliente
+// vuelve a entrar con la misma credencial de Google y cae en su uid de
+// siempre; desde ahí, Google entra directo sin pasar por aquí.
+//
+// Solo confía en el correo del token (verificado por Google), nunca en uno
+// que mande el cliente.
+export const linkGoogleAccount = onCall(
+  { region: 'us-central1', enforceAppCheck: true },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'unauthenticated')
+    }
+    const token = request.auth.token
+    const email = googleLinkEmail(token)
+    const googleUid = token.firebase.identities?.['google.com']?.[0] as string | undefined
+    if (!email || !googleUid) {
+      throw new HttpsError('permission-denied', 'not-gmail')
+    }
+
+    const snap = await db.collection('users').where('email', '==', email).get()
+    const target = pickGoogleLinkTarget(snap.docs.map((d) => ({ uid: d.id, status: d.get('status') })))
+    if (!target.ok) {
+      throw new HttpsError('not-found', target.code)
+    }
+
+    const tempUid = request.auth.uid
+    if (target.uid === tempUid) return { linked: false }
+    // La cuenta temporal no debe tener perfil — si lo tuviera, sería una
+    // cuenta real y no la estaríamos reclamando.
+    if ((await db.doc(`users/${tempUid}`).get()).exists) {
+      throw new HttpsError('failed-precondition', 'account-has-profile')
+    }
+
+    // Borrar primero: Auth no permite vincular un proveedor que ya
+    // pertenece a otra cuenta.
+    await getAuth().deleteUser(tempUid)
+    await getAuth().updateUser(target.uid, {
+      providerToLink: { providerId: 'google.com', uid: googleUid, email },
+    })
+    return { linked: true }
   },
 )
 
