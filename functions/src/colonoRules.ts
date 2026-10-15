@@ -35,3 +35,42 @@ export function isValidColonoName(name: string): boolean {
 export function isValidMxPhone(phone: string): boolean {
   return /^\+52\d{10}$/.test(phone)
 }
+
+// Normaliza (trim + minúsculas) y valida que sea una cuenta @gmail.com — el
+// único dominio aceptado para entrar con Google (ver linkGoogleAccount en
+// index.ts). Devuelve null si no es válido. No quita puntos: Google los
+// ignora, pero aquí se compara literal, así que el admin captura el correo
+// tal como lo usa el colono. Espejo en src/services/userRules.ts.
+export function normalizeGmail(email: string): string | null {
+  const normalized = email.trim().toLowerCase()
+  return /^[a-z0-9._%+-]+@gmail\.com$/.test(normalized) ? normalized : null
+}
+
+// Subconjunto de request.auth.token que importa para vincular Google.
+export interface GoogleLinkToken {
+  email?: string
+  email_verified?: boolean
+  firebase: { sign_in_provider: string }
+}
+
+// Gmail normalizado de un login de Google con correo verificado por Google,
+// o null si el token no sirve para vincular (otro proveedor, sin verificar,
+// o un dominio distinto de gmail.com).
+export function googleLinkEmail(token: GoogleLinkToken): string | null {
+  if (token.firebase.sign_in_provider !== 'google.com' || token.email_verified !== true || !token.email) return null
+  return normalizeGmail(token.email)
+}
+
+export type GoogleLinkTarget = { ok: true; uid: string } | { ok: false; code: 'gmail-not-found' | 'gmail-ambiguous' }
+
+// Dado los perfiles con ese gmail, decide a qué cuenta vincular Google: debe
+// haber exactamente un colono activo (status ausente = activo, usuarios
+// antiguos). Dos activos con el mismo correo es ambiguo — se rechaza en vez
+// de adivinar, porque vincular a la cuenta equivocada le daría acceso a otra
+// persona.
+export function pickGoogleLinkTarget(profiles: { uid: string; status?: string }[]): GoogleLinkTarget {
+  const active = profiles.filter((p) => (p.status ?? 'active') === 'active')
+  if (active.length === 0) return { ok: false, code: 'gmail-not-found' }
+  if (active.length > 1) return { ok: false, code: 'gmail-ambiguous' }
+  return { ok: true, uid: active[0].uid }
+}

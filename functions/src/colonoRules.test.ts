@@ -5,6 +5,9 @@ import {
   normalizeAddress,
   isValidColonoName,
   isValidMxPhone,
+  normalizeGmail,
+  googleLinkEmail,
+  pickGoogleLinkTarget,
 } from './colonoRules'
 
 describe('isValidStreet', () => {
@@ -92,5 +95,71 @@ describe('isValidMxPhone', () => {
 
   it('rechaza caracteres no numéricos', () => {
     expect(isValidMxPhone('+525512345abc')).toBe(false)
+  })
+})
+
+describe('normalizeGmail', () => {
+  it('acepta un gmail y lo normaliza a minúsculas sin espacios', () => {
+    expect(normalizeGmail('  Juan.Perez@Gmail.com ')).toBe('juan.perez@gmail.com')
+  })
+
+  it('rechaza otros dominios, incluso de Google Workspace', () => {
+    expect(normalizeGmail('juan@empresa.com')).toBeNull()
+    expect(normalizeGmail('juan@googlemail.com')).toBeNull()
+  })
+
+  it('rechaza correos mal formados', () => {
+    expect(normalizeGmail('')).toBeNull()
+    expect(normalizeGmail('@gmail.com')).toBeNull()
+    expect(normalizeGmail('juan perez@gmail.com')).toBeNull()
+    expect(normalizeGmail('juan@gmail.com.mx')).toBeNull()
+  })
+})
+
+describe('googleLinkEmail', () => {
+  const token = { email: 'Juan@gmail.com', email_verified: true, firebase: { sign_in_provider: 'google.com' } }
+
+  it('devuelve el gmail normalizado de un login de Google verificado', () => {
+    expect(googleLinkEmail(token)).toBe('juan@gmail.com')
+  })
+
+  it('rechaza un login que no es de Google', () => {
+    expect(googleLinkEmail({ ...token, firebase: { sign_in_provider: 'phone' } })).toBeNull()
+  })
+
+  it('rechaza un correo no verificado', () => {
+    expect(googleLinkEmail({ ...token, email_verified: false })).toBeNull()
+  })
+
+  it('rechaza una cuenta de Google que no es gmail', () => {
+    expect(googleLinkEmail({ ...token, email: 'juan@empresa.com' })).toBeNull()
+  })
+
+  it('rechaza un token sin correo', () => {
+    expect(googleLinkEmail({ ...token, email: undefined })).toBeNull()
+  })
+})
+
+describe('pickGoogleLinkTarget', () => {
+  it('elige al único colono activo con ese correo', () => {
+    expect(pickGoogleLinkTarget([{ uid: 'a', status: 'active' }])).toEqual({ ok: true, uid: 'a' })
+  })
+
+  it('trata un perfil sin status como activo (usuarios antiguos)', () => {
+    expect(pickGoogleLinkTarget([{ uid: 'a' }])).toEqual({ ok: true, uid: 'a' })
+  })
+
+  it('ignora perfiles pendientes o rechazados', () => {
+    expect(pickGoogleLinkTarget([{ uid: 'a', status: 'pending' }, { uid: 'b', status: 'rejected' }]))
+      .toEqual({ ok: false, code: 'gmail-not-found' })
+  })
+
+  it('rechaza si nadie tiene ese correo', () => {
+    expect(pickGoogleLinkTarget([])).toEqual({ ok: false, code: 'gmail-not-found' })
+  })
+
+  it('rechaza si dos colonos activos comparten el correo', () => {
+    expect(pickGoogleLinkTarget([{ uid: 'a' }, { uid: 'b', status: 'active' }]))
+      .toEqual({ ok: false, code: 'gmail-ambiguous' })
   })
 })
