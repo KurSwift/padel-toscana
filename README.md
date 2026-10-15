@@ -104,9 +104,9 @@ en producción real con `--confirm`).
   Plan Blaze (de pago) — lo requiere `functions/`.
 - `functions/` es un proyecto TypeScript aparte (su propio
   `package.json`/`tsconfig.json`, no forma parte de `tsc -b` de la raíz) —
-  siete Cloud Functions para las operaciones que necesitan Admin SDK
-  (crear reservaciones, alta/baja de colonos, asignar roles, lecturas
-  pre-auth y alta masiva). Ver AGENTS.md para el detalle de cada una.
+  nueve Cloud Functions para las operaciones que necesitan Admin SDK
+  (crear reservaciones, alta/baja de colonos, asignar roles y correo,
+  vincular Google, lecturas pre-auth y alta masiva). Ver AGENTS.md para el detalle de cada una.
 - Deploy de hosting + reglas de Firestore:
   ```bash
   npm run build
