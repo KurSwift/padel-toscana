@@ -31,3 +31,13 @@ export function hasAllowedRole(role: UserRole | undefined, allowedRoles?: UserRo
 export function canAssignRole(actorRole: UserRole): boolean {
   return actorRole === 'super-admin'
 }
+
+// Normaliza (trim + minúsculas) y valida que sea @gmail.com — el único
+// dominio con el que un colono puede entrar con Google. Devuelve null si no
+// es válido. Espejo de normalizeGmail en functions/src/colonoRules.ts, que es
+// la autoridad real (adminCreateColono/adminSetColonoEmail); aquí solo da
+// feedback inmediato en el formulario.
+export function normalizeGmail(email: string): string | null {
+  const normalized = email.trim().toLowerCase()
+  return /^[a-z0-9._%+-]+@gmail\.com$/.test(normalized) ? normalized : null
+}
