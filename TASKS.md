@@ -5,7 +5,15 @@ No es un roadmap con fechas — es una lista de candidatos a convertirse en
 issues de GitHub cuando se prioricen. Cada una, al implementarse, sigue el
 flujo normal del repo: su propio branch + PR (ver AGENTS.md).
 
-## 1. Eliminar autenticación por correo
+## 1. ~~Eliminar autenticación por correo~~ — descartada
+
+**Descartada** (2026-10-15): se decidió lo contrario. Algunas compañías
+bloquean los SMS de OTP de Firebase, así que Google Sign-In se habilitó
+para **cualquier** colono con un `@gmail.com` capturado en su perfil (ver
+"Flujo de alta y login" en CONTEXT.md, `linkGoogleAccount` en
+`functions/src/index.ts`). La excepción `GOOGLE_LOGIN_ADDRESS` ya no
+existe. Se conserva el texto original abajo como historia.
+
 
 Quitar el inicio de sesión con Google (`signInWithGoogle()` en
 `src/services/auth.ts`, botón correspondiente en `LoginPage.tsx`) y dejar

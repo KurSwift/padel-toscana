@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canActOnUser, canAssignRole, hasAllowedRole } from './userRules'
+import { canActOnUser, canAssignRole, hasAllowedRole, normalizeGmail } from './userRules'
 
 describe('canActOnUser', () => {
   it('permite actuar sobre otro usuario (cambiar rol o eliminar)', () => {
@@ -42,5 +42,17 @@ describe('hasAllowedRole', () => {
 
   it('bloquea cuando el rol es undefined pero se requiere uno específico', () => {
     expect(hasAllowedRole(undefined, ['admin'])).toBe(false)
+  })
+})
+
+describe('normalizeGmail', () => {
+  it('acepta un gmail y lo normaliza a minúsculas sin espacios', () => {
+    expect(normalizeGmail('  Juan.Perez@Gmail.com ')).toBe('juan.perez@gmail.com')
+  })
+
+  it('rechaza otros dominios y correos mal formados', () => {
+    expect(normalizeGmail('juan@empresa.com')).toBeNull()
+    expect(normalizeGmail('@gmail.com')).toBeNull()
+    expect(normalizeGmail('juan@gmail.com.mx')).toBeNull()
   })
 })

@@ -110,7 +110,7 @@ ver de un vistazo qué días están ocupados, dentro de la ventana configurable
 de anticipación. Cancha conserva la navegación por día porque sus
 reservaciones son por horario.
 
-## Flujo de alta y login (actualizado 2026-08-30 — reemplaza el auto-registro)
+## Flujo de alta y login (actualizado 2026-10-15 — login con Google para colonos con gmail)
 
 Desde el alta de colonos por admin (ver Epic
 [#33](https://github.com/KurSwift/padel-toscana/pull/33)), ya no hay
@@ -118,7 +118,8 @@ auto-registro por default. El flujo real:
 
 1. **Alta**: un admin (o `super-admin` — ver "Roles" arriba) va a
    `/configuracion` → Usuarios → "Agregar colono", captura
-   nombre, calle, número y teléfono. `adminCreateColono`
+   nombre, calle, número, teléfono y, opcional, su correo `@gmail.com`
+   (para entrar con Google, ver paso 3). `adminCreateColono`
    (`functions/src/index.ts`, Cloud Function con Admin SDK) crea la cuenta
    de Firebase Auth (por teléfono) + `users/{uid}` con `status: 'active'`
    **de inmediato** (sin paso de aprobación) + actualiza
@@ -132,10 +133,37 @@ auto-registro por default. El flujo real:
    por IP en una ventana fija de 5 minutos; la IP se guarda solo como hash en
    `lookupRateLimits`. Si nadie está registrado en ese domicilio, error — no
    hay fallback a auto-registro.
-3. **Excepción hardcodeada**: `GOOGLE_LOGIN_ADDRESS = 'nogal 35'` en
-   `LoginPage.tsx` — solo esa cuenta (la admin original, que predata este
-   modelo) puede entrar con Google. Cualquier otro domicilio solo tiene
-   teléfono.
+3. **Login con Google** (2026-10-15 — algunas compañías bloquean los SMS
+   de OTP de Firebase): después del saludo, "Continuar con Google" aparece
+   para **cualquier** domicilio, como alternativa al teléfono. Solo
+   funciona si el admin capturó el `@gmail.com` del colono (al darlo de
+   alta, o después con "Agregar correo de Gmail"/"Editar correo" en
+   `/configuracion` → Usuarios → `adminSetColonoEmail`). Solo se aceptan
+   `@gmail.com` (no Google Workspace); se comparan en minúsculas, sin
+   quitar puntos — el admin captura el correo tal como lo usa el colono.
+   - La cuenta de Auth del colono nació por teléfono, así que el primer
+     popup de Google crea una cuenta **nueva** (otro uid, sin perfil).
+     `LoginPage` lo detecta y llama a `linkGoogleAccount`
+     (`functions/src/index.ts`): toma el gmail **verificado por Google**
+     del token (nunca uno que mande el cliente), busca el único colono
+     activo con ese `email` (`pickGoogleLinkTarget` — si hay cero o más
+     de uno, rechaza), borra la cuenta temporal y vincula ese Google a la
+     cuenta original. El cliente vuelve a entrar con la misma credencial
+     (sin otro popup) y cae en su uid de siempre, con sus reservaciones.
+     Desde el segundo login, Google entra directo. El teléfono sigue
+     funcionando en la misma cuenta.
+   - Si el admin cambia o borra el correo de un colono que ya vinculó
+     Google, `adminSetColonoEmail` lo desvincula — si no, quitarle el
+     correo no le quitaría el acceso. No aplica a una cuenta que nació
+     con Google sin teléfono (la admin original de `nogal 35`): ahí se
+     rechaza el cambio (`google-only-account`) porque se quedaría sin
+     forma de entrar.
+   - `email` es por esto credencial de login: `firestore.rules` impide
+     cambiarlo directo (dueño y admin) — ver AGENTS.md → "La regla más
+     importante del repo".
+   - La antigua excepción hardcodeada (`GOOGLE_LOGIN_ADDRESS = 'nogal
+     35'`) se quitó: esa cuenta nació con Google, así que entra directo
+     por la misma vía.
 4. Si el perfil no existe tras autenticar, la persona no puede entrar
    (mensaje pidiendo contactar al admin) — ya no se manda a `/registro`.
 
@@ -289,7 +317,12 @@ Cuatro pestañas — la cuarta solo la ve `super-admin` (`AdminPage.tsx`,
 - **Usuarios**: aprobar/rechazar pendientes, agregar colonos nuevos
   directamente (`adminCreateColono`) o en bloque desde un archivo JSON
   (`adminBulkCreateColonos`, con vista previa antes de confirmar — mismo
-  formato que `scripts/preregister-colonos.mjs`). El rol de cada usuario se
+  formato que `scripts/preregister-colonos.mjs`). Cada colono activo tiene
+  "Agregar correo de Gmail"/"Editar correo" (`adminSetColonoEmail`) — el
+  `@gmail.com` con el que puede entrar con Google; vacío lo quita. El
+  alta en bloque y `preregister-colonos.mjs` todavía aceptan cualquier
+  correo sin validar gmail ni unicidad (un duplicado hace que el login
+  con Google lo rechace). El rol de cada usuario se
   muestra aquí de **solo lectura** — asignarlo se movió a Avanzado (#38/#39).
 - **Avanzado** (`AdvancedTab`, exclusivo de super-admin):
   - **Usuarios**: mismo listado que la pestaña Usuarios, pero con
@@ -441,7 +474,7 @@ es una dimensión disponible ni buscada.
 
 | Colección | Documento | Notas |
 |---|---|---|
-| `users/{uid}` | `UserProfile` | `addressNormalized` = `"{street} {number}"` en minúsculas, usado como llave de `addresses`. |
+| `users/{uid}` | `UserProfile` | `addressNormalized` = `"{street} {number}"` en minúsculas, usado como llave de `addresses`. `email` (opcional, `@gmail.com` en minúsculas, único entre colonos) es credencial de login con Google — solo cambia vía `adminCreateColono`/`adminSetColonoEmail`, ver "Flujo de alta y login". |
 | `addresses/{addressKey}` | `{ uids: string[] }` | Máximo 2 `uids`. Lectura pública (se usa antes de autenticar, para validar disponibilidad de domicilio en el registro). |
 | `mail/{autoId}` | `{ to, message: { subject, html } }` | Solo creación por la app; lectura/actualización/borrado bloqueados — los procesa la extensión de correo. |
 | `rateLimits/{uid}` | `{ windowStart: Timestamp, count: number }` | Rate limiting de `createReservation` (ventana fija, ver `functions/src/rateLimit.ts`). Solo la Cloud Function (Admin SDK) la toca — bloqueada por completo para el cliente en `firestore.rules`. |
@@ -457,16 +490,16 @@ shape de estos documentos en el cliente.
 ## Autenticación y seguridad
 
 - **Métodos**: teléfono (+52 México, OTP vía `RecaptchaVerifier` invisible)
-  para todos; Google (popup) solo para el domicilio hardcodeado en
-  `LoginPage.tsx` (`GOOGLE_LOGIN_ADDRESS`) — ver "Flujo de alta y login"
-  arriba.
+  y Google (popup) para cualquier colono con su `@gmail.com` capturado por
+  el admin — ver "Flujo de alta y login" arriba.
 - **App Check** (`src/firebase.ts`) con reCAPTCHA v3 está siempre activo,
   incluso en dev — en local se apoya en el modo debug-token (ver README y
   AGENTS.md; para `npm run test:e2e` específicamente hace falta un debug
-  token fijo vía `VITE_APPCHECK_DEBUG_TOKEN`, ver AGENTS.md). Las siete
+  token fijo vía `VITE_APPCHECK_DEBUG_TOKEN`, ver AGENTS.md). Las nueve
   Cloud Functions (`createReservation`, `adminCreateColono`,
   `adminBulkCreateColonos`, `adminDeleteColono`, `adminSetUserRole`,
-  `getResidentsByAddress`, `getPublicCalendar`) tienen `enforceAppCheck: true`.
+  `adminSetColonoEmail`, `linkGoogleAccount`, `getResidentsByAddress`,
+  `getPublicCalendar`) tienen `enforceAppCheck: true`.
 - La autorización real vive en `firestore.rules`; el cliente nunca debe ser la
   única línea de defensa para nada sensible (roles, límites, integridad de
   reservaciones).
@@ -474,7 +507,7 @@ shape de estos documentos en el cliente.
 ## Gaps / deuda conocida (útil antes de asumir que "ya existe")
 
 - Casi toda la lógica vive en el cliente + reglas de Firestore. Las
-  excepciones son las siete funciones en `functions/` (Cloud Functions
+  excepciones son las nueve funciones en `functions/` (Cloud Functions
   v2): `createReservation` (existe porque crear una reservación necesita
   validar el límite de activas por usuario y traslapes de horario, algo
   que requiere queries agregadas que `firestore.rules` no puede hacer —
@@ -483,7 +516,10 @@ shape de estos documentos en el cliente.
   `reservations` por completo, `if false` — la función es la única vía),
   `adminCreateColono`/`adminBulkCreateColonos`/`adminDeleteColono`/`adminSetUserRole` (necesitan
   Admin SDK para crear/eliminar cuentas de Auth ajenas y setear custom
-  claims), y `getResidentsByAddress`/`getPublicCalendar` (ambas leen
+  claims), `adminSetColonoEmail`/`linkGoogleAccount` (cambiar el gmail de
+  un colono y vincular su login con Google — necesitan Admin SDK para
+  vincular/desvincular proveedores de Auth), y
+  `getResidentsByAddress`/`getPublicCalendar` (ambas leen
   Firestore pre-auth con Admin SDK — la primera para el saludo de login,
   la segunda para el calendario público de cancha/casa club, ver sección
   dedicada arriba). El proyecto está en plan Blaze por esto. Ver "La
@@ -491,12 +527,15 @@ shape de estos documentos en el cliente.
 - Hay tests unitarios (Vitest — `npm run test` para el cliente,
   `npm run test:functions` para `functions/`) para toda la lógica de
   negocio pura, tests de componentes (Testing Library, ej. `BookingSheet`,
-  `StatusBadge`) y cuatro flujos E2E con Playwright (`npm run test:e2e`, contra
+  `StatusBadge`) y cinco flujos E2E con Playwright (`npm run test:e2e`, contra
   emuladores): cancha (alta → login → reserva → pago → cancelación), Casa
   Club (depósito → pago → finalización → devolución → cancelación),
   navegación responsive (tab bar móvil/sidebar de tableta) y reserva por
   administración (beneficiario, autoría protegida, cancelación y rechazo
-  de suplantación).
+  de suplantación) y login con Google (gmail capturado por admin →
+  vinculación a la cuenta creada por teléfono). El caso "admin cambia el
+  correo de un colono ya vinculado" no está en e2e — el popup del
+  emulador de Auth se rompe tras desvincular Google (ver AGENTS.md).
 - Un super-admin autenticado puede cambiar el `role` de **cualquier**
   usuario, incluido el suyo propio, directo contra Firestore (la rama
   `isSuperAdmin()` de `allow update` en `users/{uid}` no distingue
