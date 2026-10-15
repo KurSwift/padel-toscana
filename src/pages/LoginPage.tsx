@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { RecaptchaVerifier, ConfirmationResult } from 'firebase/auth'
 import toast from 'react-hot-toast'
 import { auth } from '@/firebase'
-import { signInWithGoogle, sendPhoneOtp, verifyOtp, signOut } from '@/services/auth'
+import { signInWithGoogle, linkGoogleToColono, sendPhoneOtp, verifyOtp, signOut } from '@/services/auth'
 import { getResidentsByAddress, checkUserExists } from '@/services/users'
 import { VALID_STREETS, ValidStreet } from '@/types'
 import Logo from '@/components/Logo'
@@ -12,10 +12,13 @@ import { useSiteSettings } from '@/context/SiteSettingsContext'
 import { trackAnalyticsEvent } from '@/services/analytics'
 import { authErrorToAnalyticsCode } from '@/services/analyticsRules'
 
-// Excepción hardcodeada: esta es la única cuenta que predata el modelo de
-// alta por admin (entra con Google, no con teléfono asignado) — ver
-// TASKS.md. Cualquier otro domicilio solo tiene la opción de teléfono.
-const GOOGLE_LOGIN_ADDRESS = 'nogal 35'
+// Errores de linkGoogleAccount (functions/src/index.ts) al entrar con un
+// Google que todavía no está vinculado a ningún colono.
+const GOOGLE_LINK_ERRORS: Record<string, string> = {
+  'not-gmail': 'Solo puedes entrar con una cuenta @gmail.com.',
+  'gmail-not-found': 'No encontramos un colono con ese correo de Gmail. Contacta al administrador.',
+  'gmail-ambiguous': 'Ese correo está registrado a más de un colono. Contacta al administrador.',
+}
 
 const ERROR_MESSAGES: Record<string, string> = {
   'auth/invalid-phone-number': 'Número de teléfono inválido.',
@@ -124,8 +127,18 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const result = await signInWithGoogle()
-      await afterAuth(result.user.uid)
+      // Sin perfil = Google aún no vinculado al colono (alta por teléfono):
+      // se reclama por el gmail del perfil y se vuelve a entrar en su uid.
+      const uid = (await checkUserExists(result.user.uid)) ? result.user.uid : await linkGoogleToColono(result)
+      await afterAuth(uid)
     } catch (err) {
+      const linkError = GOOGLE_LINK_ERRORS[(err as Error).message]
+      if (linkError) {
+        await signOut()
+        trackAnalyticsEvent('login_failed', { role: 'anonymous', result: 'error', error_code: 'account-not-found' })
+        toast.error(linkError, { duration: 5000 })
+        return
+      }
       const msg = getErrorMessage(err)
       if (msg) toast.error(msg)
     } finally {
@@ -260,27 +273,23 @@ export default function LoginPage() {
               </button>
 
               <p className="text-sm text-gray-600 mb-5">
-                Bienvenid@ <span className="font-semibold text-gray-900">{residentNames.join(' y ')}</span>, ingresa tu número de teléfono para continuar
+                Bienvenid@ <span className="font-semibold text-gray-900">{residentNames.join(' y ')}</span>, entra con Google o con tu número de teléfono
               </p>
 
-              {`${street} ${streetNumber}`.trim().toLowerCase() === GOOGLE_LOGIN_ADDRESS && (
-                <>
-                  <button
-                    onClick={handleGoogleSignIn}
-                    disabled={loading}
-                    className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-xl py-3 px-4 text-gray-700 font-medium hover:bg-gray-50 transition disabled:opacity-50 mb-5"
-                  >
-                    <GoogleIcon />
-                    Continuar con Google
-                  </button>
+              <button
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-xl py-3 px-4 text-gray-700 font-medium hover:bg-gray-50 transition disabled:opacity-50 mb-5"
+              >
+                <GoogleIcon />
+                Continuar con Google
+              </button>
 
-                  <div className="flex items-center gap-3 mb-5">
-                    <div className="flex-1 h-px bg-gray-200" />
-                    <span className="text-sm text-gray-400">o</span>
-                    <div className="flex-1 h-px bg-gray-200" />
-                  </div>
-                </>
-              )}
+              <div className="flex items-center gap-3 mb-5">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-sm text-gray-400">o</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Número de celular</label>
