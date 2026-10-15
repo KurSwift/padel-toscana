@@ -5,8 +5,8 @@ import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
 import { Court, CourtSettings, CourtType, UserProfile, UserRole, Reservation, ReservationStatus, ValidStreet, VALID_STREETS } from '@/types'
 import { getAllCourts, updateCourtSettings, toggleCourtActive, createCourt, DEFAULT_COURT_SETTINGS_BY_TYPE } from '@/services/courts'
-import { getAllUsers, setUserRole, setUserRoleErrorMessage, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage, adminBulkCreateColonos, adminBulkCreateColonosErrorMessage, type BulkColonoResult, deleteColono, deleteColonoErrorMessage } from '@/services/users'
-import { canAssignRole, canActOnUser } from '@/services/userRules'
+import { getAllUsers, setUserRole, setUserRoleErrorMessage, approveUser, rejectUser, adminCreateColono, adminCreateColonoErrorMessage, adminBulkCreateColonos, adminBulkCreateColonosErrorMessage, type BulkColonoResult, deleteColono, deleteColonoErrorMessage, setColonoEmail, setColonoEmailErrorMessage } from '@/services/users'
+import { canAssignRole, canActOnUser, normalizeGmail } from '@/services/userRules'
 import { uploadLogo, getLogoUrl, uploadLogoErrorMessage } from '@/services/branding'
 import { setThemePalette } from '@/services/theme'
 import { updateSiteSettings, updateSiteSettingsErrorMessage } from '@/services/siteSettings'
@@ -748,7 +748,12 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
   const [newStreet, setNewStreet] = useState<ValidStreet | ''>('')
   const [newStreetNumber, setNewStreetNumber] = useState('')
   const [newPhoneDigits, setNewPhoneDigits] = useState('')
+  const [newEmail, setNewEmail] = useState('')
   const [creating, setCreating] = useState(false)
+  // Edición inline del gmail de un colono activo (para entrar con Google).
+  const [editingEmailUid, setEditingEmailUid] = useState<string | null>(null)
+  const [emailDraft, setEmailDraft] = useState('')
+  const [savingEmail, setSavingEmail] = useState(false)
   const [bulkResults, setBulkResults] = useState<BulkColonoResult[] | null>(null)
   const [bulkFileName, setBulkFileName] = useState('')
   const [previewingBulk, setPreviewingBulk] = useState(false)
@@ -770,6 +775,7 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
     setNewStreet('')
     setNewStreetNumber('')
     setNewPhoneDigits('')
+    setNewEmail('')
   }
 
   async function handleCreateColono() {
@@ -778,6 +784,8 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
     if (!newStreet) { toast.error('Selecciona la calle.'); return }
     if (!newStreetNumber.trim()) { toast.error('Ingresa el número del domicilio.'); return }
     if (newPhoneDigits.length !== 10) { toast.error('El teléfono debe tener 10 dígitos.'); return }
+    const email = newEmail.trim() ? normalizeGmail(newEmail) : undefined
+    if (email === null) { toast.error('El correo debe ser una cuenta @gmail.com.'); return }
 
     setCreating(true)
     try {
@@ -786,6 +794,7 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
         street: newStreet,
         streetNumber: newStreetNumber.trim(),
         phone: `+52${newPhoneDigits}`,
+        email,
       })
       const newProfile: UserProfile = {
         uid,
@@ -795,6 +804,7 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
         address: `${newStreet} ${newStreetNumber.trim()}`,
         addressNormalized: `${newStreet} ${newStreetNumber.trim()}`.toLowerCase(),
         phone: `+52${newPhoneDigits}`,
+        email,
         role: 'colono',
         status: 'active',
         createdAt: Timestamp.now(),
@@ -806,6 +816,23 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
       toast.error(adminCreateColonoErrorMessage((err as Error).message))
     } finally {
       setCreating(false)
+    }
+  }
+
+  /** Guarda (o borra, si queda vacío) el gmail del colono en edición. */
+  async function handleSaveEmail(uid: string) {
+    const email = emailDraft.trim() ? normalizeGmail(emailDraft) : ''
+    if (email === null) { toast.error('El correo debe ser una cuenta @gmail.com.'); return }
+    setSavingEmail(true)
+    try {
+      await setColonoEmail(uid, email)
+      setUsers((prev) => prev.map((u) => (u.uid === uid ? { ...u, email: email || undefined } : u)))
+      setEditingEmailUid(null)
+      toast.success(email ? 'Correo guardado.' : 'Correo eliminado.')
+    } catch (err) {
+      toast.error(setColonoEmailErrorMessage((err as Error).message))
+    } finally {
+      setSavingEmail(false)
     }
   }
 
@@ -928,6 +955,14 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
                 className="flex-1 px-3 py-2.5 text-gray-900 placeholder-gray-400 outline-none text-sm bg-white"
               />
             </div>
+            <input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="Correo de Gmail (opcional, para entrar con Google)"
+              aria-label="Correo de Gmail"
+              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+            />
             <div className="flex gap-2">
               <button
                 onClick={handleCreateColono}
@@ -1061,23 +1096,59 @@ function UsersTab({ onPendingChange }: { onPendingChange: (n: number) => void })
         )}
         <div className="space-y-2">
           {active.map((u) => (
-            <div key={u.uid} className="bg-white rounded-2xl px-4 py-3 shadow-sm flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-800 truncate">
-                  {u.name}
-                  {u.uid === currentUser?.uid && (
-                    <span className="ml-1.5 text-xs text-gray-400">(tú)</span>
-                  )}
-                </p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {u.street} {u.streetNumber}
-                  {(u.email || u.phone) && <span className="text-gray-300"> · </span>}
-                  {u.email ?? u.phone ?? ''}
-                </p>
+            <div key={u.uid} className="bg-white rounded-2xl px-4 py-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 truncate">
+                    {u.name}
+                    {u.uid === currentUser?.uid && (
+                      <span className="ml-1.5 text-xs text-gray-400">(tú)</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5 break-all">
+                    {[`${u.street} ${u.streetNumber}`, u.phone, u.email].filter(Boolean).join(' · ')}
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs font-medium text-gray-500 bg-gray-100 rounded-full px-2.5 py-1">
+                  {ROLE_LABELS[u.role]}
+                </span>
               </div>
-              <span className="shrink-0 text-xs font-medium text-gray-500 bg-gray-100 rounded-full px-2.5 py-1">
-                {ROLE_LABELS[u.role]}
-              </span>
+              {editingEmailUid === u.uid ? (
+                <div className="mt-3 space-y-2">
+                  <input
+                    type="email"
+                    value={emailDraft}
+                    onChange={(e) => setEmailDraft(e.target.value)}
+                    placeholder="nombre@gmail.com (vacío para quitarlo)"
+                    aria-label={`Correo de Gmail de ${u.name}`}
+                    autoFocus
+                    className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => void handleSaveEmail(u.uid)}
+                      disabled={savingEmail}
+                      className="flex-1 bg-brand-600 text-white text-xs font-semibold rounded-lg py-2 disabled:opacity-40 flex items-center justify-center"
+                    >
+                      {savingEmail ? <Spinner sm /> : 'Guardar'}
+                    </button>
+                    <button
+                      onClick={() => setEditingEmailUid(null)}
+                      disabled={savingEmail}
+                      className="flex-1 border border-gray-300 text-xs text-gray-600 rounded-lg py-2"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setEditingEmailUid(u.uid); setEmailDraft(u.email ?? '') }}
+                  className="mt-2 text-xs font-medium text-brand-700 hover:text-brand-800"
+                >
+                  {u.email ? 'Editar correo' : 'Agregar correo de Gmail'}
+                </button>
+              )}
             </div>
           ))}
         </div>
