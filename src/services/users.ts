@@ -191,6 +191,7 @@ export async function adminCreateColono(data: {
   street: ValidStreet
   streetNumber: string
   phone: string
+  email?: string
 }): Promise<{ uid: string }> {
   try {
     const result = await adminCreateColonoCallable(data)
@@ -207,6 +208,8 @@ const ADMIN_CREATE_COLONO_ERRORS: Record<string, string> = {
   'invalid-street': 'Selecciona una calle válida.',
   'invalid-street-number': 'Ingresa el número del domicilio.',
   'invalid-phone': 'El teléfono debe tener 10 dígitos.',
+  'invalid-email': 'El correo debe ser una cuenta @gmail.com.',
+  'email-already-registered': 'Este correo ya está registrado a otro colono.',
   'admin-only': 'No tienes permisos de administrador.',
 }
 
@@ -265,4 +268,29 @@ const DELETE_COLONO_ERRORS: Record<string, string> = {
 
 export function deleteColonoErrorMessage(code: string): string {
   return DELETE_COLONO_ERRORS[code] ?? 'No se pudo eliminar al usuario. Intenta de nuevo.'
+}
+
+// Cambia (o borra, con '') el gmail con el que un colono puede entrar con
+// Google. Admin/super-admin, validado en adminSetColonoEmail
+// (functions/src/index.ts) — firestore.rules bloquea cambiar `email` directo.
+const adminSetColonoEmailCallable = httpsCallable(functions, 'adminSetColonoEmail')
+
+export async function setColonoEmail(uid: string, email: string): Promise<void> {
+  try {
+    await adminSetColonoEmailCallable({ uid, email })
+  } catch (err) {
+    throw new Error((err as { message?: string }).message ?? 'unknown-error')
+  }
+}
+
+const SET_COLONO_EMAIL_ERRORS: Record<string, string> = {
+  'invalid-email': 'El correo debe ser una cuenta @gmail.com.',
+  'email-already-registered': 'Este correo ya está registrado a otro colono.',
+  'google-only-account': 'Esta cuenta solo entra con Google; no se le puede cambiar el correo.',
+  'user-not-found': 'Ese usuario ya no existe.',
+  'admin-only': 'No tienes permisos de administrador.',
+}
+
+export function setColonoEmailErrorMessage(code: string): string {
+  return SET_COLONO_EMAIL_ERRORS[code] ?? 'No se pudo guardar el correo. Intenta de nuevo.'
 }
