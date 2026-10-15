@@ -9,13 +9,15 @@ React 19 + TypeScript + Vite 6, Tailwind CSS 3, React Router 7, Firebase v11
 (Auth, Firestore, Storage, App Check) vía SDK modular. Sin servidor propio: casi
 toda la lógica de negocio vive en `src/services/*` y se refuerza en
 `firestore.rules`. La excepción es `functions/` (Cloud Functions v2,
-TypeScript) — siete funciones: `createReservation` (existe porque esa
+TypeScript) — nueve funciones: `createReservation` (existe porque esa
 validación requiere una query agregada que `firestore.rules` no puede
 hacer — ver "La regla más importante del repo" más abajo),
 `adminCreateColono`/`adminBulkCreateColonos`/`adminDeleteColono`/`adminSetUserRole`
 (alta individual o en bloque, baja de colonos y asignación de roles por
 admin — crean/eliminan cuentas de Auth ajenas y setean custom claims,
-Admin SDK), y `getResidentsByAddress`/`getPublicCalendar` (lecturas
+Admin SDK), `adminSetColonoEmail`/`linkGoogleAccount` (gmail del colono
+y vinculación de su login con Google a la cuenta creada por teléfono — ver
+"Flujo de alta y login" en CONTEXT.md), y `getResidentsByAddress`/`getPublicCalendar` (lecturas
 pre-auth con Admin SDK — saludo de login y calendario público de cancha/
 casa club, respectivamente). El proyecto está en plan Blaze (de pago) por
 esto.
@@ -79,13 +81,34 @@ cada corrida para no depender de cuántas reservaciones de ejemplo
 acumule ya el emulador (`npm run seed` no es idempotente para
 `reservations`, ver "Emuladores, seeds y push-to-prod" más abajo).
 `e2e/helpers.ts` automatiza `loginWithPhone`
-(domicilio + teléfono, la única forma de entrar hoy — ver "Flujo de alta y
-login" en CONTEXT.md) leyendo la OTP directo del endpoint de testing del
+(domicilio + teléfono — ver "Flujo de alta y login" en CONTEXT.md) leyendo la OTP directo del endpoint de testing del
 emulador de Auth (`/emulator/v1/projects/{id}/verificationCodes`) — no hay
 SMS real que esperar. El flujo de auto-registro sigue en el código
 (`RegisterPage.tsx`) pero sin punto de entrada desde `/login`, así que ya
 no tiene helper de e2e propio (se quitó `registerWithPhone` — ver nota en
 `e2e/helpers.ts` si hace falta reconstruirlo).
+
+`google-login-flow.spec.ts` cubre el login con Google: usa el popup de
+cuentas de prueba del emulador de Auth (no hay Google real). Dos trampas
+conocidas del entorno, no de la app:
+- **El popup del emulador se rompe tras desvincular Google** de una cuenta
+  (`adminSetColonoEmail` al cambiar el correo de un colono ya vinculado):
+  cualquier popup posterior responde `Internal assertion error: User ...
+  does not have providerInfo google.com`, incluso tras borrar esa cuenta.
+  Solo se arregla borrando todas las cuentas del emulador de Auth (`curl
+  -X DELETE http://127.0.0.1:9099/emulator/v1/projects/padel-toscana/accounts`
+  y luego `npm run seed`). Por eso el spec no ejercita ese caso — se
+  verifica a mano.
+- **Rate limit de `getResidentsByAddress`** (10 por IP cada 5 minutos,
+  `lookupRateLimits`): cada login del e2e consume una consulta, así que
+  varias corridas seguidas — o la suite completa — se topan con el tope y
+  fallan en el paso de domicilio (`getByPlaceholder('5512345678')` no
+  aparece). Espera 5 minutos o borra `lookupRateLimits` en el emulador.
+
+Si `.env.local` tiene `VITE_EMULATOR_HOST` (para probar desde el celular)
+y la IP de la Mac cambió, todos los specs fallan en el paso de domicilio
+con `ERR_CONNECTION_REFUSED` en consola — corre con
+`VITE_EMULATOR_HOST=127.0.0.1 npm run test:e2e` o actualiza la IP.
 
 ## Flujo de trabajo
 
@@ -144,12 +167,15 @@ e2e/                      # Playwright — npm run test:e2e, ver más abajo
   critical-flow.spec.ts   # alta por admin → login → reserva de cancha → pago → cancelación
   casa-club-flow.spec.ts  # reserva de casa club con depósito → pago → devolución de depósito → cancelación
   admin-reservation-flow.spec.ts  # admin reserva para colono, autoría y rechazo de suplantación
+  google-login-flow.spec.ts  # gmail capturado por admin → login con Google → vinculación a la cuenta
 functions/                # Cloud Functions v2 + TypeScript — build/deploy propios, ver "Comandos"
   src/index.ts             # createReservation, adminCreateColono/adminBulkCreateColonos/adminDeleteColono/adminSetUserRole,
+                            # adminSetColonoEmail, linkGoogleAccount,
                             # getResidentsByAddress, getPublicCalendar (todas onCall)
   src/reservationRules.ts  # copia de la lógica pura que necesita (ver comentario de cabecera)
   src/bookingRules.ts       # permisos para crear reservaciones por administración (espejo en src/services/)
-  src/colonoRules.ts        # lógica pura de alta de colonos (calle válida, cupo, teléfono) — sin mirror en src/
+  src/colonoRules.ts        # lógica pura de alta de colonos (calle válida, cupo, teléfono) y de login con Google
+                            # (normalizeGmail — espejo en src/services/userRules.ts —, googleLinkEmail, pickGoogleLinkTarget)
   src/rateLimit.ts           # rate limiting genérico (ventana fija), usado por createReservation
   src/time.ts               # copia de src/utils/time.ts (toDate/addHours) + monthDateRange (solo acá)
 ```
@@ -242,6 +268,17 @@ cualquier otro usuario es exclusivo de super-admin — reforzado ahí mismo
 elimine a sí mismo, mismo check que `canActOnUser` en
 `src/services/userRules.ts` usa del lado del cliente para bloquear
 auto-cambio de rol y auto-eliminación).
+
+**`email` en `users/{uid}` es credencial de login** (desde 2026-10-15):
+`linkGoogleAccount` (`functions/src/index.ts`) vincula un login de Google
+a la cuenta cuyo `email` coincide con el gmail verificado por Google. Por
+eso `allow update` bloquea cambiar `email` al dueño y al admin (si no, un
+colono podría poner el gmail de otro y robarle el acceso, o duplicarlo) —
+solo cambia vía `adminSetColonoEmail` (y al crear, vía
+`adminCreateColono`), que validan `@gmail.com` (`normalizeGmail`, espejo
+en `src/services/userRules.ts` para el formulario) y unicidad, y
+desvinculan Google si el correo cambia. La rama `isSuperAdmin()` sigue sin
+restricción — mismo gap documentado que `role` en CONTEXT.md.
 
 **Crear una reservación es la excepción a ese patrón de dos lugares — son
 tres.** El límite de reservaciones activas por usuario
